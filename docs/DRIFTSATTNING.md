@@ -60,19 +60,32 @@ och lägger upp `onSnapshot`-lyssnare för realtid.
 ## 4. Bjuda in fler lärare — skapa konton
 
 Det finns ingen självregistrering (medvetet — inga elever ska kunna
-skapa konton). Du skapar ett konto per lärare i konsolen:
+skapa konton). Lärarna loggar in med **bara sitt förnamn** (eller
+initialer) + lösenord — ingen e-postadress. Firebase Auth kräver dock
+e-post bakom kulisserna, så appen lägger automatiskt på en **fast, dold
+domän `@klassrum.local`**: läraren skriver `elias`, appen loggar in som
+`elias@klassrum.local`. Domänen syns aldrig i gränssnittet.
+
+Du skapar därför kontona med samma mönster i konsolen:
 
 1. **Authentication** → fliken **Users** → **Lägg till användare**.
-2. Fyll i lärarens **e-post** och ett **startlösenord**, spara.
-3. Ge läraren e-post + lösenord. Vid första inloggningen på en ny enhet
-   krävs nät; därefter fungerar appen även offline för den läraren.
+2. I **E-post**-fältet: skriv `förnamn@klassrum.local`, t.ex.
+   `elias@klassrum.local` (gemener, inga mellanslag). Sätt ett
+   **startlösenord**, spara.
+3. Ge läraren bara **förnamnet** (`elias`) och lösenordet — inte
+   domänen. Vid första inloggningen på en ny enhet krävs nät; därefter
+   fungerar appen även offline för den läraren.
+
+> Krockar två lärare på förnamn (två "Anna"): använd t.ex.
+> `anna` och `annab` (eller initialer) — det läraren skriver måste
+> matcha delen före `@klassrum.local` i kontot.
 
 Alla inloggade lärare delar samma klasser, elever, noteringar, pass och
 klassinställningar och ser varandras ändringar i realtid. **Lektions­-
 planeringar är privata** per lärare — var och en ser bara sina egna.
 
 > Vill en lärare byta lösenord: gör det i **Authentication → Users**
-> (tre prickar → återställ lösenord), eller skicka återställningsmejl.
+> (tre prickar → återställ lösenord).
 
 ## 5. Deploya säkerhetsreglerna
 
@@ -139,7 +152,7 @@ innan lärarna hunnit lägga in lokal data.
 |---|---|
 | Status fastnar på "Offline" fast nätet funkar | Reglerna inte deployade, eller inte inloggad → Firestore nekar (`permission-denied`). Kontrollera steg 3–5. |
 | "Missing or insufficient permissions" i konsolloggen | Säkerhetsreglerna saknas/är fel deployade. Kör om steg 5. |
-| Inloggning misslyckas för en lärare | Kontot saknas i Authentication (steg 4), eller fel e-post/lösenord. |
+| Inloggning misslyckas för en lärare | Kontot saknas i Authentication (steg 4), fel förnamn/lösenord, eller kontots e-post skapades utan `@klassrum.local`. Förnamnet läraren skriver måste matcha delen före `@klassrum.local`. |
 | Data syns lokalt men inte i konsolen | `apiKey` börjar fortfarande med `FYLL_I`, eller SDK:n blockeras (t.ex. nätverksbrandvägg mot `gstatic.com`). |
 
 Se även [AUTH.md](AUTH.md) (lösenordsväggen) och
