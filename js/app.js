@@ -13,6 +13,7 @@ import { createDataLayer } from "./data/datalayer.js";
 import { createRouter } from "./router.js";
 import { MODES, isStudentMode } from "./modes/registry.js";
 import { initClassPicker, ACTIVE_CLASS_KEY } from "./ui/class-picker.js";
+import { initQuickNote } from "./ui/quick-note.js";
 import { initStudentPanel } from "./ui/student-panel.js";
 import { initPraise } from "./ui/praise.js";
 import { createSyncBus, isPreviewWindow, announceStudentScreen, watchStudentScreen } from "./sync.js";
@@ -198,6 +199,10 @@ function startApp() {
   const signOutBtn = $("#sign-out");
   signOutBtn.innerHTML = icon("logout");
   signOutBtn.addEventListener("click", () => void auth.signOut());
+
+  // Snabbanteckning (F9) — fungerar i alla lägen, ALDRIG i elevvy-fönster
+  // (rutan vägrar öppnas där och stängs om vyn växlar; se ui/quick-note.js).
+  initQuickNote({ store, data });
 
   // Router
   const router = createRouter({ store, data, viewEl: $("#view"), sync: bus });
