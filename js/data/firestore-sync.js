@@ -50,10 +50,18 @@ export function createFirestoreSync({ firebaseConfig, onRemoteDocs, onStatus }) 
     try {
       const unsub = api.onSnapshot(
         api.collection(db, ...path.split("/")),
+        // includeMetadataChanges: vi får en extra händelse när samma data
+        // bekräftas från servern (fromCache: false). Det gör dels att
+        // synkstatusen slår om till "online" tillförlitligt, dels att
+        // fjärr-borttagningar bara verkställs på en auktoritativ snapshot.
+        { includeMetadataChanges: true },
         (snap) => {
           const docs = {};
           snap.forEach((d) => { docs[d.id] = d.data(); });
-          onRemoteDocs?.(path, docs);
+          // En snapshot från servern (ej cache) är auktoritativ: den listar
+          // ALLA dokument som finns i molnet, så det som saknas där är
+          // raderat av en annan lärare och ska tas bort även hos oss.
+          onRemoteDocs?.(path, docs, { authoritative: !snap.metadata.fromCache });
           onStatus?.(snap.metadata.fromCache ? "offline" : "online");
         },
         (err) => {

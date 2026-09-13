@@ -120,8 +120,14 @@
   top: 0.05em;
   width: 1.85rem;
   height: 1.85rem;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* line-height 1 gör att siffrans radbox blir lika hög som glyfen, så
+     flex-centreringen sätter siffran exakt mitt i ringen (både i höjd-
+     och sidled) — annars kan den ärvda radhöjden (1.35) putta ned siffran
+     så att den ser ur-centrerad ut, oavsett radhöjd på uppgiften. */
+  line-height: 1;
   font-size: 0.9em;
   font-weight: 700;
   color: var(--color-accent-ink, #17130a);

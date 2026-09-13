@@ -21,10 +21,6 @@ classes/{classId}/students/{studentId}  — elev i klassen
                        notering i Läge 4. Unik per klass; bara aktiv i
                        Läge 4:s registreringsflik.
 
-classes/{classId}/lessonPlans/{planId}  — lektionsplanering (Läge 2)
-  date: "2026-09-14" — ISO-datum; en planering per dag och klass är normalfallet
-  blocks: [ { start, end, subjectId, title, note } ]
-
 classes/{classId}/sessions/{sessionId}  — genomförda pass/resultat
                                           (trafikljuspass, aktiviteter; Läge 3/5)
   type: "trafikljus" | …
@@ -74,15 +70,40 @@ classes/{classId}/settings/display      — namnvisning (togglas i lärarvyn)
 teachers/{uid}                          — lärarprofil (se docs/AUTH.md)
   email, displayName
   classIds: ["…"]    — klasser läraren undervisar (för behörighetsregler)
+
+teachers/{uid}/classes/{classId}/lessonPlans/{planId}
+                     — lektionsplanering (Läge 2). PRIVAT per lärare:
+                       ligger under lärarens uid, inte under den delade
+                       klassnoden. Bara ägaren läser/skriver (firestore.rules).
+  ownerUid           — lärarens uid (= {uid} i pathen; gör ägaren explicit)
+  date: "2026-09-14" — ISO-datum; en planering per dag och klass är normalfallet
+  name, subjectId, start, end
+  fields: { … }      — planeringens innehåll (vad/hur/varför/…)
+  show: { … }        — vilka fält som visas på tavlan
 ```
+
+## Delat kontra privat
+
+- **DELAT mellan alla inloggade lärare** (läs+skriv, realtid via
+  onSnapshot): klasser, elever, noteringar, pass/resultat och
+  klassinställningar (allt under `classes/{classId}`). En lärare ser
+  alla andras noteringar på eleverna, sparade pass och delade
+  inställningar.
+- **PRIVAT per lärare**: lektionsplaneringar
+  (`teachers/{uid}/classes/{classId}/lessonPlans`). Varje lärare
+  planerar sina egna lektioner; ingen annan lärare kommer åt dem.
+  Pathen bär ägarskapet, så en klientlyssnare på det egna subträdet
+  behöver ingen `where`-filtrering (se `js/data/plans.js`).
 
 ## Motivering
 
-- **Allt klassdata under `classes/{id}`** — klassen är appens naturliga
+- **Delad klassdata under `classes/{id}`** — klassen är appens naturliga
   avgränsning: klassvalet i topbaren väljer i praktiken vilket subtree
   alla lägen läser/skriver. Det gör även Firestores säkerhetsregler
-  enkla (behörighet per klass, se docs/AUTH.md) och håller lyssnare
-  små (man prenumererar bara på vald klass).
+  enkla (delad läs/skriv för inloggade lärare, se docs/AUTH.md) och
+  håller lyssnare små (man prenumererar bara på vald klass). Undantaget
+  är lektionsplaneringar, som är privata per lärare och därför ligger
+  under `teachers/{uid}` i stället (se Delat kontra privat ovan).
 - **Subkollektioner i stället för arrayfält** (elever, planeringar,
   noteringar): dokument kan uppdateras oberoende av varandra, vilket
   minimerar synk-konflikter när flera lärare arbetar samtidigt —

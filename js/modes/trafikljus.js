@@ -14,7 +14,7 @@
  *                       (sessions). Se DATAMODELL.md / docs/SYNC.md.
  *
  * Kontrakt: samma modul renderar lärarvy och elevvy — förgrenar på
- * ctx.view. Elevvyn är REN: bara klocka, fas och kort instruktion.
+ * ctx.view. Elevvyn är REN: bara den stora klockan och färgfasen.
  */
 
 import { createTicker } from "../lib/timer.js";
@@ -29,26 +29,12 @@ const sessionsPath = (classId) => `classes/${classId}/sessions`;
 const DEFAULT_CONFIG = { yellowSec: 60, redSec: 120 };
 const MIN_SEC = 5;
 
-/** Faser: kort, lugn instruktionstext per fas (saklig ton mot eleverna). */
+/** Faser: bara färg + etikett. Ingen instruktionstext visas på skärmen
+    — den stora klockan och färgskiftet räcker (saklig ton mot eleverna). */
 const PHASES = {
-  green: {
-    key: "green",
-    label: "Grönt",
-    lead: "Plocka undan",
-    text: "Plocka undan och ställ in stolen.",
-  },
-  yellow: {
-    key: "yellow",
-    label: "Gult",
-    lead: "Snart tyst",
-    text: "Ställ dig bakom stolen — vi fasar ut till tystnad.",
-  },
-  red: {
-    key: "red",
-    label: "Rött",
-    lead: "Lånad tid",
-    text: "Övertid — lånad tid. Vi avslutar lugnt.",
-  },
+  green:  { key: "green",  label: "Grönt" },
+  yellow: { key: "yellow", label: "Gult" },
+  red:    { key: "red",    label: "Rött" },
 };
 
 // ---- Rena hjälpare (tidsstämpelbaserat, syncbart) ------------------------
@@ -160,8 +146,6 @@ export default {
 
     const stageEl = el.querySelector(".tl-stage");
     const clockEl = el.querySelector(".tl-clock");
-    const phaseTextEl = el.querySelector(".tl-phase-text");
-    const phaseLeadEl = el.querySelector(".tl-phase-lead");
 
     // -- Ritning (både vyer) -----------------------------------------------
 
@@ -170,11 +154,10 @@ export default {
       const sec = Math.floor(elapsedMs(timer, now) / 1000);
       const phase = phaseFor(sec, config);
       clockEl.textContent = fmtMMSS(elapsedMs(timer, now));
+      // Fasen styr bara färgen (data-phase) — ingen instruktionstext.
       stageEl.dataset.phase = phase.key;
       stageEl.dataset.running = String(!!timer && timer.pausedAt == null);
       stageEl.dataset.stopped = String(!!timer && timer.pausedAt != null);
-      if (phaseLeadEl) phaseLeadEl.textContent = phase.lead;
-      phaseTextEl.textContent = phase.text;
       if (!isStudent) drawControls();
     }
 
@@ -400,13 +383,11 @@ export default {
 // ---- Markup-mallar --------------------------------------------------------
 
 function stageMarkup() {
+  // Ren scen: bara stor klocka + färgfas (bakgrunden via data-phase).
+  // Ingen instruktionstext per fas — färgen och tiden räcker.
   return `
     <div class="tl-stage" data-phase="green" data-running="false" data-stopped="false">
       <div class="tl-clock" role="timer" aria-live="off">00:00</div>
-      <div class="tl-phase">
-        <span class="tl-phase-lead">${PHASES.green.lead}</span>
-        <span class="tl-phase-text">${PHASES.green.text}</span>
-      </div>
     </div>`;
 }
 

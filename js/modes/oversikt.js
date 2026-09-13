@@ -21,6 +21,7 @@ import { loadNameDisplay, saveNameDisplay } from "./elever/shared.js";
 import {
   loadPrivacy, savePrivacy, RETENTION_OPTIONS, deleteAllClassData,
 } from "../lib/privacy.js";
+import { plansPath as plansPathFor } from "../data/plans.js";
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -241,7 +242,8 @@ export default {
 
     const cid = activeId();
     if (cid) {
-      this._offs.push(data.watch(`classes/${cid}/lessonPlans`, (docs) => { plans = docs; render(); }));
+      // Planeringar är privata per lärare — visa bara den inloggades egna.
+      this._offs.push(data.watch(plansPathFor(cid), (docs) => { plans = docs; render(); }));
       this._offs.push(data.watch(`classes/${cid}/settings`, (docs) => {
         settingsDocs = docs;
         initials = docs.find((d) => d.id === "display")?.value?.nameDisplay === "initials";
