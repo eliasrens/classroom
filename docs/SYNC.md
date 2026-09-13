@@ -40,14 +40,27 @@ const off = ctx.sync.on(type, cb);   // cb({ type, payload, from, at })
 
 | Typ | Riktning | Payload | När |
 |---|---|---|---|
-| `state` | lärare → alla | `{ modeId, classId }` | Vid varje läges-/klassbyte i lärarvyn, och som svar på `state:request` |
+| `state` | lärare → alla | `{ classId }` | Vid varje klassbyte i lärarvyn, och som svar på `state:request` |
+| `present` | lärare → alla | `{ modeId }` | Läraren skickar ut ett läge ("Visa på elevskärm"), och som svar på `state:request` |
 | `state:request` | elev → lärare | — | Nyöppnad elevskärm vill ha aktuellt tillstånd |
 | `teacher:ping` | lärare → alla | — | Varannan sekund (presence) |
 | `student:hello` / `student:pong` / `student:bye` | elev → lärare | — | Presence-livstecken |
 
-Elevskärmen följer `state` automatiskt (appkärnan byter hash →
-routern remountar läget). **Lägen behöver alltså ingen egen
-följ-läraren-logik** — de blir remountade med rätt `ctx`.
+**Läget är frikopplat från lärarens navigering.** Lärarens flikbyte
+(`store.modeId`) byter INTE läge på elevskärmen — elevskärmen står kvar
+på det senast utskickade läget. Läraren trycker aktivt ut ett läge med
+"Visa på elevskärm" (panelen i lärarvyn), vilket publicerar `present`
+med `modeId`; elevskärmen byter då hash och routern remountar läget.
+**Lägen behöver ingen egen följ-läraren-logik** — de blir remountade
+med rätt `ctx`.
+
+`state` bär numera bara **klassvalet**, som alltid följer med automatiskt
+(samma aktiva klass överallt). Vid `state:request` (nyöppnad elevskärm
+eller förhandsvisning) svarar läraren med både klassval och det
+utskickade läget; första gången sätts ett rimligt startläge (lärarens
+nuvarande elev-visningsbara läge, annars morgonskärm). `presentedMode` i
+storen speglar det utskickade läget för indikator/förhandsvisning i
+lärarvyn.
 
 ### Lägesegna händelser
 
@@ -115,10 +128,12 @@ Fyra lager, alla aktiva samtidigt:
 1. **Routern** vägrar montera annat än `STUDENT_MODE_IDS`
    (`js/modes/registry.js`: morgon, lektion, trafikljus) i elevvyn —
    även om någon skriver `#/elev/elever` för hand.
-2. **Följ-logiken** hoppar över `state`-meddelanden med lärarlägen:
-   byter läraren till Elevlista/Översikt står elevskärmen kvar på
-   senaste elevläge (avsiktligt — läraren kan kolla listan utan att
-   eleverna ser det).
+2. **Utskicks-logiken** (`present`) skickar bara ut elev-visningsbara
+   lägen: "Visa på elevskärm" är avstängd på Elevlista/Översikt, och
+   elevskärmen byter aldrig till ett lärarläge även om ett `present`
+   med sådant modeId skulle nå fram. Dessutom byter lärarens vanliga
+   flikbyte aldrig läge ute — eleverna ser bara det läraren aktivt
+   skickat ut.
 3. **Mode-modulerna** förgrenar på `ctx.view` och renderar aldrig
    noteringar/kontroller i elevvyn (MODULKONTRAKT regel 4).
 4. **CSS-skyddsnätet**: allt lärarmaterial märks `.teacher-only` och
