@@ -26,7 +26,7 @@ export function initClassPicker({ el, store, data }) {
     for (const c of [...classes].sort((a, b) => a.name.localeCompare(b.name, "sv"))) {
       select.append(new Option(c.name, c.id, false, c.id === classId));
     }
-    select.append(new Option("＋ Ny klass…", ADD_VALUE));
+    select.append(new Option("+ Ny klass…", ADD_VALUE));
     select.value = classId ?? "";
   }
 

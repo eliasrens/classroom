@@ -1,92 +1,135 @@
 /* ============================================================
    DESIGNSYSTEM — TOKENS
-   Alla färger, radier, skuggor och typografisteg definieras här.
-   Två teman: lärarvy (kompakt) och elevvy (projektor: stort, lugnt,
-   hög kontrast, läsbart från bakre delen av klassrummet).
-   Temat väljs med <html data-theme="teacher"> eller "student"
-   (på rot-elementet så att rem-skalan följer med).
+   Vuxet, återhållsamt formspråk: djupa neutrala gråtoner, EN
+   dämpad accentfärg, stram typografihierarki, måttliga radier
+   och diskreta skuggor. Inga gradienter, ingen pillerform.
+
+   Teman (på rot-elementet så att rem-skalan följer med):
+     <html data-theme="teacher">                  lärarvy — MÖRK som standard
+     <html data-theme="teacher" data-scheme="light">  lärarvy — ljust alternativ
+     <html data-theme="student">                  elevvy/projektor — ljus, stor text,
+                                                  mjuka toner utan bländning
    ============================================================ */
 
 :root {
-  /* ---- Grundpalett (mjuka toner, hög kontrast mot text) ---- */
-  --color-bg: #f6f4ef;          /* varm off-white */
-  --color-surface: #ffffff;
-  --color-surface-alt: #eceae3;
-  --color-ink: #1f2430;         /* nästan-svart text */
-  --color-ink-soft: #5a6072;
-  --color-line: #d8d5cc;
+  /* ---- Accent: dämpad mässing/bärnsten. Appens ENDA accentfärg. ---- */
+  --hue-accent: #c79a4e;
 
-  --color-accent: #2f6fed;      /* primär interaktionsfärg */
-  --color-accent-ink: #ffffff;
-  --color-accent-soft: #e3ecfd;
+  /* ---- Statusfärger (dämpade) ---- */
+  --color-ok: #5d9c76;
+  --color-warn: #c0913e;
+  --color-danger: #c2655c;
 
-  --color-ok: #2e9e5b;
-  --color-warn: #e0a10c;
-  --color-danger: #d5453c;
+  /* Trafikljus (Läge 3; pedagogiskt tydliga men inte självlysande) */
+  --color-light-green: #3f9e63;
+  --color-light-yellow: #ddb43c;
+  --color-light-red: #cf5348;
 
-  /* Trafikljus (Läge 3 återanvänder) */
-  --color-light-green: #37b45f;
-  --color-light-yellow: #f2c53d;
-  --color-light-red: #e04a41;
-
-  /* ---- Ämnespalett (mjuka men mättade toner; textfärg räknas
-         fram automatiskt i js/lib/color.js via luminans) ---- */
-  --subject-ma: #4f7ff0;   /* Matematik */
-  --subject-sv: #e8618c;   /* Svenska */
-  --subject-en: #8a5fd0;   /* Engelska */
-  --subject-no: #3aa876;   /* NO */
-  --subject-so: #e59b3a;   /* SO */
-  --subject-idh: #e0564b;  /* Idrott & hälsa */
-  --subject-bl: #d4699e;   /* Bild */
-  --subject-mu: #46b3c9;   /* Musik */
-  --subject-sl: #a3853e;   /* Slöjd */
+  /* ---- Ämnespalett (dämpade, vuxna toner; textfärg räknas fram
+         automatiskt i js/lib/color.js via luminans) ---- */
+  --subject-ma: #5577b5;   /* Matematik */
+  --subject-sv: #b05f7d;   /* Svenska */
+  --subject-en: #7a63a8;   /* Engelska */
+  --subject-no: #4e8f72;   /* NO */
+  --subject-so: #b88540;   /* SO */
+  --subject-idh: #b3564e;  /* Idrott & hälsa */
+  --subject-bl: #a86d94;   /* Bild */
+  --subject-mu: #4f93a8;   /* Musik */
+  --subject-sl: #937a45;   /* Slöjd */
   --subject-tk: #6b7f93;   /* Teknik */
-  --subject-rast: #9aa564; /* Rast/övrigt */
+  --subject-rast: #85905f; /* Rast/övrigt */
 
-  /* ---- Radier (rundade hörn genomgående) ---- */
-  --radius-s: 8px;
-  --radius-m: 14px;
-  --radius-l: 22px;
+  /* ---- Radier: återhållsamma. --radius-round endast för punkter/prickar. ---- */
+  --radius-s: 4px;
+  --radius-m: 6px;
+  --radius-l: 10px;
   --radius-round: 999px;
 
-  /* ---- Skuggor (mjuka) ---- */
-  --shadow-s: 0 1px 3px rgb(31 36 48 / 8%);
-  --shadow-m: 0 4px 14px rgb(31 36 48 / 10%);
-  --shadow-l: 0 10px 32px rgb(31 36 48 / 14%);
+  /* ---- Skuggor: diskreta — avgränsning sköts främst av kantlinjer ---- */
+  --shadow-s: 0 1px 2px rgb(0 0 0 / 12%);
+  --shadow-m: 0 2px 8px rgb(0 0 0 / 16%);
 
-  /* ---- Typografi ----
-     Skalan är relativ: teman skruvar bara på --font-base,
-     så alla steg följer med. */
-  --font-family: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --font-base: 16px;
-  --text-s: 0.85rem;
+  /* ---- Typografi. Skalan är relativ: teman skruvar bara på --font-base. ---- */
+  --font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  --font-base: 15px;
+  --text-s: 0.86rem;
   --text-m: 1rem;
-  --text-l: 1.35rem;
-  --text-xl: 1.9rem;
-  --text-2xl: 2.7rem;
-  --text-3xl: 4rem;    /* projektor-rubriker */
-  --text-giant: 7rem;  /* t.ex. klocka/timer på elevskärm */
+  --text-l: 1.25rem;
+  --text-xl: 1.6rem;
+  --text-2xl: 2.1rem;
+  --text-3xl: 3.2rem;   /* projektor-rubriker */
+  --text-giant: 6.5rem; /* t.ex. klocka/timer på elevskärm */
 
   /* ---- Rytm ---- */
   --space-1: 4px;
   --space-2: 8px;
-  --space-3: 14px;
-  --space-4: 22px;
-  --space-5: 36px;
+  --space-3: 12px;
+  --space-4: 20px;
+  --space-5: 32px;
 
-  --topbar-height: 56px;
+  --topbar-height: 48px;
 }
 
-/* ============ LÄRARVY — kompakt ============ */
+/* ============ LÄRARVY — MÖRK (standard) ============
+   Djupa neutrala gråtoner, inte rent svart. Kompakt informationstäthet. */
 html[data-theme="teacher"] {
-  --font-base: 16px;
-  --density-pad: var(--space-2);
+  color-scheme: dark;
+  --font-base: 15px;
+  --density-pad: var(--space-3);
+
+  --color-bg: #14161a;
+  --color-surface: #1b1e24;
+  --color-surface-alt: #23272f;
+  --color-ink: #e4e6e9;
+  --color-ink-soft: #969ea9;
+  --color-line: #2b303a;
+
+  --color-accent: var(--hue-accent);       /* ytor: knappar, markörer */
+  --color-accent-text: #d5ab61;            /* accentfärgad TEXT på mörk botten */
+  --color-accent-ink: #17130a;             /* text PÅ accentyta */
+  --color-accent-soft: #2a2620;            /* svagt tonad accentbakgrund */
+}
+
+/* ============ LÄRARVY — ljust alternativ (växlas i topbaren) ============ */
+html[data-theme="teacher"][data-scheme="light"] {
+  color-scheme: light;
+
+  --color-bg: #f2f2f0;
+  --color-surface: #fbfbfa;
+  --color-surface-alt: #e9e9e5;
+  --color-ink: #21252b;
+  --color-ink-soft: #61686f;
+  --color-line: #d6d6d0;
+
+  --color-accent: #a87c2f;
+  --color-accent-text: #8a6420;
+  --color-accent-ink: #ffffff;
+  --color-accent-soft: #f0e7d4;
+
+  --shadow-s: 0 1px 2px rgb(30 33 38 / 8%);
+  --shadow-m: 0 2px 8px rgb(30 33 38 / 10%);
 }
 
 /* ============ ELEVVY — projektor ============
-   Få element, stor text, extra luft. Läsbar längst bak. */
+   Samma formspråk, men: ljus, varm och bländfri botten, få element,
+   stor text, hög kontrast — läsbar från bakre delen av klassrummet. */
 html[data-theme="student"] {
+  color-scheme: light;
   --font-base: 22px;
   --density-pad: var(--space-4);
-  --color-bg: #f9f7f1;
+
+  --color-bg: #f3f1ec;
+  --color-surface: #faf9f6;
+  --color-surface-alt: #e9e6df;
+  --color-ink: #24282e;
+  --color-ink-soft: #5d646c;
+  --color-line: #d8d5cd;
+
+  --color-accent: #a87c2f;
+  --color-accent-text: #8a6420;
+  --color-accent-ink: #ffffff;
+  --color-accent-soft: #efe6d2;
+
+  --shadow-s: 0 1px 2px rgb(36 40 46 / 8%);
+  --shadow-m: 0 2px 8px rgb(36 40 46 / 10%);
 }

@@ -9,7 +9,7 @@ parallellt utan att röra varandra eller appkärnan.
 export default {
   id: "trafikljus",        // stabilt id — används i URL (#/trafikljus) och registret
   title: "Trafikljusur",   // visas i lägesmenyn
-  icon: "🚦",              // emoji i lägesmenyn
+  icon: "signal",          // ikonnamn ur js/lib/icons.js (linje-SVG, ALDRIG emoji)
 
   /**
    * Rendera läget in i el (en tömd <main>).
@@ -55,9 +55,22 @@ export default {
    i `js/lib/names.js` (endast förnamn + valfri tag; initial-läget
    styrs av klassinställningen `settings/display`, se DATAMODELL.md).
    Rendera aldrig `firstName` rått — då bryts initial-reservläget.
-6. **Styling**: använd designtokens (`css/tokens.css`). Lägesspecifik
-   CSS läggs i `css/modes/<id>.css` och länkas från `index.html`.
-   Ämnesfärger + läsbar textfärg: `subjectStyle()` i `js/lib/color.js`.
+6. **Styling & designspråk**: använd designtokens (`css/tokens.css`).
+   Lägesspecifik CSS läggs i `css/modes/<id>.css` och länkas från
+   `index.html`. Ämnesfärger + läsbar textfärg: `subjectStyle()` i
+   `js/lib/color.js`. Formspråket är vuxet och återhållsamt — det
+   gäller HELA epiken:
+   - Lärarvyn är MÖRK som standard (ljust alternativ togglas i
+     topbaren via `data-scheme="light"`); skriv mot tokens, aldrig
+     hårdkodade färger, så följer läget båda schemana.
+   - INGA emoji i gränssnittet (knappar, rubriker, etiketter, menyer)
+     — behövs en ikon: `icon()` i `js/lib/icons.js` (linje-SVG,
+     currentColor). Emoji är tillåtet ENBART som pedagogiskt innehåll
+     riktat till eleverna på elevskärmen, och sparsamt.
+   - Inga gradienter, ingen pillerform på knappar/flikar, inga tunga
+     skuggor — avgränsa med kantlinjer (`--color-line`) och måttliga
+     radier (`--radius-s/m/l`). EN accentfärg: `--color-accent`
+     (ytor) / `--color-accent-text` (färgad text).
 7. **Ingen global state utanför store**: det ett läge vill dela med
    andra lägen går via datalagret (persistent) — inte via egna
    globala variabler.

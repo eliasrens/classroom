@@ -4,6 +4,6 @@ import { createPlaceholderMode } from "./placeholder.js";
 export default createPlaceholderMode({
   id: "trafikljus",
   title: "Trafikljusur",
-  icon: "🚦",
+  icon: "signal",
   studentText: "Här kommer trafikljuset och nedräkningen att visas — stort och tydligt.",
 });

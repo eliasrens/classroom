@@ -4,6 +4,6 @@ import { createPlaceholderMode } from "./placeholder.js";
 export default createPlaceholderMode({
   id: "morgon",
   title: "Morgonskärm",
-  icon: "🌅",
+  icon: "sunrise",
   studentText: "God morgon! Här kommer dagens schema och information att visas.",
 });

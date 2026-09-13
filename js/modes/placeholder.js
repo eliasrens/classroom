@@ -4,6 +4,8 @@
  * med en platshållarvy. Respektive mode-issue ersätter sin modul
  * med en riktig implementation — kontraktets yta ska behållas.
  */
+import { icon as renderIcon } from "../lib/icons.js";
+
 export function createPlaceholderMode({ id, title, icon, studentText }) {
   return {
     id,
@@ -15,7 +17,7 @@ export function createPlaceholderMode({ id, title, icon, studentText }) {
       const cls = ctx.activeClass;
       el.innerHTML = `
         <div class="mode-placeholder">
-          <div class="mode-placeholder__icon">${icon}</div>
+          <div class="mode-placeholder__icon">${renderIcon(icon, { size: 44, strokeWidth: 1.4 })}</div>
           <h1>${title}</h1>
           <p>${
             isStudent

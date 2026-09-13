@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Klassrumsverktyget</title>
   <meta name="description" content="Klassrumsverktyg för mellanstadiet — morgonskärm, lektionsplanering, trafikljusur, elevlista och översikt.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏫</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23c79a4e'/><text x='50' y='70' font-size='58' font-weight='700' text-anchor='middle' font-family='sans-serif' fill='%2317130a'>K</text></svg>">
   <link rel="stylesheet" href="./css/tokens.css">
   <link rel="stylesheet" href="./css/base.css">
   <link rel="stylesheet" href="./css/app.css">
@@ -17,13 +17,17 @@
   <div id="app" class="app" hidden>
     <!-- Topbar: klassval + lägesmeny. Döljs i elevvy (styrs av router/tema). -->
     <header class="topbar" id="topbar">
-      <div class="topbar__brand" title="Klassrumsverktyget">🏫</div>
+      <div class="topbar__brand" title="Klassrumsverktyget">
+        <span class="brandmark" aria-hidden="true">K</span>
+        <span class="brandtext">Klassrumsverktyget</span>
+      </div>
       <nav class="mode-nav" id="mode-nav" aria-label="Lägen"></nav>
       <div class="topbar__spacer"></div>
       <div id="class-picker" class="class-picker"></div>
-      <button id="open-student-view" class="btn btn--ghost" title="Öppna elevskärm i nytt fönster">🖥️ Elevskärm</button>
+      <button id="open-student-view" class="btn btn--ghost" title="Öppna elevskärm i nytt fönster">Elevskärm</button>
       <div id="sync-status" class="sync-status" title="Synkstatus" aria-live="polite"></div>
-      <button id="sign-out" class="btn btn--ghost" title="Logga ut">Logga ut</button>
+      <button id="toggle-scheme" class="btn btn--ghost btn--icon" title="Växla ljust/mörkt läge" aria-label="Växla ljust/mörkt läge"></button>
+      <button id="sign-out" class="btn btn--ghost btn--icon" title="Logga ut" aria-label="Logga ut"></button>
     </header>
 
     <!-- Här monterar router aktivt läge -->

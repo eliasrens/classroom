@@ -12,9 +12,8 @@
 export function renderLogin(el, { auth, view }) {
   if (view === "student") {
     el.innerHTML = `
-      <div class="auth card auth--student">
-        <div class="auth__icon" aria-hidden="true">🏫</div>
-        <h1>Strax klart…</h1>
+      <div class="auth auth--student">
+        <h1>Strax klart</h1>
         <p>Skärmen startar när läraren är redo.</p>
       </div>`;
     return;
@@ -25,12 +24,14 @@ export function renderLogin(el, { auth, view }) {
 
   el.innerHTML = `
     <form class="auth card" autocomplete="off">
-      <div class="auth__icon" aria-hidden="true">🏫</div>
-      <h1>Klassrumsverktyget</h1>
+      <div class="auth__brand">
+        <span class="brandmark" aria-hidden="true">K</span>
+        <h1>Klassrumsverktyget</h1>
+      </div>
       ${isSetup
-        ? `<p>Välkommen! Välj ett lösenord för appen (minst 4 tecken).
+        ? `<p class="auth__intro">Välj ett lösenord för appen (minst 4 tecken).
            Det behövs varje gång appen öppnas i en ny webbläsare.</p>`
-        : `<p>Logga in för att fortsätta.</p>`}
+        : `<p class="auth__intro">Logga in för att fortsätta.</p>`}
       ${isFirebase ? `
         <label class="auth__field">E-post
           <input type="email" name="email" required autocomplete="username" autofocus>

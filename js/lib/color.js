@@ -46,17 +46,17 @@ export function readableTextColor(bgHex, { dark = "#1f2430", light = "#ffffff" }
  * synk för att JS ska kunna räkna textfärg och rendera etiketter.
  */
 export const SUBJECTS = [
-  { id: "ma",   name: "Matematik",      color: "#4f7ff0" },
-  { id: "sv",   name: "Svenska",        color: "#e8618c" },
-  { id: "en",   name: "Engelska",       color: "#8a5fd0" },
-  { id: "no",   name: "NO",             color: "#3aa876" },
-  { id: "so",   name: "SO",             color: "#e59b3a" },
-  { id: "idh",  name: "Idrott & hälsa", color: "#e0564b" },
-  { id: "bl",   name: "Bild",           color: "#d4699e" },
-  { id: "mu",   name: "Musik",          color: "#46b3c9" },
-  { id: "sl",   name: "Slöjd",          color: "#a3853e" },
+  { id: "ma",   name: "Matematik",      color: "#5577b5" },
+  { id: "sv",   name: "Svenska",        color: "#b05f7d" },
+  { id: "en",   name: "Engelska",       color: "#7a63a8" },
+  { id: "no",   name: "NO",             color: "#4e8f72" },
+  { id: "so",   name: "SO",             color: "#b88540" },
+  { id: "idh",  name: "Idrott & hälsa", color: "#b3564e" },
+  { id: "bl",   name: "Bild",           color: "#a86d94" },
+  { id: "mu",   name: "Musik",          color: "#4f93a8" },
+  { id: "sl",   name: "Slöjd",          color: "#937a45" },
   { id: "tk",   name: "Teknik",         color: "#6b7f93" },
-  { id: "rast", name: "Rast/övrigt",    color: "#9aa564" },
+  { id: "rast", name: "Rast/övrigt",    color: "#85905f" },
 ];
 
 /** Slår upp ett ämne och ger { ...subject, textColor } klart att använda. */

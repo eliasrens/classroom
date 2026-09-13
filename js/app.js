@@ -13,10 +13,24 @@ import { createDataLayer } from "./data/datalayer.js";
 import { createRouter } from "./router.js";
 import { MODES } from "./modes/registry.js";
 import { initClassPicker, ACTIVE_CLASS_KEY } from "./ui/class-picker.js";
+import { icon } from "./lib/icons.js";
 
 const $ = (sel) => document.querySelector(sel);
 const appEl = $("#app");
 const gateEl = $("#auth-gate");
+
+// ---- Ljust/mörkt läge (lärarvyn; mörkt är standard) ----
+
+const SCHEME_KEY = "classroom:ui:scheme";
+
+function applyScheme(scheme) {
+  if (scheme === "light") document.documentElement.dataset.scheme = "light";
+  else delete document.documentElement.dataset.scheme;
+  const btn = $("#toggle-scheme");
+  if (btn) btn.innerHTML = icon(scheme === "light" ? "moon" : "sun");
+}
+
+try { applyScheme(localStorage.getItem(SCHEME_KEY)); } catch { applyScheme(null); }
 
 /** 'student' om fönstret visar elevskärm (#/elev/…) — behövs redan före login. */
 const currentView = () => (/^#\/?elev(\/|$)/.test(location.hash) ? "student" : "teacher");
@@ -79,7 +93,7 @@ function startApp() {
   const navEl = $("#mode-nav");
   navEl.innerHTML = MODES
     .map((m) => `<a class="mode-nav__link" href="#/${m.id}" data-mode="${m.id}">
-        <span aria-hidden="true">${m.icon}</span> ${m.title}</a>`)
+        ${icon(m.icon)}<span>${m.title}</span></a>`)
     .join("");
 
   store.subscribe(["modeId"], ({ modeId }) => {
@@ -93,13 +107,24 @@ function startApp() {
   initClassPicker({ el: $("#class-picker"), store, data });
 
   // Elevskärm i eget fönster — ärver inloggningen (samma webbläsare/session).
-  $("#open-student-view").addEventListener("click", () => {
+  const studentBtn = $("#open-student-view");
+  studentBtn.insertAdjacentHTML("afterbegin", icon("monitor"));
+  studentBtn.addEventListener("click", () => {
     const { modeId } = store.get();
     window.open(`${location.pathname}#/elev/${modeId}`, "classroom-student-view");
   });
 
+  // Ljust/mörkt läge i lärarvyn
+  $("#toggle-scheme").addEventListener("click", () => {
+    const next = document.documentElement.dataset.scheme === "light" ? null : "light";
+    try { next ? localStorage.setItem(SCHEME_KEY, next) : localStorage.removeItem(SCHEME_KEY); } catch { /* ok */ }
+    applyScheme(next);
+  });
+
   // Utloggning (loggar ut alla fönster, även elevskärmen)
-  $("#sign-out").addEventListener("click", () => void auth.signOut());
+  const signOutBtn = $("#sign-out");
+  signOutBtn.innerHTML = icon("logout");
+  signOutBtn.addEventListener("click", () => void auth.signOut());
 
   // Router
   const router = createRouter({ store, data, viewEl: $("#view") });

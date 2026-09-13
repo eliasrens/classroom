@@ -35,7 +35,8 @@ mot Firestore när anslutning finns. Appen kraschar aldrig utan Firebase.
 ```
 index.html              app-skal: topbar (lägesmeny, klassval, elevskärm, synkstatus)
 css/
-  tokens.css            designsystem: tokens + lärar-/elevtema (projektor)
+  tokens.css            designsystem: tokens; mörk lärarvy (standard) + ljust
+                        alternativ + elevtema (projektor)
   base.css, app.css     bas + appskalets komponenter
 js/
   app.js                bootstrap — lösenordsvägg först, sedan resten
@@ -45,6 +46,7 @@ js/
   firebase-config.js    PLATSHÅLLARE — fyll i för molnsynk + Firebase Auth
   data/                 offline-first-datalager (lokalt + Firestore-synk + outbox)
   lib/color.js          ämnespalett + automatisk luminans/kontrast-uträkning
+  lib/icons.js          linje-ikoner (inline-SVG) — inga emoji i gränssnittet
   lib/names.js          elevnamn: endast förnamn, valfri tag, initial-läge
   modes/                de fem lägena (platshållare) + registret
   ui/login.js           login-vy + elevskärmens väntevy

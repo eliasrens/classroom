@@ -1,4 +1,4 @@
-/* App-skal: topbar, lägesmeny, vy-yta, klassval, synkstatus. */
+/* App-skal: topbar, lägesmeny, vy-yta, klassval, synkstatus, login. */
 
 .app {
   min-height: 100dvh;
@@ -6,42 +6,57 @@
   flex-direction: column;
 }
 
-/* ---- Topbar ---- */
+/* ---- Topbar: kompakt, avgränsad med kantlinje (ingen skugga) ---- */
 
 .topbar {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   min-height: var(--topbar-height);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-1) var(--space-3);
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-line);
-  box-shadow: var(--shadow-s);
   position: sticky;
   top: 0;
   z-index: 10;
 }
 
-.topbar__brand { font-size: var(--text-l); }
+.topbar__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+.topbar__brand .brandmark {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-s);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+}
 .topbar__spacer { flex: 1; }
 
 /* Elevvy: rent, inga verktygsfält */
 html[data-theme="student"] .topbar { display: none; }
 
-/* ---- Lägesmeny ---- */
+/* ---- Lägesmeny: låg profil, aktiv markeras med accenttext ---- */
 
-.mode-nav {
-  display: flex;
-  gap: var(--space-1);
-  flex-wrap: wrap;
-}
+.mode-nav { display: flex; gap: var(--space-1); flex-wrap: wrap; }
 
 .mode-nav__link {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-round);
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-m);
+  border: 1px solid transparent;
   text-decoration: none;
   color: var(--color-ink-soft);
   white-space: nowrap;
@@ -49,7 +64,8 @@ html[data-theme="student"] .topbar { display: none; }
 .mode-nav__link:hover { background: var(--color-surface-alt); color: var(--color-ink); }
 .mode-nav__link[aria-current="page"] {
   background: var(--color-accent-soft);
-  color: var(--color-accent);
+  border-color: var(--color-line);
+  color: var(--color-accent-text);
   font-weight: 600;
 }
 
@@ -65,12 +81,13 @@ html[data-theme="student"] .topbar { display: none; }
   color: var(--color-ink-soft);
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-2);
+  white-space: nowrap;
 }
 .sync-status::before {
   content: "";
-  width: 0.6em;
-  height: 0.6em;
+  width: 7px;
+  height: 7px;
   border-radius: var(--radius-round);
   background: var(--color-ink-soft);
 }
@@ -103,15 +120,15 @@ html[data-theme="student"] .view {
   place-items: center;
   gap: var(--space-3);
   min-height: 50vh;
-  border: 2px dashed var(--color-line);
+  border: 1px dashed var(--color-line);
   border-radius: var(--radius-l);
   color: var(--color-ink-soft);
   text-align: center;
   padding: var(--space-4);
 }
-.mode-placeholder__icon { font-size: var(--text-3xl); line-height: 1; }
+.mode-placeholder__icon { color: var(--color-ink-soft); opacity: 0.7; line-height: 0; }
 
-/* ---- Lösenordsvägg / login ---- */
+/* ---- Lösenordsvägg / login: stram och saklig ---- */
 
 .auth-gate {
   min-height: 100dvh;
@@ -124,54 +141,75 @@ html[data-theme="student"] .view {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  width: min(26rem, 100%);
+  width: min(24rem, 100%);
   padding: var(--space-5);
-  text-align: center;
+  text-align: left;
 }
 
-.auth__icon { font-size: var(--text-3xl); line-height: 1; }
+.auth__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.auth__brand .brandmark {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-s);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 700;
+}
+.auth__brand h1 { margin: 0; font-size: var(--text-l); }
+
+.auth__intro { color: var(--color-ink-soft); }
 
 .auth__field {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  text-align: left;
   font-weight: 600;
   font-size: var(--text-s);
   color: var(--color-ink-soft);
 }
 
 .auth__field input {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-2);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-m);
   font-size: var(--text-m);
+  background: var(--color-bg);
   color: var(--color-ink);
 }
+.auth__field input:focus-visible { outline-offset: 0; }
 
-.auth__error {
-  margin: 0;
-  color: var(--color-danger);
-  font-weight: 600;
+.auth__error { margin: 0; color: var(--color-danger); font-weight: 600; }
+
+.auth__submit { justify-content: center; }
+
+.auth__hint { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); }
+
+/* Elevskärm som väntar: lugn, centrerad, inga formulär, ingen lärarinfo */
+.auth--student {
+  text-align: center;
+  align-items: center;
+  border: none;
+  background: none;
+  box-shadow: none;
 }
-
-.auth__submit { justify-content: center; font-weight: 600; }
-
-.auth__hint {
-  margin: 0;
-  font-size: var(--text-s);
-  color: var(--color-ink-soft);
-}
-
-/* Elevskärm som väntar: lugn, inga formulär, ingen lärarinfo */
-.auth--student { color: var(--color-ink-soft); }
+.auth--student h1 { font-size: var(--text-2xl); }
+.auth--student p { color: var(--color-ink-soft); }
 
 /* ---- Responsivt: laptop ↔ projektor ---- */
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .topbar { flex-wrap: wrap; }
+  .topbar__brand .brandtext { display: none; }
 }
 
 @media (min-width: 1600px) {
-  html[data-theme="teacher"] { --font-base: 18px; }
+  html[data-theme="teacher"] { --font-base: 16px; }
 }

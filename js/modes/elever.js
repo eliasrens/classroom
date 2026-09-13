@@ -4,5 +4,5 @@ import { createPlaceholderMode } from "./placeholder.js";
 export default createPlaceholderMode({
   id: "elever",
   title: "Elevlista",
-  icon: "🧑‍🎓",
+  icon: "users",
 });
