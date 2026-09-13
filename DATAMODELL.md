@@ -10,8 +10,12 @@ classes/{classId}                       — en klass (4A, 4B, …)
   name: "4A"
 
 classes/{classId}/students/{studentId}  — elev i klassen
-  firstName, lastName
-  displayName        — visningsnamn (unikt i klassen, t.ex. "Elsa B")
+  firstName          — ENDAST förnamn. Det finns AVSIKTLIGT inget
+                       efternamns-/fullnamnsfält (integritet: appen
+                       visas på projektor).
+  tag                — VALFRI kort särskiljare (emoji/bokstav/siffra,
+                       t.ex. "🐱" eller "B") om två elever delar
+                       förnamn. Aldrig obligatorisk.
   active: true       — false i stället för borttagning (historik bevaras)
 
 classes/{classId}/lessonPlans/{planId}  — lektionsplanering (Läge 2)
@@ -34,6 +38,11 @@ classes/{classId}/settings/{key}        — inställningar per klass
                                           (dokument-id = inställningens namn,
                                            t.ex. "schedule", "morningScreen")
   value: { … }
+
+classes/{classId}/settings/display      — namnvisning (togglas i lärarvyn)
+  value: { nameDisplay: "first" | "initials" }
+                     — "initials" = reservläget: initialer räknas
+                       fram ur förnamnet (js/lib/names.js), lagras ej
 
 teachers/{uid}                          — lärarprofil (se docs/AUTH.md)
   email, displayName
@@ -61,3 +70,9 @@ teachers/{uid}                          — lärarprofil (se docs/AUTH.md)
   vid synk.
 - **Mjuk borttagning av elever** (`active: false`) så att gamla
   pass/noteringar aldrig pekar på obefintliga elever.
+- **Endast förnamn på elever** — medvetet integritetsval: skärmen
+  projiceras i klassrummet och data delas mellan lärare. Namnkrockar
+  löses med den valfria `tag`-särskiljaren, aldrig med efternamn.
+  Visningshjälpare (`studentLabel`, `initialsFor`) finns i
+  `js/lib/names.js` och används av alla lägen så att initial-läget
+  fungerar överallt.

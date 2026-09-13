@@ -51,9 +51,13 @@ export default {
 4. **Elevvyn** nås på `#/elev/<id>` (knappen "Elevskärm" öppnar den i
    eget fönster). Samma modul renderar båda vyerna — förgrena på
    `ctx.view`. Elevvyn får INTE innehålla interaktiva lärarverktyg.
-5. **Styling**: använd designtokens (`css/tokens.css`). Lägesspecifik
+5. **Elevnamn**: visa ALLTID namn via `studentLabel()`/`initialsFor()`
+   i `js/lib/names.js` (endast förnamn + valfri tag; initial-läget
+   styrs av klassinställningen `settings/display`, se DATAMODELL.md).
+   Rendera aldrig `firstName` rått — då bryts initial-reservläget.
+6. **Styling**: använd designtokens (`css/tokens.css`). Lägesspecifik
    CSS läggs i `css/modes/<id>.css` och länkas från `index.html`.
    Ämnesfärger + läsbar textfärg: `subjectStyle()` i `js/lib/color.js`.
-6. **Ingen global state utanför store**: det ett läge vill dela med
+7. **Ingen global state utanför store**: det ett läge vill dela med
    andra lägen går via datalagret (persistent) — inte via egna
    globala variabler.

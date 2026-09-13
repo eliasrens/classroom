@@ -23,11 +23,12 @@ export function createFirestoreSync({ firebaseConfig, onRemoteDocs, onStatus }) 
   async function start() {
     if (fs || startFailed) return fs != null;
     try {
-      const [{ initializeApp }, api] = await Promise.all([
+      const [appMod, api] = await Promise.all([
         import(`${SDK_BASE}/firebase-app.js`),
         import(`${SDK_BASE}/firebase-firestore.js`),
       ]);
-      const app = initializeApp(firebaseConfig);
+      // Auth-lagret kan redan ha initierat appen — dela instansen.
+      const app = appMod.getApps().length ? appMod.getApp() : appMod.initializeApp(firebaseConfig);
       const db = api.getFirestore(app);
       fs = { db, api };
       onStatus?.("online");

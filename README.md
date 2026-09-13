@@ -15,6 +15,15 @@ python3 -m http.server 8000   # → http://localhost:8000
 
 Eller lägg repot direkt på GitHub Pages. Ingen bundler, inga beroenden.
 
+## Inloggning
+
+Hela appen ligger bakom en lösenordsvägg — inget renderas före
+inloggning. Utan Firebase: läraren väljer ett lokalt app-lösenord vid
+första start. Med Firebase: e-post + lösenord via Firebase Auth
+(konton skapas i konsolen; en redan inloggad lärare kan fortsätta
+offline). Elevskärmen ärver lärarens session och visar aldrig någon
+inloggning. Detaljer: [docs/AUTH.md](docs/AUTH.md).
+
 ## Firebase (valfritt)
 
 Appen kör helt lokalt (data i webbläsaren) tills `js/firebase-config.js`
@@ -29,17 +38,20 @@ css/
   tokens.css            designsystem: tokens + lärar-/elevtema (projektor)
   base.css, app.css     bas + appskalets komponenter
 js/
-  app.js                bootstrap — kopplar ihop allt
+  app.js                bootstrap — lösenordsvägg först, sedan resten
+  auth.js               lösenordsväggen (lokalt lösenord eller Firebase Auth)
   store.js              observerbart globalt tillstånd (klass, läge, vy, synk)
   router.js             hashrouter: #/<läge> (lärare), #/elev/<läge> (elevskärm)
-  firebase-config.js    PLATSHÅLLARE — fyll i för molnsynk
+  firebase-config.js    PLATSHÅLLARE — fyll i för molnsynk + Firebase Auth
   data/                 offline-first-datalager (lokalt + Firestore-synk + outbox)
   lib/color.js          ämnespalett + automatisk luminans/kontrast-uträkning
+  lib/names.js          elevnamn: endast förnamn, valfri tag, initial-läge
   modes/                de fem lägena (platshållare) + registret
+  ui/login.js           login-vy + elevskärmens väntevy
   ui/class-picker.js    klassval i topbaren
 docs/
   MODULKONTRAKT.md      kontraktet varje läge implementerar — LÄS FÖRST
-  AUTH.md               auth-skiss (grund för säkerhetsregler)
+  AUTH.md               lösenordsväggen + grund för säkerhetsregler
 DATAMODELL.md           Firestore-datastruktur + motivering
 ```
 

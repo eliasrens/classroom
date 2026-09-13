@@ -11,7 +11,10 @@
   <link rel="stylesheet" href="./css/app.css">
 </head>
 <body>
-  <div id="app" class="app">
+  <!-- Lösenordsvägg: login-vyn renderas här; appen nedanför är dold tills läraren är inloggad. -->
+  <div id="auth-gate" class="auth-gate" hidden></div>
+
+  <div id="app" class="app" hidden>
     <!-- Topbar: klassval + lägesmeny. Döljs i elevvy (styrs av router/tema). -->
     <header class="topbar" id="topbar">
       <div class="topbar__brand" title="Klassrumsverktyget">🏫</div>
@@ -20,6 +23,7 @@
       <div id="class-picker" class="class-picker"></div>
       <button id="open-student-view" class="btn btn--ghost" title="Öppna elevskärm i nytt fönster">🖥️ Elevskärm</button>
       <div id="sync-status" class="sync-status" title="Synkstatus" aria-live="polite"></div>
+      <button id="sign-out" class="btn btn--ghost" title="Logga ut">Logga ut</button>
     </header>
 
     <!-- Här monterar router aktivt läge -->
