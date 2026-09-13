@@ -13,12 +13,21 @@ rules_version = '2';
 // PRINCIP: ingen oautentiserad åtkomst. All läsning och skrivning
 // kräver en inloggad lärare (request.auth != null via Firebase Auth).
 // Konton skapas i Firebase-konsolen — ingen öppen självregistrering
-// (matchar single-user/litet arbetslag, se docs/AUTH.md).
+// (matchar ett arbetslag runt samma klasser, se docs/AUTH.md).
 //
-// Standardmodellen nedan är den ENKLA varianten: alla inloggade lärare
-// delar all data (ett litet arbetslag runt samma klasser). Vill man
-// senare begränsa per klass finns den varianten utkommenterad sist —
-// datamodellen (teachers/{uid}.classIds) är förberedd för båda.
+// ÅTKOMSTMODELL (se DATAMODELL.md):
+//   DELAT mellan alla inloggade lärare (läs+skriv):
+//     - klasser (classes/{id})
+//     - elever, noteringar, pass/resultat, inställningar
+//       (classes/{id}/students | notes | sessions | settings)
+//     En lärare ska se alla andras noteringar på eleverna, sparade
+//     pass och delade klassinställningar — realtid via onSnapshot.
+//   PRIVAT per lärare (bara ägaren läser+skriver):
+//     - lektionsplaneringar, under lärarens uid
+//       (teachers/{uid}/classes/{cid}/lessonPlans/{planId})
+//     Pathen bär ägarskapet: en lyssnare på det egna subträdet kan
+//     aldrig råka få en annan lärares planeringar, så ingen where-sats
+//     behövs på klienten och ingen extra get()-läsning i reglerna.
 // ============================================================
 
 service cloud.firestore {
@@ -29,19 +38,28 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Lärarprofil: var och en äger bara sitt eget dokument.
-    // (email, displayName, classIds — se DATAMODELL.md)
+    // ---- PRIVAT per lärare -------------------------------------------
+    // Lärarprofilen (email, displayName) OCH lärarens privata
+    // lektionsplaneringar (teachers/{uid}/classes/{cid}/lessonPlans/…).
+    // Var och en kommer bara åt sitt eget subträd.
     match /teachers/{uid} {
       allow read, write: if signedIn() && request.auth.uid == uid;
+
+      // Allt under lärarens uid — inkl. de privata planeringarna.
+      match /{document=**} {
+        allow read, write: if signedIn() && request.auth.uid == uid;
+      }
     }
 
-    // All klassdata (elever, planeringar, noteringar, pass,
-    // inställningar) ligger under classes/{classId}. En inloggad
-    // lärare får läsa och skriva allt klassmaterial.
+    // ---- DELAT mellan alla inloggade lärare --------------------------
+    // Klassen och all delad klassdata: elever, noteringar, pass,
+    // inställningar. Alla inloggade lärare läser och skriver — så att
+    // ändringar syns hos alla i realtid (onSnapshot).
     match /classes/{classId} {
       allow read, write: if signedIn();
 
-      // Subkollektioner: students, lessonPlans, notes, sessions, settings.
+      // Subkollektioner: students, notes, sessions, settings.
+      // (Lektionsplaneringar ligger INTE här — de är privata, se ovan.)
       match /{document=**} {
         allow read, write: if signedIn();
       }
@@ -56,21 +74,18 @@ service cloud.firestore {
 }
 
 // ------------------------------------------------------------
-// ALTERNATIV: åtkomst PER KLASS (större skola, flera arbetslag).
-// Ersätt classes-blocket ovan med detta — då kommer bara lärare vars
-// profil (teachers/{uid}.classIds) listar klassen åt klassens data:
+// NOT: planeringarna bär dessutom ett ownerUid-fält (sätts av
+// js/data/plans.js). Det behövs inte av reglerna ovan — pathen under
+// teachers/{uid} avgör redan ägarskapet — men gör ägaren explicit i
+// datat. Vill man i stället lägga planeringar i en DELAD kollektion och
+// skydda dem per fält ser regeln ut så här:
 //
-//   match /classes/{classId} {
-//     function teachesClass() {
-//       return signedIn()
-//         && classId in get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.classIds;
-//     }
-//     allow read, write: if teachesClass();
-//     match /{document=**} {
-//       allow read, write: if teachesClass();
-//     }
+//   match /plans/{planId} {
+//     allow read: if signedIn() && resource.data.ownerUid == request.auth.uid;
+//     allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
+//     allow update, delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
 //   }
 //
-// (get() kostar en extra läsning per anrop — därför är den enkla
-//  varianten standard för single-user/litet arbetslag.)
+// (Då MÅSTE klientens lyssnare filtrera med where("ownerUid","==",uid),
+//  annars nekas hela lyssnaren. Path-varianten ovan slipper det.)
 // ------------------------------------------------------------

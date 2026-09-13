@@ -28,7 +28,15 @@ inloggning. Detaljer: [docs/AUTH.md](docs/AUTH.md).
 
 Appen kör helt lokalt (data i webbläsaren) tills `js/firebase-config.js`
 fylls i med ett riktigt Firebase-projekt — då synkar datalagret automatiskt
-mot Firestore när anslutning finns. Appen kraschar aldrig utan Firebase.
+mot Firestore när anslutning finns och flera lärare ser varandras ändringar
+i realtid (onSnapshot). Appen kraschar aldrig utan Firebase.
+
+Steg-för-steg för idrifttagning — config, inbjudan av fler lärare och
+deploy av säkerhetsreglerna: **[docs/DRIFTSATTNING.md](docs/DRIFTSATTNING.md)**.
+
+Delat mellan alla inloggade lärare: klasser, elever, noteringar, pass och
+klassinställningar. Privat per lärare: lektionsplaneringar. Se
+[DATAMODELL.md](DATAMODELL.md).
 
 ## Arkitektur
 
@@ -54,9 +62,11 @@ js/
   ui/class-picker.js    klassval i topbaren
   ui/help.js            genvägslista under "?" · ui/shortcuts.js  globala tangentgenvägar
 firestore.rules         Firestore-säkerhetsregler: inloggning krävs för all läs/skriv
+firebase.json           pekar firebase-CLI:t på firestore.rules (för deploy av regler)
 docs/
   MODULKONTRAKT.md      kontraktet varje läge implementerar — LÄS FÖRST
   AUTH.md               lösenordsväggen + säkerhetsregler
+  DRIFTSATTNING.md      koppla på Firebase: config, lärarkonton, deploy av regler
 DATAMODELL.md           Firestore-datastruktur + motivering
 ```
 
