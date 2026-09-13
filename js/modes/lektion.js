@@ -16,12 +16,14 @@
  * - Elevvyn visar planeringen ren (inga kontroller), synkad via
  *   datalagret (settings.activePlanId + planeringens innehåll).
  *
- * Kontrakt: docs/MODULKONTRAKT.md. Data: DATAMODELL.md
- * (classes/{id}/lessonPlans, classes/{id}/settings).
+ * Kontrakt: docs/MODULKONTRAKT.md. Data: DATAMODELL.md.
+ * Planeringar är PRIVATA per lärare (teachers/{uid}/classes/{id}/lessonPlans,
+ * se js/data/plans.js); inställningar delas (classes/{id}/settings).
  */
 
 import { icon } from "../lib/icons.js";
 import { readableTextColor, SUBJECTS } from "../lib/color.js";
+import { plansPath as plansPathFor, currentUid } from "../data/plans.js";
 
 /* De nio av-/påslagbara delarna, i den ordning kryssrutorna visas.
    `slot` säger var i tavlan de bor; `list` = flerradsfält. */
@@ -68,6 +70,9 @@ function normalizePlan(plan) {
   const show = p.show ?? {};
   return {
     id: p.id,
+    // Ägaren stämplas på planeringen (privat per lärare). Pathen bär redan
+    // ägarskapet; fältet gör det uttryckligt och matchar firestore.rules.
+    ownerUid: p.ownerUid ?? currentUid(),
     name: p.name ?? "Ny planering",
     date: p.date ?? todayISO(),
     subjectId: p.subjectId ?? "so",
@@ -255,7 +260,9 @@ export default {
     }
 
     const base = `classes/${activeClass.id}`;
-    const plansPath = `${base}/lessonPlans`;
+    // Planeringar är PRIVATA per lärare (teachers/{uid}/…), se data/plans.js.
+    // Inställningar (aktiv planering, ämnen) ligger kvar i den DELADE klassnoden.
+    const plansPath = plansPathFor(activeClass.id);
     const settingsPath = `${base}/settings`;
 
     let plans = [];

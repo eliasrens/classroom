@@ -10,6 +10,10 @@
  *   3. Om firebase-config.js är ifylld synkas kön mot Firestore när
  *      det finns anslutning, och fjärrändringar mergas in lokalt
  *      (last-write-wins per dokument via fältet `updatedAt`).
+ *      onSnapshot-lyssnare gör att en lärares ändringar syns hos ALLA
+ *      andra inloggade lärare/flikar i realtid. En server-snapshot är
+ *      auktoritativ: dokument som en annan lärare raderat tas bort även
+ *      lokalt (utom egna, ännu ej pushade skrivningar i outboxen).
  *
  * Pathsyntax = Firestores: "classes", "classes/{id}/students", …
  * (se DATAMODELL.md). Alla dokument får id, `updatedAt` (epoch ms)
@@ -94,18 +98,48 @@ export function createDataLayer({ onSyncState } = {}) {
 
   // ---- Merge av fjärrdata (last-write-wins per dokument) ----
 
-  function mergeRemote(path, remoteDocs) {
+  /** Dokument-id:n i samlingen `path` som ligger osparade i outboxen
+   *  (lokalt skapade/ändrade, ännu ej pushade). En delete-op räknas inte:
+   *  då är dokumentet redan borttaget lokalt. */
+  function pendingIdsFor(path) {
+    const ids = new Set();
+    for (const op of readOutbox()) {
+      if (op.path === path && op.op !== "delete") ids.add(op.id);
+    }
+    return ids;
+  }
+
+  function mergeRemote(path, remoteDocs, { authoritative = false } = {}) {
     const local = readCollection(path);
     const merged = { ...local };
     let changed = false;
+
+    // Ta in/uppdatera fjärrdokument — last-write-wins per dokument via updatedAt.
     for (const [id, doc] of Object.entries(remoteDocs)) {
       if (!local[id] || (doc.updatedAt ?? 0) >= (local[id].updatedAt ?? 0)) {
-        if (JSON.stringify(local[id]) !== JSON.stringify(doc)) {
-          merged[id] = { ...doc, id };
+        const remote = { ...doc, id };
+        if (JSON.stringify(local[id]) !== JSON.stringify(remote)) {
+          merged[id] = remote;
           changed = true;
         }
       }
     }
+
+    // Fjärr-borttagningar: när en annan lärare raderar en elev/notering/
+    // planering ska den försvinna även här (realtidsdelning). Verkställs
+    // BARA på en auktoritativ server-snapshot — och aldrig på dokument som
+    // ligger osparade i outboxen (skapade lokalt offline, finns ännu inte
+    // i molnet men får inte tolkas som "raderade").
+    if (authoritative) {
+      const pending = pendingIdsFor(path);
+      for (const id of Object.keys(local)) {
+        if (!(id in remoteDocs) && !pending.has(id)) {
+          delete merged[id];
+          changed = true;
+        }
+      }
+    }
+
     if (changed) {
       writeCollection(path, merged);
       notify(path);

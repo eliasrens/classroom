@@ -13,7 +13,7 @@
  *   classes/{cid}/settings/display   — value: { nameDisplay }
  */
 
-import { SESSION_KEY } from "../../auth.js";
+import { plansPath as plansPathFor, currentUid } from "../../data/plans.js";
 
 // ---- Paths ----
 
@@ -88,7 +88,7 @@ const minutesOf = (hhmm) => {
  */
 export async function currentLessonBlock(data, cid) {
   try {
-    const plans = await data.list(`classes/${cid}/lessonPlans`);
+    const plans = await data.list(plansPathFor(cid));
     const date = todayISO();
     const now = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -108,9 +108,7 @@ export async function currentLessonBlock(data, cid) {
 
 // ---- Skapa notering ----
 
-const createdBy = () => {
-  try { return localStorage.getItem(SESSION_KEY) ?? "local"; } catch { return "local"; }
-};
+const createdBy = () => currentUid();
 
 /**
  * Skapar en notering med automatiskt datum/tid (createdAt sätts av

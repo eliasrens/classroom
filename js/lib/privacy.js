@@ -23,6 +23,8 @@
  * i lärarvyn.
  */
 
+import { plansPath as plansPathFor } from "../data/plans.js";
+
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const PRIVACY_SETTING_ID = "privacy";
@@ -89,16 +91,22 @@ export async function runRetention(data, cid, now = Date.now()) {
 }
 
 /**
- * Radera ALL data för en klass: varje dokument i varje subkollektion
- * (students, notes, lessonPlans, sessions, settings, …) samt själva
- * klassdokumentet i "classes". Går via datalagret så att raderingarna
- * även synkas bort ur Firestore. Returnerar antal borttagna dokument.
+ * Radera ALL data för en klass: varje dokument i varje delad subkollektion
+ * (students, notes, sessions, settings, …), den inloggade lärarens egna
+ * privata planeringar för klassen, samt själva klassdokumentet i "classes".
+ * Går via datalagret så att raderingarna även synkas bort ur Firestore.
+ * Returnerar antal borttagna dokument.
  */
 export async function deleteAllClassData(data, cid) {
   if (!cid) return 0;
   let removed = 0;
   // Alla subkollektioner under klassen (namnen behöver inte vara kända).
+  // Delad klassdata: students, notes, sessions, settings, …
   const paths = await data.collections(`classes/${cid}/`);
+  // Den inloggade lärarens PRIVATA planeringar för klassen ligger utanför
+  // classes/{cid}/ (teachers/{uid}/…) — ta med dem. Andra lärares privata
+  // planeringar rörs aldrig (och kan inte röras, se firestore.rules).
+  paths.push(plansPathFor(cid));
   for (const path of paths) {
     const docs = await data.list(path);
     for (const d of docs) {
