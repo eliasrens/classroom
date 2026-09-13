@@ -16,6 +16,15 @@ export const MODES = [morgon, lektion, trafikljus, elever, oversikt];
 
 export const DEFAULT_MODE_ID = MODES[0].id;
 
+/**
+ * SPÄRR: de enda lägen som får renderas på elevskärmen. Elevlista och
+ * Översikt (noteringar, lärarpaneler) får ALDRIG nå elevvyn — routern
+ * vägrar montera dem där och elevskärmen följer aldrig med dit.
+ */
+export const STUDENT_MODE_IDS = ["morgon", "lektion", "trafikljus"];
+
+export const isStudentMode = (id) => STUDENT_MODE_IDS.includes(id);
+
 export function getMode(id) {
   return MODES.find((m) => m.id === id) ?? null;
 }
