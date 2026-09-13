@@ -155,5 +155,27 @@ innan lärarna hunnit lägga in lokal data.
 | Inloggning misslyckas för en lärare | Kontot saknas i Authentication (steg 4), fel förnamn/lösenord, eller kontots e-post skapades utan `@klassrum.local`. Förnamnet läraren skriver måste matcha delen före `@klassrum.local`. |
 | Data syns lokalt men inte i konsolen | `apiKey` börjar fortfarande med `FYLL_I`, eller SDK:n blockeras (t.ex. nätverksbrandvägg mot `gstatic.com`). |
 
+## Elevskärm på projektorn (auto-helskärm)
+
+När du trycker **"Öppna elevskärm"** försöker appen lägga elevfönstret
+på **skärm 2 (projektorn)** och gå direkt i **helskärm** där — utan att du
+behöver dra fönstret manuellt.
+
+Det kräver:
+
+- **Chrome eller Edge** (använder Window Management API — saknas i
+  Firefox/Safari).
+- **https** (eller `localhost`) — säker kontext krävs.
+- Ett **engångsgodkännande**: första gången frågar webbläsaren om appen
+  får "hantera fönster på alla dina skärmar". Godkänn så minns den valet.
+
+Uppfylls något av detta inte — annan webbläsare, http, behörigheten nekad,
+eller bara **en skärm** — händer inget fel: elevfönstret öppnas som vanligt
+och du växlar helskärm manuellt med **dubbelklick** i elevfönstret (eller
+knappen **"Helskärm här"** i lärarvyns elevskärmspanel). Allt är
+best-effort och inkapslat — funktionen faller alltid tillbaka rent.
+
+---
+
 Se även [AUTH.md](AUTH.md) (lösenordsväggen) och
 [../DATAMODELL.md](../DATAMODELL.md) (datastruktur + delat/privat).
