@@ -11,22 +11,54 @@
    - Elevvy: bara tavlan, stor och ren, synkad via datalagret.
    ============================================================ */
 
-/* ---- Lärarvyns arbetsyta: sidopanel + förhandsvisning ---- */
+/* ---- Lärarvyns arbetsyta: sidopanel + förhandsvisning ----
+   Hela planeringen ska rymmas utan att sidan scrollar. Topbarens höjd
+   varierar, så vi gissar den inte i en viewport-uträkning: app-skalet
+   ankras till exakt en viewport (BARA i lektionsläget, andra lägen
+   matchar inte :has(.lesson) och scrollar som förut) och en flex-kedja
+   fördelar den definita höjden vidare. Panelen scrollar internt vid
+   behov; tavlan skalas så den ryms i både höjd och bredd (se .lb-fit). */
+.app:has(.lesson) { height: 100dvh; }
+.view:has(.lesson) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
 .lesson {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(300px, 360px) 1fr;
   gap: var(--space-4);
-  align-items: start;
+  align-items: stretch;
 }
+/* Ytan är ett stor-container (både bredd OCH höjd via container-type:size)
+   med definit höjd — så tavlan kan skalas efter den faktiska ytan. */
 .lesson__stage {
-  position: sticky;
-  top: calc(var(--topbar-height) + var(--space-3));
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+/* Tavlan (16:9) fyller den mindre av (ytans bredd, ytans höjd × 16/9),
+   mätt i container-enheter mot ytan → aldrig högre eller bredare än
+   ytan, alltså ingen scroll. .lb-fit förblir tavlans typografi-container
+   (cqi), så texten skalar mot rätt bredd. */
+.lesson__stage .lb-fit {
+  width: min(100cqw, calc(100cqh * 16 / 9));
+  aspect-ratio: 16 / 9;
 }
 
-/* På smala skärmar: panelen över tavlan */
+/* På smala skärmar: panelen över tavlan; låt sidan scrolla normalt
+   (både panel och tavla ryms inte i höjd på en telefon). */
 @media (max-width: 860px) {
+  .app:has(.lesson) { height: auto; }
+  .view:has(.lesson) { display: block; }
   .lesson { grid-template-columns: 1fr; }
-  .lesson__stage { position: static; }
+  .lesson-panel { overflow: visible; }
+  .lesson__stage { container-type: inline-size; }
+  .lesson__stage .lb-fit { width: 100%; aspect-ratio: auto; }
 }
 
 /* ---- Sidopanel (lärarverktyg) ---- */
@@ -35,6 +67,8 @@
   flex-direction: column;
   gap: var(--space-4);
   min-width: 0;
+  min-height: 0;
+  overflow: auto;
 }
 .lesson-panel__group { display: flex; flex-direction: column; gap: var(--space-2); }
 .lesson-panel__group > h2 {
@@ -254,16 +288,20 @@ ul.lb-list { margin: 0; padding-left: 1.1em; display: flex; flex-direction: colu
   color: var(--color-ink-soft);
 }
 
-/* ---- Elevvy: tavlan centreras och fyller skärmen ---- */
+/* ---- Elevvy: tavlan centreras och fyller skärmen (inkl. helskärm) ----
+   Fyller ytan under .view:s padding och centrerar tavlan. dvh gör att
+   det stämmer även med webbläsarens dynamiska UI och i äkta helskärm. */
 html[data-theme="student"] .lesson-stage-student {
-  min-height: calc(100vh - 2 * var(--space-4));
+  width: 100%;
+  height: calc(100dvh - 2 * var(--density-pad));
   display: grid;
   place-items: center;
-  padding: var(--space-4);
 }
 /* .lb-fit blir den 16:9-formade rutan; tavlan fyller den. Wrappern är
-   container → tavlans cqi-typografi skalar mot den rätta bredden. */
+   container → tavlans cqi-typografi skalar mot den rätta bredden.
+   Begränsas av höjden så tavlan aldrig blir högre än skärmen → ingen
+   scroll, varken på laptop eller projektor. */
 html[data-theme="student"] .lesson-stage-student .lb-fit {
-  width: min(calc(100vw - 2 * var(--space-4)), calc((100vh - 2 * var(--space-4)) * 16 / 9));
+  width: min(100%, calc((100dvh - 2 * var(--density-pad)) * 16 / 9));
   max-width: 100%;
 }
