@@ -17,6 +17,9 @@ classes/{classId}/students/{studentId}  — elev i klassen
                        t.ex. "🐱" eller "B") om två elever delar
                        förnamn. Aldrig obligatorisk.
   active: true       — false i stället för borttagning (historik bevaras)
+  hotkey             — VALFRI tangent (en bokstav/siffra) för snabb-
+                       notering i Läge 4. Unik per klass; bara aktiv i
+                       Läge 4:s registreringsflik.
 
 classes/{classId}/lessonPlans/{planId}  — lektionsplanering (Läge 2)
   date: "2026-09-14" — ISO-datum; en planering per dag och klass är normalfallet
@@ -30,14 +33,38 @@ classes/{classId}/sessions/{sessionId}  — genomförda pass/resultat
 
 classes/{classId}/notes/{noteId}        — noteringar om elever (Läge 4)
   studentId
-  text
+  kind: "typ" | "text" | "insats"
+                     — typ = kategoriserad snabbnotering (ett tryck),
+                       text = fritextanteckning,
+                       insats = vad läraren gjorde åt saken
+  typeId             — för kind "typ": prat | stol | fokus | sen | annat | positiv
+  positive: bool     — noteringar om det som går bra (egen tangent/knapp)
+  text               — fritext (tom för rena snabbnoteringar)
+  labelId            — VALFRI lärardefinierad etikett (settings/elevlista → labels)
+  followUp: bool     — markerad för uppföljning — sätts ALLTID av läraren
+                       själv, aldrig automatiskt
+  helped             — endast kind "insats": "ja" | "delvis" | "nej" | null
+  lesson             — SNAPSHOT av pågående block ur lessonPlans vid
+                       skapandet: { date, start, end, subjectId, title } | null
+                       (grund för mönstervyerna: moment/veckodag/tid/ämne)
   createdBy          — lärarens uid/e-post
-  createdAt
+  createdAt          — epoch ms; tillsammans med klass-kopplingen i pathen
+                       gör tidsstämpeln central auto-radering (Läge 5) möjlig
 
 classes/{classId}/settings/{key}        — inställningar per klass
                                           (dokument-id = inställningens namn,
                                            t.ex. "schedule", "morningScreen")
   value: { … }
+
+classes/{classId}/settings/elevlista    — Läge 4:s inställningar
+  value: {
+    defaultTypeId    — standardtyp för ett-trycks-notering ("prat" …)
+    labels: [ { id, name, color } ]
+                     — lärarens egna etiketter för anteckningar
+                       (t.ex. positivt, följ upp, ring hem)
+    sessionStart     — epoch ms; minneslistan visar noteringar efter
+                       denna. "Nollställ inför nästa lektion" = nu.
+  }
 
 classes/{classId}/settings/display      — namnvisning (togglas i lärarvyn)
   value: { nameDisplay: "first" | "initials" }
