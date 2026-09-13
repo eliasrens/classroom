@@ -1,0 +1,77 @@
+/* Bas: reset + grundelement. Inga komponentregler här. */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { font-size: var(--font-base); }
+
+body {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: var(--text-m);
+  line-height: 1.45;
+  color: var(--color-ink);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 { margin: 0 0 var(--space-3); line-height: 1.15; }
+h1 { font-size: var(--text-2xl); }
+h2 { font-size: var(--text-xl); }
+h3 { font-size: var(--text-l); }
+p  { margin: 0 0 var(--space-3); }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+img { max-width: 100%; display: block; }
+
+:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-s);
+}
+
+/* Generiska byggstenar som alla lägen får använda */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-s);
+  cursor: pointer;
+}
+.btn:hover { background: var(--color-surface-alt); }
+.btn--primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+.btn--primary:hover { filter: brightness(1.08); background: var(--color-accent); }
+.btn--ghost { background: transparent; box-shadow: none; }
+
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-m);
+  padding: var(--density-pad, var(--space-3));
+}
+
+/* Visuellt dold men läsbar för skärmläsare */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.select, select {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+}

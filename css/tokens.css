@@ -1,0 +1,92 @@
+/* ============================================================
+   DESIGNSYSTEM — TOKENS
+   Alla färger, radier, skuggor och typografisteg definieras här.
+   Två teman: lärarvy (kompakt) och elevvy (projektor: stort, lugnt,
+   hög kontrast, läsbart från bakre delen av klassrummet).
+   Temat väljs med <html data-theme="teacher"> eller "student"
+   (på rot-elementet så att rem-skalan följer med).
+   ============================================================ */
+
+:root {
+  /* ---- Grundpalett (mjuka toner, hög kontrast mot text) ---- */
+  --color-bg: #f6f4ef;          /* varm off-white */
+  --color-surface: #ffffff;
+  --color-surface-alt: #eceae3;
+  --color-ink: #1f2430;         /* nästan-svart text */
+  --color-ink-soft: #5a6072;
+  --color-line: #d8d5cc;
+
+  --color-accent: #2f6fed;      /* primär interaktionsfärg */
+  --color-accent-ink: #ffffff;
+  --color-accent-soft: #e3ecfd;
+
+  --color-ok: #2e9e5b;
+  --color-warn: #e0a10c;
+  --color-danger: #d5453c;
+
+  /* Trafikljus (Läge 3 återanvänder) */
+  --color-light-green: #37b45f;
+  --color-light-yellow: #f2c53d;
+  --color-light-red: #e04a41;
+
+  /* ---- Ämnespalett (mjuka men mättade toner; textfärg räknas
+         fram automatiskt i js/lib/color.js via luminans) ---- */
+  --subject-ma: #4f7ff0;   /* Matematik */
+  --subject-sv: #e8618c;   /* Svenska */
+  --subject-en: #8a5fd0;   /* Engelska */
+  --subject-no: #3aa876;   /* NO */
+  --subject-so: #e59b3a;   /* SO */
+  --subject-idh: #e0564b;  /* Idrott & hälsa */
+  --subject-bl: #d4699e;   /* Bild */
+  --subject-mu: #46b3c9;   /* Musik */
+  --subject-sl: #a3853e;   /* Slöjd */
+  --subject-tk: #6b7f93;   /* Teknik */
+  --subject-rast: #9aa564; /* Rast/övrigt */
+
+  /* ---- Radier (rundade hörn genomgående) ---- */
+  --radius-s: 8px;
+  --radius-m: 14px;
+  --radius-l: 22px;
+  --radius-round: 999px;
+
+  /* ---- Skuggor (mjuka) ---- */
+  --shadow-s: 0 1px 3px rgb(31 36 48 / 8%);
+  --shadow-m: 0 4px 14px rgb(31 36 48 / 10%);
+  --shadow-l: 0 10px 32px rgb(31 36 48 / 14%);
+
+  /* ---- Typografi ----
+     Skalan är relativ: teman skruvar bara på --font-base,
+     så alla steg följer med. */
+  --font-family: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-base: 16px;
+  --text-s: 0.85rem;
+  --text-m: 1rem;
+  --text-l: 1.35rem;
+  --text-xl: 1.9rem;
+  --text-2xl: 2.7rem;
+  --text-3xl: 4rem;    /* projektor-rubriker */
+  --text-giant: 7rem;  /* t.ex. klocka/timer på elevskärm */
+
+  /* ---- Rytm ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 14px;
+  --space-4: 22px;
+  --space-5: 36px;
+
+  --topbar-height: 56px;
+}
+
+/* ============ LÄRARVY — kompakt ============ */
+html[data-theme="teacher"] {
+  --font-base: 16px;
+  --density-pad: var(--space-2);
+}
+
+/* ============ ELEVVY — projektor ============
+   Få element, stor text, extra luft. Läsbar längst bak. */
+html[data-theme="student"] {
+  --font-base: 22px;
+  --density-pad: var(--space-4);
+  --color-bg: #f9f7f1;
+}
