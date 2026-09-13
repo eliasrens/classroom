@@ -11,9 +11,11 @@ import { createAuth } from "./auth.js";
 import { renderLogin } from "./ui/login.js";
 import { createDataLayer } from "./data/datalayer.js";
 import { createRouter } from "./router.js";
-import { MODES } from "./modes/registry.js";
+import { MODES, isStudentMode } from "./modes/registry.js";
 import { initClassPicker, ACTIVE_CLASS_KEY } from "./ui/class-picker.js";
 import { initQuickNote } from "./ui/quick-note.js";
+import { initStudentPanel } from "./ui/student-panel.js";
+import { createSyncBus, isPreviewWindow, announceStudentScreen, watchStudentScreen } from "./sync.js";
 import { icon } from "./lib/icons.js";
 
 const $ = (sel) => document.querySelector(sel);
@@ -90,6 +92,60 @@ function startApp() {
     if (e.key === ACTIVE_CLASS_KEY) store.set({ classId: e.newValue || null });
   });
 
+  // ---- Sync lärare ↔ elevskärm (BroadcastChannel; se docs/SYNC.md) ----
+
+  const bus = createSyncBus();
+  const preview = isPreviewWindow(); // förhandsvisnings-iframen: följer, men är tyst
+
+  // Sätt rätt vy INNAN sync-prenumerationerna nedan gör sina första
+  // anrop — annars agerar ett elevfönster lärare i en blink vid start.
+  store.set({ view: currentView() });
+
+  // Lärarfönstret publicerar tillstånd — vid varje ändring och på begäran.
+  const publishState = () => {
+    const { view, modeId, classId } = store.get();
+    if (view === "teacher") bus.publish("state", { modeId, classId });
+  };
+  store.subscribe(["modeId", "classId", "view"], publishState);
+  bus.on("state:request", publishState);
+
+  // Elevskärmen följer läraren — men ALDRIG in i lärarlägen (spärr).
+  bus.on("state", ({ payload }) => {
+    if (store.get().view !== "student") return;
+    store.set({ classId: payload.classId ?? null });
+    if (isStudentMode(payload.modeId) && payload.modeId !== store.get().modeId) {
+      location.hash = `#/elev/${payload.modeId}`;
+    }
+  });
+
+  // Nyöppnad elevskärm: fråga läraren vad som gäller just nu.
+  if (currentView() === "student") bus.publish("state:request");
+
+  // Presence: elevfönstret annonserar sig, lärarfönstret vaktar.
+  let stopPresence = null;
+  store.subscribe(["view"], ({ view }) => {
+    stopPresence?.();
+    stopPresence = null;
+    if (preview) return;
+    if (view === "student") stopPresence = announceStudentScreen(bus);
+    else stopPresence = watchStudentScreen(bus, (open) => store.set({ studentOpen: open }));
+  });
+
+  // Hård spärr: lärarens verktygsfält får aldrig ens finnas i elevvyn
+  // (CSS döljer det redan via data-theme — detta är bältet OCH hängslena).
+  store.subscribe(["view"], ({ view }) => {
+    $("#topbar").hidden = view === "student";
+  });
+
+  // Elevfönster på projektorn: dubbelklick växlar helskärm.
+  if (!preview) {
+    window.addEventListener("dblclick", () => {
+      if (store.get().view !== "student") return;
+      if (document.fullscreenElement) void document.exitFullscreen();
+      else void document.documentElement.requestFullscreen?.().catch(() => {});
+    });
+  }
+
   // Lägesmeny
   const navEl = $("#mode-nav");
   navEl.innerHTML = MODES
@@ -108,12 +164,25 @@ function startApp() {
   initClassPicker({ el: $("#class-picker"), store, data });
 
   // Elevskärm i eget fönster — ärver inloggningen (samma webbläsare/session).
+  // Namngivet fönster: ett andra klick återanvänder/fokuserar samma skärm.
+  function openStudentWindow() {
+    const { modeId } = store.get();
+    const target = isStudentMode(modeId) ? modeId : MODES[0].id;
+    window.open(`${location.pathname}#/elev/${target}`, "classroom-student-view")?.focus();
+  }
+
   const studentBtn = $("#open-student-view");
   studentBtn.insertAdjacentHTML("afterbegin", icon("monitor"));
-  studentBtn.addEventListener("click", () => {
-    const { modeId } = store.get();
-    window.open(`${location.pathname}#/elev/${modeId}`, "classroom-student-view");
+  studentBtn.addEventListener("click", openStudentWindow);
+  store.subscribe(["studentOpen"], ({ studentOpen }) => {
+    studentBtn.dataset.open = String(!!studentOpen);
+    studentBtn.title = studentOpen
+      ? "Elevskärmen är öppen — klicka för att fokusera den"
+      : "Öppna elevskärm i nytt fönster";
   });
+
+  // Panel i lärarvyn: indikator + live-förhandsvisning + enskärmsläge.
+  initStudentPanel({ store, openStudentWindow });
 
   // Ljust/mörkt läge i lärarvyn
   $("#toggle-scheme").addEventListener("click", () => {
@@ -132,6 +201,6 @@ function startApp() {
   initQuickNote({ store, data });
 
   // Router
-  const router = createRouter({ store, data, viewEl: $("#view") });
+  const router = createRouter({ store, data, viewEl: $("#view"), sync: bus });
   router.start();
 }

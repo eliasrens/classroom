@@ -22,8 +22,10 @@ export default {
    *                //   teacher: kompakt arbetsvy (lärarens laptop)
    *                //   student: projektorvy — få element, stor text
    *   activeClass, // klassdokumentet { id, name, … } eller null
-   *   store,       //  globalt tillstånd (js/store.js): classId, modeId, view, syncState
+   *   store,       //  globalt tillstånd (js/store.js): classId, modeId, view, syncState, studentOpen
    *   data,        //  datalagret (js/data/datalayer.js): list/get/put/patch/remove/watch
+   *   sync,        //  sync-bussen (js/sync.js): publish/on — omedelbara händelser
+   *                //  lärare→elevskärm, t.ex. timerstart. Kontrakt: docs/SYNC.md
    * }
    */
   async mount(el, ctx) {},
@@ -50,7 +52,13 @@ export default {
    som speglar lärarens ändringar). Avregistrera i `unmount`.
 4. **Elevvyn** nås på `#/elev/<id>` (knappen "Elevskärm" öppnar den i
    eget fönster). Samma modul renderar båda vyerna — förgrena på
-   `ctx.view`. Elevvyn får INTE innehålla interaktiva lärarverktyg.
+   `ctx.view`. Elevvyn får INTE innehålla interaktiva lärarverktyg
+   eller noteringar. Märk dessutom ALLT lärarmaterial i din markup med
+   klassen `teacher-only` (CSS-skyddsnätet släcker den i elevvyn) och
+   lyssna/publicera händelser enligt sync-kontraktet i `docs/SYNC.md`.
+   Bara lägen i `STUDENT_MODE_IDS` (registry) kan renderas i elevvyn.
+   Nedräkningar/klockor: använd `js/lib/timer.js` (tidsstämpelbaserad,
+   bakgrundssäker) — aldrig egna tick-räknare.
 5. **Elevnamn**: visa ALLTID namn via `studentLabel()`/`initialsFor()`
    i `js/lib/names.js` (endast förnamn + valfri tag; initial-läget
    styrs av klassinställningen `settings/display`, se DATAMODELL.md).

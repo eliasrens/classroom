@@ -1,0 +1,143 @@
+/**
+ * ELEVSKÄRMSPANELEN — lärarvyns hörna för allt kring elevskärmen:
+ *
+ *  - indikator: är elevskärmen ÖPPEN eller STÄNGD (store.studentOpen,
+ *    matas av presence-vakten i sync.js)
+ *  - liten live-förhandsvisning av exakt det eleverna ser: en iframe
+ *    som kör appens elevvy med ?preview — den följer lägesbyten via
+ *    sync-kanalen precis som en riktig elevskärm, men är tyst i
+ *    presence-protokollet och räknas aldrig som öppen skärm
+ *  - "Öppna elevskärm" (nytt fönster → projektorn)
+ *  - "Helskärm här" — ENSKÄRMSLÄGE: samma fönster växlar till elevvy
+ *    i helskärm; Esc/avslutad helskärm tar läraren tillbaka
+ *
+ * Panelen renderas bara i lärarvyn (döljs helt när view = student).
+ */
+
+import { icon } from "../lib/icons.js";
+import { DEFAULT_MODE_ID, isStudentMode } from "../modes/registry.js";
+
+const COLLAPSED_KEY = "classroom:ui:studentPanelCollapsed";
+const RETURN_KEY = "classroom:singlescreenReturn"; // sessionStorage: lärarens läge att återvända till
+
+const readReturnMode = () => { try { return sessionStorage.getItem(RETURN_KEY); } catch { return null; } };
+const writeReturnMode = (v) => {
+  try { v == null ? sessionStorage.removeItem(RETURN_KEY) : sessionStorage.setItem(RETURN_KEY, v); }
+  catch { /* lagring otillgänglig — Esc-vägen funkar ändå via helskärmsläget */ }
+};
+
+export function initStudentPanel({ store, openStudentWindow }) {
+  const el = document.createElement("aside");
+  el.className = "student-panel";
+  el.setAttribute("aria-label", "Elevskärm");
+  el.innerHTML = `
+    <header class="student-panel__head">
+      <span class="student-panel__status" data-open="false">
+        ${icon("monitor")}<span class="student-panel__statustext">Elevskärm stängd</span>
+      </span>
+      <button class="btn btn--ghost btn--icon student-panel__toggle"
+        title="Fäll ihop/ut förhandsvisningen" aria-expanded="true"></button>
+    </header>
+    <div class="student-panel__body">
+      <div class="student-panel__frame" title="Förhandsvisning — det eleverna ser just nu">
+        <iframe class="student-panel__iframe" title="Förhandsvisning av elevskärmen"
+          aria-hidden="true" tabindex="-1"></iframe>
+      </div>
+      <div class="student-panel__actions">
+        <button class="btn student-panel__open">${icon("monitor")}<span>Öppna elevskärm</span></button>
+        <button class="btn btn--ghost student-panel__fullscreen"
+          title="Enskärmsläge: visa elevskärmen i helskärm i detta fönster">
+          ${icon("expand")}<span>Helskärm här</span></button>
+      </div>
+    </div>`;
+  document.getElementById("app").appendChild(el);
+
+  const statusEl = el.querySelector(".student-panel__status");
+  const statusText = el.querySelector(".student-panel__statustext");
+  const toggleBtn = el.querySelector(".student-panel__toggle");
+  const iframe = el.querySelector(".student-panel__iframe");
+
+  // ---- Indikator: öppen/stängd ----
+
+  store.subscribe(["studentOpen"], ({ studentOpen }) => {
+    statusEl.dataset.open = String(!!studentOpen);
+    statusText.textContent = studentOpen ? "Elevskärm öppen" : "Elevskärm stängd";
+  });
+
+  // ---- Förhandsvisning (laddas bara när panelen är utfälld) ----
+
+  function previewUrl() {
+    const { modeId } = store.get();
+    const target = isStudentMode(modeId) ? modeId : DEFAULT_MODE_ID;
+    return `${location.pathname}?preview=1#/elev/${target}`;
+  }
+
+  // Två src-tilldelningar i samma task kan lämna iframen fast på
+  // about:blank (Chromium). Därför: debounce + stäm av mot iframens
+  // FAKTISKA adress, inte src-attributet.
+  let previewTimer = null;
+  function updatePreview() {
+    const wantLoaded = !el.hidden && el.dataset.collapsed !== "true";
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => {
+      let actual = null;
+      try { actual = iframe.contentWindow?.location.href; } catch { /* okänd → behandla som blank */ }
+      const isBlank = !actual || actual === "about:blank";
+      if (wantLoaded && isBlank) iframe.src = previewUrl();
+      else if (!wantLoaded && !isBlank) iframe.src = "about:blank";
+    }, 60);
+  }
+
+  function setCollapsed(collapsed) {
+    el.dataset.collapsed = String(collapsed);
+    toggleBtn.setAttribute("aria-expanded", String(!collapsed));
+    toggleBtn.innerHTML = icon(collapsed ? "chevron-up" : "chevron-down");
+    // Ihopfälld panel ska inte kosta en hel app-instans i bakgrunden.
+    updatePreview();
+    try { localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : ""); } catch { /* ok */ }
+  }
+
+  let startCollapsed = false;
+  try { startCollapsed = localStorage.getItem(COLLAPSED_KEY) === "1"; } catch { /* ok */ }
+  setCollapsed(startCollapsed);
+
+  toggleBtn.addEventListener("click", () => setCollapsed(el.dataset.collapsed !== "true"));
+
+  // ---- Åtgärder ----
+
+  el.querySelector(".student-panel__open").addEventListener("click", openStudentWindow);
+  el.querySelector(".student-panel__fullscreen").addEventListener("click", enterSingleScreen);
+
+  // Panelen (och dess iframe) finns bara i lärarvyn — hård spärr.
+  store.subscribe(["view"], ({ view }) => {
+    el.hidden = view !== "teacher";
+    updatePreview();
+  });
+
+  // ---- Enskärmsläge ----
+
+  function enterSingleScreen() {
+    const { modeId } = store.get();
+    writeReturnMode(modeId);
+    location.hash = `#/elev/${isStudentMode(modeId) ? modeId : DEFAULT_MODE_ID}`;
+    // Helskärm kräver användargest — vi är i ett klick, så det går.
+    document.documentElement.requestFullscreen?.().catch(() => { /* elevvy utan helskärm duger */ });
+  }
+
+  function returnToTeacher() {
+    const back = readReturnMode();
+    if (back == null) return;
+    writeReturnMode(null);
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    location.hash = `#/${back || DEFAULT_MODE_ID}`;
+  }
+
+  // Läraren lämnar helskärm (Esc eller systemgest) → tillbaka till lärarvyn.
+  document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement && store.get().view === "student") returnToTeacher();
+  });
+  // Esc fungerar även om helskärmen aldrig gick igång.
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && store.get().view === "student") returnToTeacher();
+  });
+}
