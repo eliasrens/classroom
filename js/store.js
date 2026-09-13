@@ -12,6 +12,9 @@
  *   syncState — 'local' | 'online' | 'offline' (sätts av datalagret)
  *   studentOpen — true när en elevskärm är öppen (sätts av presence-
  *                 vakten i js/sync.js; bara meningsfullt i lärarvyn)
+ *   presentedMode — modeId som JUST NU visas på elevskärmen (det läge
+ *                 läraren aktivt skickat ut). Frikopplat från modeId
+ *                 (lärarens egen flik). Bara meningsfullt i lärarvyn.
  */
 
 export function createStore(initial = {}) {
@@ -62,4 +65,5 @@ export const store = createStore({
   view: "teacher",
   syncState: "local",
   studentOpen: false,
+  presentedMode: null,
 });

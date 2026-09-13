@@ -212,7 +212,31 @@ html[data-theme="student"] .view {
   gap: var(--space-2);
   padding: var(--space-2);
 }
+.student-panel__actions + .student-panel__actions { padding-top: 0; }
 .student-panel__actions .btn { flex: 1; justify-content: center; }
+
+/* "Eleverna ser:" — vilket LÄGE som är utskickat just nu (≠ lärarens flik) */
+.student-panel__showing {
+  margin: 0;
+  padding: var(--space-2) var(--space-2) 0;
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+}
+.student-panel__showing strong { color: var(--color-ink); }
+
+/* "Visa på elevskärm": aktiv/gjord när lärarens flik redan visas ute */
+.student-panel__present:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: none;
+}
+.student-panel__present[data-active="true"] {
+  background: var(--color-ok);
+  border-color: var(--color-ok);
+  color: #fff;
+  cursor: default;
+}
+.student-panel__present[data-active="true"]:hover { filter: none; background: var(--color-ok); }
 
 /* ---- "Bra jobbat" — snabbknapp nere till vänster (nåbar från andra lägen) ---- */
 

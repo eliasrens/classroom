@@ -28,6 +28,11 @@ const $ = (sel) => document.querySelector(sel);
 const appEl = $("#app");
 const gateEl = $("#auth-gate");
 
+// Utskickat läge (det eleverna ser) persistas som klassvalet — så att ett
+// omladdat/nyöppnat LÄRARfönster LÄR SIG vad som redan visas i stället för
+// att nollställa det. Delas mellan fönster via storage-eventet.
+const PRESENTED_MODE_KEY = "classroom:presentedMode";
+
 // ---- Ljust/mörkt läge (lärarvyn; mörkt är standard) ----
 
 const SCHEME_KEY = "classroom:ui:scheme";
@@ -99,9 +104,19 @@ function startApp() {
     if (saved) store.set({ classId: saved });
   } catch { /* lagring otillgänglig — kör vidare utan */ }
 
-  // Elevskärmen (och andra flikar) följer lärarens klassbyte live.
+  // Återställ utskickat läge — så ett omladdat lärarfönster inte råkar
+  // byta läge ute på elevskärmen (se PRESENTED_MODE_KEY ovan).
+  try {
+    const savedMode = localStorage.getItem(PRESENTED_MODE_KEY);
+    if (savedMode && isStudentMode(savedMode)) store.set({ presentedMode: savedMode });
+  } catch { /* lagring otillgänglig — bootstrappas vid första state:request */ }
+
+  // Elevskärmen (och andra flikar) följer lärarens klassbyte live; andra
+  // lärarfönster håller indikatorn för utskickat läge i synk.
   window.addEventListener("storage", (e) => {
     if (e.key === ACTIVE_CLASS_KEY) store.set({ classId: e.newValue || null });
+    else if (e.key === PRESENTED_MODE_KEY && store.get().view === "teacher"
+             && isStudentMode(e.newValue)) store.set({ presentedMode: e.newValue });
   });
 
   // ---- Sync lärare ↔ elevskärm (BroadcastChannel; se docs/SYNC.md) ----
@@ -135,24 +150,66 @@ function startApp() {
     void runRetention(data, classId);
   });
 
-  // Lärarfönstret publicerar tillstånd — vid varje ändring och på begäran.
+  // Lärarfönstret publicerar KLASSVALET — vid varje klassbyte och på
+  // begäran. Klassen följer alltid med automatiskt (samma aktiva klass
+  // överallt). LÄGET gör det INTE längre: lärarens flikbyte ska inte
+  // röra elevskärmen — det styrs av "Visa på elevskärm" (present nedan).
   const publishState = () => {
-    const { view, modeId, classId } = store.get();
-    if (view === "teacher") bus.publish("state", { modeId, classId });
+    const { view, classId } = store.get();
+    if (view === "teacher") bus.publish("state", { classId });
   };
-  store.subscribe(["modeId", "classId", "view"], publishState);
+  store.subscribe(["classId", "view"], publishState);
   bus.on("state:request", publishState);
 
-  // Elevskärmen följer läraren — men ALDRIG in i lärarlägen (spärr).
+  // ---- Utskickat läge ("Visa på elevskärm") ----
+  //
+  // presentedMode = det läge som JUST NU visas på elevskärmen. Frikopplat
+  // från lärarens egen flik (store.modeId). Läraren skickar aktivt ut ett
+  // läge; först då byter elevskärmen. Bara elev-visningsbara lägen kan
+  // skickas ut (Elevlista/Översikt når som förut ALDRIG elevskärmen).
+  const startableMode = () => {
+    const { modeId } = store.get();
+    return isStudentMode(modeId) ? modeId : MODES[0].id;
+  };
+
+  // Skicka ut ett läge till alla elevskärmar (och håll indikatorn i synk).
+  function present(modeId) {
+    if (!isStudentMode(modeId)) return;
+    try { localStorage.setItem(PRESENTED_MODE_KEY, modeId); } catch { /* ok */ }
+    store.set({ presentedMode: modeId });
+    bus.publish("present", { modeId });
+  }
+
+  // Andra lärarfönster/flikar håller sin indikator i synk med det utskickade.
+  bus.on("present", ({ payload }) => {
+    if (store.get().view !== "teacher") return;
+    if (isStudentMode(payload?.modeId)) store.set({ presentedMode: payload.modeId });
+  });
+
+  // Elevskärmen följer KLASSVALET automatiskt — aldrig läget (frikopplat).
   bus.on("state", ({ payload }) => {
     if (store.get().view !== "student") return;
     store.set({ classId: payload.classId ?? null });
-    if (isStudentMode(payload.modeId) && payload.modeId !== store.get().modeId) {
+  });
+
+  // Elevskärmen byter läge BARA när läraren aktivt skickar ut ett — och
+  // aldrig in i lärarlägen (spärr behålls).
+  bus.on("present", ({ payload }) => {
+    if (store.get().view !== "student") return;
+    if (isStudentMode(payload?.modeId) && payload.modeId !== store.get().modeId) {
       location.hash = `#/elev/${payload.modeId}`;
     }
   });
 
-  // Nyöppnad elevskärm: fråga läraren vad som gäller just nu.
+  // Nyöppnad elevskärm (eller förhandsvisning): fråga läraren vad som gäller.
+  // Läraren svarar med klassval OCH det utskickade läget — vid första
+  // förfrågan sätts ett rimligt startläge (lärarens nuvarande elev-
+  // visningsbara läge, annars morgonskärm); därefter styr bara knappen.
+  bus.on("state:request", () => {
+    if (store.get().view !== "teacher") return;
+    if (store.get().presentedMode == null) present(startableMode());
+    else bus.publish("present", { modeId: store.get().presentedMode });
+  });
   if (currentView() === "student") bus.publish("state:request");
 
   // Presence: elevfönstret annonserar sig, lärarfönstret vaktar.
@@ -241,8 +298,9 @@ function startApp() {
       : "Öppna elevskärm i nytt fönster";
   });
 
-  // Panel i lärarvyn: indikator + live-förhandsvisning + enskärmsläge.
-  initStudentPanel({ store, openStudentWindow });
+  // Panel i lärarvyn: indikator + live-förhandsvisning + enskärmsläge
+  // + "Visa på elevskärm" (skickar ut lärarens aktuella läge).
+  initStudentPanel({ store, openStudentWindow, present });
 
   // "Bra jobbat" — snabbknapp för namntavlan, nåbar från andra lägen.
   initPraise({ store, data });
