@@ -15,7 +15,7 @@
  */
 
 import { icon } from "../lib/icons.js";
-import { DEFAULT_MODE_ID, isStudentMode } from "../modes/registry.js";
+import { DEFAULT_MODE_ID, isStudentMode, getMode } from "../modes/registry.js";
 
 const COLLAPSED_KEY = "classroom:ui:studentPanelCollapsed";
 const RETURN_KEY = "classroom:singlescreenReturn"; // sessionStorage: lärarens läge att återvända till
@@ -26,7 +26,7 @@ const writeReturnMode = (v) => {
   catch { /* lagring otillgänglig — Esc-vägen funkar ändå via helskärmsläget */ }
 };
 
-export function initStudentPanel({ store, openStudentWindow }) {
+export function initStudentPanel({ store, openStudentWindow, present }) {
   const el = document.createElement("aside");
   el.className = "student-panel";
   el.setAttribute("aria-label", "Elevskärm");
@@ -43,6 +43,13 @@ export function initStudentPanel({ store, openStudentWindow }) {
         <iframe class="student-panel__iframe" title="Förhandsvisning av elevskärmen"
           aria-hidden="true" tabindex="-1"></iframe>
       </div>
+      <p class="student-panel__showing" aria-live="polite">
+        Eleverna ser: <strong class="student-panel__shownmode">—</strong>
+      </p>
+      <div class="student-panel__actions">
+        <button class="btn btn--primary student-panel__present" data-active="false">
+          ${icon("monitor")}<span class="student-panel__presentlabel">Visa på elevskärm</span></button>
+      </div>
       <div class="student-panel__actions">
         <button class="btn student-panel__open">${icon("monitor")}<span>Öppna elevskärm</span></button>
         <button class="btn btn--ghost student-panel__fullscreen"
@@ -56,6 +63,9 @@ export function initStudentPanel({ store, openStudentWindow }) {
   const statusText = el.querySelector(".student-panel__statustext");
   const toggleBtn = el.querySelector(".student-panel__toggle");
   const iframe = el.querySelector(".student-panel__iframe");
+  const shownModeEl = el.querySelector(".student-panel__shownmode");
+  const presentBtn = el.querySelector(".student-panel__present");
+  const presentLabel = el.querySelector(".student-panel__presentlabel");
 
   // ---- Indikator: öppen/stängd ----
 
@@ -64,11 +74,44 @@ export function initStudentPanel({ store, openStudentWindow }) {
     statusText.textContent = studentOpen ? "Elevskärm öppen" : "Elevskärm stängd";
   });
 
+  // ---- "Visa på elevskärm" + indikator för utskickat läge ----
+  //
+  // Skickar ut lärarens NUVARANDE flik till elevskärmen (bara elev-
+  // visningsbara lägen). Knappen markeras som aktiv när lärarens flik
+  // redan är det som visas ute. Indikatorn visar det utskickade läget —
+  // skilt från lärarens egen flik.
+
+  presentBtn.addEventListener("click", () => present(store.get().modeId));
+
+  store.subscribe(["modeId", "presentedMode"], ({ modeId, presentedMode }) => {
+    const shown = presentedMode ? getMode(presentedMode) : null;
+    shownModeEl.textContent = shown ? shown.title : "—";
+
+    const canPresent = isStudentMode(modeId);
+    const alreadyShown = canPresent && modeId === presentedMode;
+    presentBtn.disabled = !canPresent;
+    presentBtn.dataset.active = String(alreadyShown);
+    if (!canPresent) {
+      presentLabel.textContent = "Visa på elevskärm";
+      presentBtn.title = "Det här läget kan inte visas för eleverna";
+    } else if (alreadyShown) {
+      presentLabel.textContent = "Visas för eleverna";
+      presentBtn.title = "Det här läget visas redan på elevskärmen";
+    } else {
+      presentLabel.textContent = "Visa på elevskärm";
+      presentBtn.title = "Skicka ut det här läget till elevskärmen";
+    }
+  });
+
   // ---- Förhandsvisning (laddas bara när panelen är utfälld) ----
 
+  // Förhandsvisningen speglar det UTSKICKADE läget (det eleverna ser),
+  // inte lärarens egen flik. Efter initial laddning följer iframen
+  // vidare present-meddelanden live via sync-bussen (den är en riktig,
+  // men tyst, elevskärm) — därför sätts src bara när den är tom.
   function previewUrl() {
-    const { modeId } = store.get();
-    const target = isStudentMode(modeId) ? modeId : DEFAULT_MODE_ID;
+    const { presentedMode } = store.get();
+    const target = isStudentMode(presentedMode) ? presentedMode : DEFAULT_MODE_ID;
     return `${location.pathname}?preview=1#/elev/${target}`;
   }
 
