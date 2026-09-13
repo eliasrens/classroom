@@ -19,6 +19,7 @@ import { initPraise } from "./ui/praise.js";
 import { createSyncBus, isPreviewWindow, announceStudentScreen, watchStudentScreen } from "./sync.js";
 import { icon } from "./lib/icons.js";
 import { runRetention } from "./lib/privacy.js";
+import { getProjectorScreen, screenOpenFeatures, enterFullscreenOnProjector } from "./lib/screens.js";
 import { initHelp } from "./ui/help.js";
 import { initShortcuts } from "./ui/shortcuts.js";
 
@@ -41,6 +42,12 @@ try { applyScheme(localStorage.getItem(SCHEME_KEY)); } catch { applyScheme(null)
 
 /** 'student' om fönstret visar elevskärm (#/elev/…) — behövs redan före login. */
 const currentView = () => (/^#\/?elev(\/|$)/.test(location.hash) ? "student" : "teacher");
+
+/** Öppnades detta elevfönster med begäran om auto-helskärm på projektorn? */
+const wantsAutoFullscreen = () => {
+  try { return new URLSearchParams(location.search).has("autofs"); }
+  catch { return false; }
+};
 
 // ---- Lösenordsvägg ----
 
@@ -104,6 +111,14 @@ function startApp() {
   // Sätt rätt vy INNAN sync-prenumerationerna nedan gör sina första
   // anrop — annars agerar ett elevfönster lärare i en blink vid start.
   store.set({ view: currentView() });
+
+  // Elevfönster som öppnats på projektorn med ?autofs=1: gå i helskärm på
+  // den skärmen direkt. Best-effort — fönstret ärver klick-gesten från
+  // "Öppna elevskärm", men lyckas det inte finns dubbelklick kvar. Aldrig
+  // i förhandsvisnings-iframen (den är inbäddad i lärarvyn).
+  if (!preview && currentView() === "student" && wantsAutoFullscreen()) {
+    void enterFullscreenOnProjector().catch(() => { /* helskärm är en bonus */ });
+  }
 
   // INTEGRITET: auto-radering av gamla noteringar (Läge 5). Körs bara i
   // lärarvyn när en klass är aktiv — gränsen sätts per klass i
@@ -180,10 +195,36 @@ function startApp() {
 
   // Elevskärm i eget fönster — ärver inloggningen (samma webbläsare/session).
   // Namngivet fönster: ett andra klick återanvänder/fokuserar samma skärm.
-  function openStudentWindow() {
+  //
+  // Om Window Management API finns (Chrome/Edge, https/localhost, behörighet
+  // given) och det finns en andra skärm (projektorn): öppna fönstret
+  // positionerat på DEN skärmens bounds och be det gå i helskärm där (flaggan
+  // ?autofs=1 läses vid elevvyns uppstart, se startApp). Allt annat — API
+  // saknas/nekas, bara en skärm, popup blockerad — faller tillbaka på dagens
+  // beteende: vanligt window.open + befintlig dubbelklick-för-helskärm.
+  async function openStudentWindow() {
     const { modeId } = store.get();
     const target = isStudentMode(modeId) ? modeId : MODES[0].id;
-    window.open(`${location.pathname}#/elev/${target}`, "classroom-student-view")?.focus();
+    const url = `${location.pathname}#/elev/${target}`;
+
+    let projector = null;
+    try { projector = await getProjectorScreen(); } catch { projector = null; }
+
+    // Fallback: ingen andra skärm / API saknas / nekad → som förut.
+    if (!projector) {
+      try { window.open(url, "classroom-student-view")?.focus(); } catch { /* ok */ }
+      return;
+    }
+
+    // Projektor hittad: positionera på dess yta och flagga för auto-helskärm.
+    const fsUrl = `${location.pathname}?autofs=1#/elev/${target}`;
+    let win = null;
+    try { win = window.open(fsUrl, "classroom-student-view", screenOpenFeatures(projector.screen)); }
+    catch { win = null; }
+    // Popup blockerad (t.ex. aktivering förbrukad av behörighets-await) →
+    // sista utväg: öppna som vanligt, utan positionering/auto-helskärm.
+    if (!win) { try { win = window.open(url, "classroom-student-view"); } catch { /* ok */ } }
+    win?.focus();
   }
 
   const studentBtn = $("#open-student-view");
