@@ -10,6 +10,8 @@
  *   modeId    — aktivt läge ('morgon' | 'lektion' | 'trafikljus' | 'elever' | 'oversikt')
  *   view      — 'teacher' | 'student' (vilken vy detta fönster visar)
  *   syncState — 'local' | 'online' | 'offline' (sätts av datalagret)
+ *   studentOpen — true när en elevskärm är öppen (sätts av presence-
+ *                 vakten i js/sync.js; bara meningsfullt i lärarvyn)
  */
 
 export function createStore(initial = {}) {
@@ -59,4 +61,5 @@ export const store = createStore({
   modeId: "morgon",
   view: "teacher",
   syncState: "local",
+  studentOpen: false,
 });

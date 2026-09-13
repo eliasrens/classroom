@@ -10,19 +10,20 @@
  * (kontraktets regel — lägen slipper egen klassbyteslogik).
  */
 
-import { getMode, DEFAULT_MODE_ID } from "./modes/registry.js";
+import { getMode, DEFAULT_MODE_ID, isStudentMode } from "./modes/registry.js";
 
-export function createRouter({ store, data, viewEl }) {
+export function createRouter({ store, data, viewEl, sync }) {
   let current = null; // { mode, view } som är monterat just nu
 
   function parseHash() {
     const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
     const isStudent = parts[0] === "elev";
-    const modeId = (isStudent ? parts[1] : parts[0]) || DEFAULT_MODE_ID;
-    return {
-      view: isStudent ? "student" : "teacher",
-      modeId: getMode(modeId) ? modeId : DEFAULT_MODE_ID,
-    };
+    let modeId = (isStudent ? parts[1] : parts[0]) || DEFAULT_MODE_ID;
+    if (!getMode(modeId)) modeId = DEFAULT_MODE_ID;
+    // SPÄRR: elevvyn kan bara visa elevlägen — lärarlägen (elevlista,
+    // översikt, noteringar) får aldrig renderas på projektorn.
+    if (isStudent && !isStudentMode(modeId)) modeId = DEFAULT_MODE_ID;
+    return { view: isStudent ? "student" : "teacher", modeId };
   }
 
   async function mountCurrent() {
@@ -39,7 +40,7 @@ export function createRouter({ store, data, viewEl }) {
 
     const { classId } = store.get();
     const activeClass = classId ? await data.get("classes", classId) : null;
-    const ctx = { store, data, view, activeClass };
+    const ctx = { store, data, view, activeClass, sync };
 
     current = { mode, view };
     try {

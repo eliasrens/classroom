@@ -23,6 +23,9 @@ const PATHS = {
   sun: `<circle cx="12" cy="12" r="4"/><path d="M12 2.5V5M12 19v2.5M2.5 12H5M19 12h2.5M4.9 4.9 6.7 6.7M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/>`,
   moon: `<path d="M20 13.5A8 8 0 0 1 10.5 4 8 8 0 1 0 20 13.5z"/>`,
   plus: `<path d="M12 5v14M5 12h14"/>`,
+  expand: `<path d="M15 4h5v5M9 20H4v-5M20 4l-6.5 6.5M4 20l6.5-6.5"/>`,
+  "chevron-down": `<path d="M6 9.5l6 6 6-6"/>`,
+  "chevron-up": `<path d="M6 14.5l6-6 6 6"/>`,
 };
 
 /**
