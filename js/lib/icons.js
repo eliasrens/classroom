@@ -27,6 +27,11 @@ const PATHS = {
   expand: `<path d="M15 4h5v5M9 20H4v-5M20 4l-6.5 6.5M4 20l6.5-6.5"/>`,
   "chevron-down": `<path d="M6 9.5l6 6 6-6"/>`,
   "chevron-up": `<path d="M6 14.5l6-6 6 6"/>`,
+  // Trafikljusur (Läge 3)
+  play: `<path d="M7 5.5v13l11-6.5z"/>`,
+  stop: `<rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/>`,
+  reset: `<path d="M4 5.5v5h5M4.6 10.5a8 8 0 1 1-1.1 5"/>`,
+  save: `<path d="M5 4h11l3 3v13H5zM8 4v5h7M8 20v-6h8v6"/>`,
   // Läge 4 — Elevlista & noteringar
   check: `<path d="M4.5 12.5 10 18 19.5 6.5"/>`,
   x: `<path d="m6 6 12 12M18 6 6 18"/>`,

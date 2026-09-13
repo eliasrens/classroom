@@ -1,0 +1,245 @@
+/* ============================================================
+   LÄGE 3 — TRAFIKLJUSUR
+   Stor uppräknande klocka + dynamiska fasfärger. Färgerna är
+   dämpade och projektorvänliga (inte skrikande neon); övergångar
+   mellan faser tonas mjukt. Lärarvyn har kontroller + paneler,
+   elevvyn är REN (bara scenen).
+   ============================================================ */
+
+.tl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+}
+.tl--teacher { max-width: 960px; margin: 0 auto; }
+
+/* ---- Scenen: den färgade klockytan ---- */
+
+.tl-stage {
+  --stage-bg: var(--tl-green-bg);
+  --stage-ink: var(--tl-green-ink);
+  background: var(--stage-bg);
+  color: var(--stage-ink);
+  border-radius: var(--radius-l);
+  padding: var(--space-5) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  text-align: center;
+  /* Mjuk fasövergång — inte skrikande. */
+  transition: background-color 600ms ease, color 600ms ease;
+}
+
+/* Fasfärger (dämpade). Samma toner i båda teman så scenen är
+   klassrummets fasta referens. */
+:root {
+  --tl-green-bg: #4f9d6b;   --tl-green-ink: #f4fbf6;
+  --tl-yellow-bg: #d9b24a;  --tl-yellow-ink: #2f2a13;
+  --tl-red-bg: #cf6f63;     --tl-red-ink: #fff2f0;
+}
+.tl-stage[data-phase="green"]  { --stage-bg: var(--tl-green-bg);  --stage-ink: var(--tl-green-ink); }
+.tl-stage[data-phase="yellow"] { --stage-bg: var(--tl-yellow-bg); --stage-ink: var(--tl-yellow-ink); }
+.tl-stage[data-phase="red"]    { --stage-bg: var(--tl-red-bg);    --stage-ink: var(--tl-red-ink); }
+
+/* Stoppad klocka: behåller fasfärgen men markerar frysning diskret. */
+.tl-stage[data-stopped="true"] { box-shadow: inset 0 0 0 3px rgb(255 255 255 / 35%); }
+
+.tl-clock {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  font-size: clamp(4.5rem, 20vw, 13rem);
+}
+
+.tl-phase {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 22ch;
+}
+.tl-phase-lead {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: clamp(0.9rem, 2.4vw, 1.4rem);
+  opacity: 0.85;
+}
+.tl-phase-text {
+  font-weight: 500;
+  font-size: clamp(1.1rem, 3.2vw, 2rem);
+  line-height: 1.25;
+}
+
+/* ---- Elevvy: scenen fyller skärmen, extra stor ---- */
+
+.tl--student {
+  min-height: calc(100dvh - 2 * var(--density-pad));
+  justify-content: center;
+}
+.tl--student .tl-stage {
+  flex: 1;
+  width: 100%;
+  min-height: calc(100dvh - 2 * var(--density-pad));
+  border-radius: var(--radius-l);
+}
+.tl--student .tl-clock { font-size: clamp(6rem, 26vw, 24rem); }
+.tl--student .tl-phase-text { font-size: clamp(1.4rem, 4vw, 3rem); }
+
+/* ---- Kontroller ---- */
+
+.tl-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.tl-btn {
+  flex: 1 1 0;
+  min-width: 8rem;
+  justify-content: center;
+  font-size: var(--text-l);
+  padding: var(--space-3) var(--space-4);
+}
+.tl-btn:disabled { opacity: 0.45; cursor: default; }
+.tl-btn:disabled:hover { background: var(--color-surface); }
+.tl-btn--save:not(:disabled) {
+  border-color: var(--color-ok);
+  color: var(--color-ok);
+}
+
+.tl-hint {
+  margin: 0;
+  color: var(--color-ink-soft);
+  font-size: var(--text-s);
+  text-align: center;
+}
+.tl-hint kbd {
+  font-family: inherit;
+  font-size: 0.85em;
+  padding: 1px 5px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--color-surface-alt);
+}
+
+/* ---- Paneler: inställningar + statistik ---- */
+
+.tl-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+.tl-settings h3, .tl-stats h3 { margin-bottom: var(--space-2); }
+.tl-settings-help {
+  color: var(--color-ink-soft);
+  font-size: var(--text-s);
+  margin-bottom: var(--space-3);
+}
+.tl-fields { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+.tl-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 0;
+  min-width: 7rem;
+}
+.tl-field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-s);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+}
+.tl-field-input {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.tl-field-input input {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-size: var(--text-l);
+  font-variant-numeric: tabular-nums;
+}
+.tl-unit { color: var(--color-ink-soft); font-size: var(--text-s); }
+
+/* ---- Statistik ---- */
+
+.tl-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-round);
+  flex: none;
+}
+.tl-dot[data-phase="green"]  { background: var(--color-light-green); }
+.tl-dot[data-phase="yellow"] { background: var(--color-light-yellow); }
+.tl-dot[data-phase="red"]    { background: var(--color-light-red); }
+
+.tl-tally {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  display: flex;
+  gap: var(--space-4);
+}
+.tl-tally li { display: flex; align-items: baseline; gap: var(--space-2); }
+.tl-tally-n {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.tl-tally-l { color: var(--color-ink-soft); font-size: var(--text-s); }
+
+.tl-record {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+}
+.tl-record-label { color: var(--color-ink-soft); font-size: var(--text-s); }
+.tl-record-time {
+  font-size: var(--text-l);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent-text);
+}
+.tl-badge {
+  font-size: var(--text-s);
+  font-weight: 700;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-s);
+  background: var(--color-ok);
+  color: #fff;
+}
+.tl-week-total { margin: 0; color: var(--color-ink-soft); font-size: var(--text-s); }
+.tl-stat-empty { color: var(--color-ink-soft); font-size: var(--text-s); }
+
+.tl-passes { list-style: none; margin: 0; padding: 0; }
+.tl-pass {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-line);
+}
+.tl-pass:last-child { border-bottom: none; }
+.tl-pass-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  min-width: 4ch;
+}
+.tl-pass-date { color: var(--color-ink-soft); font-size: var(--text-s); margin-left: auto; }
+.tl-pass.is-record .tl-pass-time { color: var(--color-accent-text); }
+
+@media (max-width: 640px) {
+  .tl-btn { flex-basis: 40%; }
+}
