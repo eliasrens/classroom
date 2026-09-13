@@ -178,9 +178,9 @@ export default {
       if (!isStudent) drawControls();
     }
 
-    // createTicker: ritsignal (ritar direkt när fliken blir synlig igen).
-    const stopTicker = createTicker(drawTimer);
-    unsubs.push(stopTicker);
+    // createTicker startas SIST i respektive gren — dess första tick
+    // ritar direkt, och lärargrenens drawControls kräver att knapparna
+    // hunnit deklareras (annars TDZ-fel i den allra första ritningen).
 
     // -- Elevvy: bara lyssna --------------------------------------------------
 
@@ -204,6 +204,7 @@ export default {
         }),
       );
 
+      unsubs.push(createTicker(drawTimer));
       this._cleanup = () => { for (const u of unsubs) u(); };
       return;
     }
@@ -384,6 +385,9 @@ export default {
     window.addEventListener("keydown", onKey);
     unsubs.push(() => window.removeEventListener("keydown", onKey));
 
+    // Allt (knappar, watchers) är nu på plats — starta ritsignalen.
+    unsubs.push(createTicker(drawTimer));
+
     this._cleanup = () => { for (const u of unsubs) u(); };
   },
 
@@ -430,11 +434,11 @@ function teacherMarkup() {
           <div class="tl-fields">
             <label class="tl-field">
               <span class="tl-field-label">${icon("signal")} Gult vid</span>
-              <span class="tl-field-input"><input type="number" inputmode="numeric" min="${MIN_SEC}" step="5" data-cfg="yellow"><span class="tl-unit">sek</span></span>
+              <span class="tl-field-input"><input type="number" name="tl-yellow" inputmode="numeric" min="${MIN_SEC}" step="5" data-cfg="yellow"><span class="tl-unit">sek</span></span>
             </label>
             <label class="tl-field">
               <span class="tl-field-label">${icon("signal")} Rött vid</span>
-              <span class="tl-field-input"><input type="number" inputmode="numeric" min="${MIN_SEC}" step="5" data-cfg="red"><span class="tl-unit">sek</span></span>
+              <span class="tl-field-input"><input type="number" name="tl-red" inputmode="numeric" min="${MIN_SEC}" step="5" data-cfg="red"><span class="tl-unit">sek</span></span>
             </label>
           </div>
         </section>
