@@ -1,0 +1,262 @@
+/* ============================================================
+   LÄGE 2 — LEKTIONSPLANERING
+   6-fältslayout (Bilaga A) i finare typografi. Ämnesfärgen ligger
+   som ram, toppfältsband och accent mot en ljus "pappersyta" — inte
+   heltäckande, inte bländande. Textfärg räknas ur luminansen
+   (js/lib/color.js) så den alltid är läsbar, även för egna ämnen.
+
+   Två vyer, samma tavla:
+   - Lärarvy: verktygsrad + fältredigerare (vänster) och en levande
+     förhandsvisning av tavlan (höger). Kryssrutor slår av/på fält.
+   - Elevvy: bara tavlan, stor och ren, synkad via datalagret.
+   ============================================================ */
+
+/* ---- Lärarvyns arbetsyta: sidopanel + förhandsvisning ---- */
+.lesson {
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) 1fr;
+  gap: var(--space-4);
+  align-items: start;
+}
+.lesson__stage {
+  position: sticky;
+  top: calc(var(--topbar-height) + var(--space-3));
+}
+
+/* På smala skärmar: panelen över tavlan */
+@media (max-width: 860px) {
+  .lesson { grid-template-columns: 1fr; }
+  .lesson__stage { position: static; }
+}
+
+/* ---- Sidopanel (lärarverktyg) ---- */
+.lesson-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.lesson-panel__group { display: flex; flex-direction: column; gap: var(--space-2); }
+.lesson-panel__group > h2 {
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+  margin: 0 0 var(--space-1);
+}
+.lesson-panel .btn-row { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.lesson-panel label.field-label {
+  font-size: 0.8rem;
+  color: var(--color-ink-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lesson-panel input[type="text"],
+.lesson-panel input[type="time"],
+.lesson-panel input[type="date"],
+.lesson-panel select,
+.lesson-panel textarea {
+  width: 100%;
+  padding: calc(var(--space-1) + 2px) var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+.lesson-panel textarea { resize: vertical; min-height: 2.4em; line-height: 1.4; }
+.lesson-panel .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+
+/* Sparade planeringar-lista */
+.plan-list { display: flex; flex-direction: column; gap: 2px; max-height: 12rem; overflow: auto; }
+.plan-list__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+.plan-list__item:hover { background: var(--color-surface-alt); }
+.plan-list__item[aria-current="true"] {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+.plan-list__dot { width: 10px; height: 10px; border-radius: var(--radius-round); flex: 0 0 auto; }
+.plan-list__name { font-weight: 600; }
+.plan-list__meta { color: var(--color-ink-soft); font-size: 0.8rem; margin-left: auto; }
+
+/* Fältredigerare — en rad per fält, med kryssruta */
+.field-edit {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  padding: var(--space-2);
+  background: var(--color-surface);
+}
+.field-edit--off { opacity: 0.55; }
+.field-edit__head { display: flex; align-items: center; gap: var(--space-2); }
+.field-edit__head label {
+  display: flex; align-items: center; gap: var(--space-2);
+  font-weight: 600; font-size: 0.85rem; letter-spacing: 0.04em; text-transform: uppercase;
+  cursor: pointer;
+}
+.field-edit input[type="checkbox"] { width: 1.05em; height: 1.05em; accent-color: var(--color-accent); cursor: pointer; }
+.field-edit textarea, .field-edit input[type="text"] { margin-top: var(--space-2); }
+.field-edit__hint { font-size: 0.72rem; color: var(--color-ink-soft); margin-top: 2px; }
+
+/* ============================================================
+   TAVLAN — 6-fältslayout. Delas av lärarförhandsvisning och elevvy.
+   Ämnesfärgen kommer in via --subj / --subj-ink (sätts inline i JS).
+   ============================================================ */
+/* Tavlan skalar sin typografi mot SIN EGEN bredd. Ett element kan inte
+   fråga sin egen container-storlek, så bredden mäts på wrappern
+   .lb-fit (container) och tavlan sätter font-size i cqi (inline-size). */
+.lb-fit {
+  container-type: inline-size;
+  width: 100%;
+}
+.lesson-board {
+  --subj: var(--color-accent);
+  --subj-ink: #ffffff;
+  --lb-paper: #ffffff;
+  --lb-ink: #1f2430;
+  --lb-ink-soft: #5b626e;
+  --lb-line: #e2e2df;
+
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--lb-paper);
+  color: var(--lb-ink);
+  border: 3px solid var(--subj);
+  border-radius: var(--radius-l);
+  overflow: hidden;
+  box-shadow: var(--shadow-m);
+  /* ~1/48 av tavlans bredd — funkar i den lilla förhandsvisningen och
+     i helskärm på projektorn. */
+  font-size: clamp(8px, 2.05cqi, 34px);
+}
+
+/* Toppfält (~sjättedel): ämnesband till vänster, tid till höger */
+.lb-top {
+  flex: 0 0 auto;
+  min-height: 14%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1em;
+  padding: 0.7em 1.1em;
+  background: var(--subj);
+  color: var(--subj-ink);
+}
+.lb-subject { font-size: 1.7em; font-weight: 700; letter-spacing: 0.01em; }
+.lb-time { font-size: 1.15em; font-weight: 600; white-space: nowrap; opacity: 0.95; }
+
+/* Mitten: tre kolumner (smal / bred / knappt-1/3) */
+.lb-mid {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+.lb-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--lb-line);
+}
+.lb-col:last-child { border-right: 0; }
+.lb-col--left  { flex: 2 1 0; }
+.lb-col--mid   { flex: 5 1 0; }
+.lb-col--right { flex: 3 1 0; }
+
+/* Bottenfält (~sjättedel): DU BEHÖVER vänster, MÅL höger */
+.lb-bottom {
+  flex: 0 0 auto;
+  min-height: 15%;
+  display: flex;
+  border-top: 2px solid var(--subj);
+}
+.lb-bottom .lb-field { flex: 1 1 0; border-right: 1px solid var(--lb-line); }
+.lb-bottom .lb-field:last-child { border-right: 0; }
+
+/* Ett fält */
+.lb-field {
+  padding: 0.55em 0.9em;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25em;
+  overflow: hidden;
+}
+.lb-col--left .lb-field { flex: 1 1 0; border-bottom: 1px solid var(--lb-line); }
+.lb-col--left .lb-field:last-child { border-bottom: 0; }
+.lb-field__label {
+  font-size: 0.8em;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--subj);
+}
+.lb-field__body { font-size: 1.02em; line-height: 1.32; min-height: 0; overflow: hidden; }
+/* Bara de fält som kan bli långa får rulla — korta fält klipps aldrig. */
+.lb-col--mid .lb-field__body,
+.lb-col--right .lb-field__body { overflow-y: auto; }
+.lb-col--mid .lb-field__label { font-size: 0.9em; }
+.lb-col--mid .lb-field__body { font-size: 1.08em; }
+
+/* ATT GÖRA — numrerad lista */
+ol.lb-steps { margin: 0; padding: 0; list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 0.35em; }
+ol.lb-steps > li {
+  counter-increment: step;
+  display: flex;
+  gap: 0.6em;
+  align-items: baseline;
+}
+ol.lb-steps > li::before {
+  content: counter(step);
+  flex: 0 0 auto;
+  min-width: 1.5em;
+  height: 1.5em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-round);
+  background: var(--subj);
+  color: var(--subj-ink);
+  font-size: 0.72em;
+  font-weight: 700;
+}
+ul.lb-list { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 0.25em; }
+
+.lb-empty { color: var(--lb-ink-soft); font-style: italic; }
+
+/* Tom klass/planering */
+.lesson-empty {
+  display: grid;
+  place-items: center;
+  gap: var(--space-3);
+  min-height: 50vh;
+  text-align: center;
+  color: var(--color-ink-soft);
+}
+
+/* ---- Elevvy: tavlan centreras och fyller skärmen ---- */
+html[data-theme="student"] .lesson-stage-student {
+  min-height: calc(100vh - 2 * var(--space-4));
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+/* .lb-fit blir den 16:9-formade rutan; tavlan fyller den. Wrappern är
+   container → tavlans cqi-typografi skalar mot den rätta bredden. */
+html[data-theme="student"] .lesson-stage-student .lb-fit {
+  width: min(calc(100vw - 2 * var(--space-4)), calc((100vh - 2 * var(--space-4)) * 16 / 9));
+  max-width: 100%;
+}
