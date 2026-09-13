@@ -1,0 +1,361 @@
+/* App-skal: topbar, lägesmeny, vy-yta, klassval, synkstatus, login. */
+
+.app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Topbar: kompakt, avgränsad med kantlinje (ingen skugga) ---- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--topbar-height);
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-line);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.topbar__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+.topbar__brand .brandmark {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-s);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+.topbar__spacer { flex: 1; }
+
+/* Elevvy: rent, inga verktygsfält */
+html[data-theme="student"] .topbar { display: none; }
+
+/*
+ * SPÄRR: allt lärarmaterial (noteringar, paneler, kontroller) märks
+ * `.teacher-only` och kan därmed ALDRIG synas i elevvyn — även om ett
+ * läge av misstag skulle rendera det där. Lägen ska förgrena på
+ * ctx.view; detta är sista skyddsnätet (se docs/SYNC.md).
+ */
+html[data-theme="student"] .teacher-only { display: none !important; }
+
+/* Elevskärmsknappen i topbaren visar öppen-status med en punkt */
+#open-student-view::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-round);
+  background: var(--color-ink-soft);
+  opacity: 0.5;
+}
+#open-student-view[data-open="true"]::after { background: var(--color-ok); opacity: 1; }
+
+/* ---- Lägesmeny: låg profil, aktiv markeras med accenttext ---- */
+
+.mode-nav { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+
+.mode-nav__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-m);
+  border: 1px solid transparent;
+  text-decoration: none;
+  color: var(--color-ink-soft);
+  white-space: nowrap;
+}
+.mode-nav__link:hover { background: var(--color-surface-alt); color: var(--color-ink); }
+.mode-nav__link[aria-current="page"] {
+  background: var(--color-accent-soft);
+  border-color: var(--color-line);
+  color: var(--color-accent-text);
+  font-weight: 600;
+}
+
+/* ---- Klassval ---- */
+
+.class-picker { display: flex; align-items: center; gap: var(--space-2); }
+.class-picker select { font-weight: 600; min-width: 5.5em; }
+
+/* ---- Synkstatus ---- */
+
+.sync-status {
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+.sync-status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-round);
+  background: var(--color-ink-soft);
+}
+.sync-status[data-state="local"]::before   { background: var(--color-warn); }
+.sync-status[data-state="online"]::before  { background: var(--color-ok); }
+.sync-status[data-state="offline"]::before { background: var(--color-danger); }
+
+/* ---- Vy-ytan ---- */
+
+.view {
+  flex: 1;
+  padding: var(--density-pad, var(--space-3));
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+html[data-theme="student"] .view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  max-width: none;
+}
+
+/* Platshållare tills lägena är byggda */
+.mode-placeholder {
+  display: grid;
+  place-items: center;
+  gap: var(--space-3);
+  min-height: 50vh;
+  border: 1px dashed var(--color-line);
+  border-radius: var(--radius-l);
+  color: var(--color-ink-soft);
+  text-align: center;
+  padding: var(--space-4);
+}
+.mode-placeholder__icon { color: var(--color-ink-soft); opacity: 0.7; line-height: 0; }
+
+/* ---- Elevskärmspanelen: indikator + live-förhandsvisning ---- */
+
+.student-panel {
+  position: fixed;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  z-index: 20;
+  width: 300px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-l);
+  overflow: hidden;
+}
+
+.student-panel__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-2);
+}
+
+.student-panel__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  font-size: var(--text-s);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+}
+.student-panel__status::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-round);
+  background: var(--color-ink-soft);
+  opacity: 0.5;
+}
+.student-panel__status[data-open="true"] { color: var(--color-ink); }
+.student-panel__status[data-open="true"]::before { background: var(--color-ok); opacity: 1; }
+
+.student-panel[data-collapsed="true"] .student-panel__body { display: none; }
+
+.student-panel__frame {
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-block: 1px solid var(--color-line);
+  background: var(--color-bg);
+}
+.student-panel__iframe {
+  /* En hel elevskärm (1280×720) nedskalad till panelbredden. */
+  width: 1280px;
+  height: 720px;
+  transform: scale(0.2328); /* 298/1280 — panelbredd minus kantlinjer */
+  transform-origin: 0 0;
+  border: 0;
+  pointer-events: none; /* bara titta — interaktion sker i lärarvyn */
+}
+
+.student-panel__actions {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2);
+}
+.student-panel__actions .btn { flex: 1; justify-content: center; }
+
+/* ---- "Bra jobbat" — snabbknapp nere till vänster (nåbar från andra lägen) ---- */
+
+.praise {
+  position: fixed;
+  left: var(--space-3);
+  bottom: var(--space-3);
+  z-index: 20;
+}
+.praise__fab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: calc(var(--space-1) + 2px) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-m);
+  cursor: pointer;
+  font-weight: 600;
+}
+.praise__fab:hover { background: var(--color-surface-alt); }
+.praise__fab svg { color: var(--color-accent-text); }
+
+.praise__pop {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + var(--space-2));
+  width: 17rem;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  box-shadow: var(--shadow-m);
+}
+.praise__head { display: flex; align-items: center; gap: var(--space-2); }
+.praise__head strong { flex: 1; display: inline-flex; align-items: center; gap: var(--space-2); }
+.praise__head strong svg { color: var(--color-accent-text); }
+
+.praise__list {
+  display: grid;
+  gap: var(--space-1);
+  overflow: auto;
+  padding: var(--space-1);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-bg);
+}
+.praise__item { display: flex; align-items: center; gap: var(--space-2); cursor: pointer; }
+.praise__free { display: flex; gap: var(--space-2); }
+.praise__free input {
+  flex: 1;
+  padding: calc(var(--space-1) + 1px) var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+.praise__hint { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); }
+
+/* ---- Lösenordsvägg / login: stram och saklig ---- */
+
+.auth-gate {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+
+.auth {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(24rem, 100%);
+  padding: var(--space-5);
+  text-align: left;
+}
+
+.auth__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.auth__brand .brandmark {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-s);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 700;
+}
+.auth__brand h1 { margin: 0; font-size: var(--text-l); }
+
+.auth__intro { color: var(--color-ink-soft); }
+
+.auth__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-weight: 600;
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+}
+
+.auth__field input {
+  padding: var(--space-2) var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  font-size: var(--text-m);
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+.auth__field input:focus-visible { outline-offset: 0; }
+
+.auth__error { margin: 0; color: var(--color-danger); font-weight: 600; }
+
+.auth__submit { justify-content: center; }
+
+.auth__hint { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); }
+
+/* Elevskärm som väntar: lugn, centrerad, inga formulär, ingen lärarinfo */
+.auth--student {
+  text-align: center;
+  align-items: center;
+  border: none;
+  background: none;
+  box-shadow: none;
+}
+.auth--student h1 { font-size: var(--text-2xl); }
+.auth--student p { color: var(--color-ink-soft); }
+
+/* ---- Responsivt: laptop ↔ projektor ---- */
+
+@media (max-width: 1100px) {
+  .topbar { flex-wrap: wrap; }
+  .topbar__brand .brandtext { display: none; }
+}
+
+@media (min-width: 1600px) {
+  html[data-theme="teacher"] { --font-base: 16px; }
+}

@@ -1,0 +1,76 @@
+rules_version = '2';
+
+// ============================================================
+// FIRESTORE-SÄKERHETSREGLER — Klassrumsverktyget
+//
+// VARFÖR: hela klientkoden ligger publikt (GitHub Pages) — vem som
+// helst kan läsa den, plocka isär datalagret och prata direkt med
+// Firestore-API:t. Lösenordsväggen i js/auth.js skyddar bara
+// gränssnittet, inte databasen. Därför MÅSTE dessa regler göra det
+// riktiga jobbet: utan dem skulle elevdata (förnamn, noteringar) vara
+// öppet läs- och skrivbart för vem som helst på nätet.
+//
+// PRINCIP: ingen oautentiserad åtkomst. All läsning och skrivning
+// kräver en inloggad lärare (request.auth != null via Firebase Auth).
+// Konton skapas i Firebase-konsolen — ingen öppen självregistrering
+// (matchar single-user/litet arbetslag, se docs/AUTH.md).
+//
+// Standardmodellen nedan är den ENKLA varianten: alla inloggade lärare
+// delar all data (ett litet arbetslag runt samma klasser). Vill man
+// senare begränsa per klass finns den varianten utkommenterad sist —
+// datamodellen (teachers/{uid}.classIds) är förberedd för båda.
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // En inloggad lärare (Firebase Auth). Ingen anonym åtkomst.
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Lärarprofil: var och en äger bara sitt eget dokument.
+    // (email, displayName, classIds — se DATAMODELL.md)
+    match /teachers/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // All klassdata (elever, planeringar, noteringar, pass,
+    // inställningar) ligger under classes/{classId}. En inloggad
+    // lärare får läsa och skriva allt klassmaterial.
+    match /classes/{classId} {
+      allow read, write: if signedIn();
+
+      // Subkollektioner: students, lessonPlans, notes, sessions, settings.
+      match /{document=**} {
+        allow read, write: if signedIn();
+      }
+    }
+
+    // Allt annat är låst som standard (defense in depth): en ny
+    // kollektion är otillgänglig tills en regel uttryckligen öppnar den.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// ------------------------------------------------------------
+// ALTERNATIV: åtkomst PER KLASS (större skola, flera arbetslag).
+// Ersätt classes-blocket ovan med detta — då kommer bara lärare vars
+// profil (teachers/{uid}.classIds) listar klassen åt klassens data:
+//
+//   match /classes/{classId} {
+//     function teachesClass() {
+//       return signedIn()
+//         && classId in get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.classIds;
+//     }
+//     allow read, write: if teachesClass();
+//     match /{document=**} {
+//       allow read, write: if teachesClass();
+//     }
+//   }
+//
+// (get() kostar en extra läsning per anrop — därför är den enkla
+//  varianten standard för single-user/litet arbetslag.)
+// ------------------------------------------------------------
