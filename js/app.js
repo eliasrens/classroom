@@ -18,6 +18,9 @@ import { initStudentPanel } from "./ui/student-panel.js";
 import { initPraise } from "./ui/praise.js";
 import { createSyncBus, isPreviewWindow, announceStudentScreen, watchStudentScreen } from "./sync.js";
 import { icon } from "./lib/icons.js";
+import { runRetention } from "./lib/privacy.js";
+import { initHelp } from "./ui/help.js";
+import { initShortcuts } from "./ui/shortcuts.js";
 
 const $ = (sel) => document.querySelector(sel);
 const appEl = $("#app");
@@ -101,6 +104,17 @@ function startApp() {
   // Sätt rätt vy INNAN sync-prenumerationerna nedan gör sina första
   // anrop — annars agerar ett elevfönster lärare i en blink vid start.
   store.set({ view: currentView() });
+
+  // INTEGRITET: auto-radering av gamla noteringar (Läge 5). Körs bara i
+  // lärarvyn när en klass är aktiv — gränsen sätts per klass i
+  // Översikten. Registreras efter att vyn satts så ett elevfönster
+  // aldrig råkar skriva. Elevskärmen rör aldrig noteringar.
+  let lastPurgedClass = null;
+  store.subscribe(["classId", "view"], ({ classId, view }) => {
+    if (view !== "teacher" || !classId || classId === lastPurgedClass) return;
+    lastPurgedClass = classId;
+    void runRetention(data, classId);
+  });
 
   // Lärarfönstret publicerar tillstånd — vid varje ändring och på begäran.
   const publishState = () => {
@@ -203,6 +217,13 @@ function startApp() {
   // Snabbanteckning (F9) — fungerar i alla lägen, ALDRIG i elevvy-fönster
   // (rutan vägrar öppnas där och stängs om vyn växlar; se ui/quick-note.js).
   initQuickNote({ store, data });
+
+  // Hjälp (genvägslista under "?") + globala tangentgenvägar.
+  const help = initHelp({ store });
+  const helpBtn = $("#open-help");
+  helpBtn.innerHTML = icon("help");
+  helpBtn.addEventListener("click", () => help.toggle());
+  initShortcuts({ store, openStudentWindow, openHelp: help.open });
 
   // Router
   const router = createRouter({ store, data, viewEl: $("#view"), sync: bus });

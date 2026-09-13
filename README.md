@@ -48,12 +48,15 @@ js/
   lib/color.js          ämnespalett + automatisk luminans/kontrast-uträkning
   lib/icons.js          linje-ikoner (inline-SVG) — inga emoji i gränssnittet
   lib/names.js          elevnamn: endast förnamn, valfri tag, initial-läge
-  modes/                de fem lägena (platshållare) + registret
+  lib/privacy.js        integritet: auto-radering av noteringar + radera all klassdata
+  modes/                de fem lägena + registret (Läge 5 = oversikt.js: startvyn)
   ui/login.js           login-vy + elevskärmens väntevy
   ui/class-picker.js    klassval i topbaren
+  ui/help.js            genvägslista under "?" · ui/shortcuts.js  globala tangentgenvägar
+firestore.rules         Firestore-säkerhetsregler: inloggning krävs för all läs/skriv
 docs/
   MODULKONTRAKT.md      kontraktet varje läge implementerar — LÄS FÖRST
-  AUTH.md               lösenordsväggen + grund för säkerhetsregler
+  AUTH.md               lösenordsväggen + säkerhetsregler
 DATAMODELL.md           Firestore-datastruktur + motivering
 ```
 
