@@ -1,0 +1,227 @@
+/* ============================================================
+   LÄGE 5 — ÖVERSIKT / START (lärarvy) + hjälp-overlay (?).
+   Lugn, luftig ingångsvy. Skriver mot designtokens (css/tokens.css)
+   så både mörkt och ljust schema följer med. Endast lärarvy.
+   ============================================================ */
+
+.oversikt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 60rem;
+  margin: 0 auto;
+  padding-block: var(--space-3);
+}
+
+/* ---- Hero: lugn hälsning ---- */
+.ov-hero { padding-block: var(--space-2); }
+.ov-hero__kicker {
+  margin: 0 0 var(--space-1);
+  color: var(--color-ink-soft);
+  font-size: var(--text-s);
+  text-transform: capitalize;
+}
+.ov-hero__title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-2xl);
+  letter-spacing: -0.01em;
+}
+.ov-hero__sub { margin: 0; color: var(--color-ink-soft); }
+.ov-hero__sub strong { color: var(--color-ink); }
+
+/* ---- Sektioner ---- */
+.ov-section { display: flex; flex-direction: column; gap: var(--space-3); }
+.ov-section__title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-m);
+  color: var(--color-ink-soft);
+  font-weight: 600;
+}
+.ov-section__title svg { color: var(--color-accent-text); }
+
+/* ---- Klassval: chips ---- */
+.ov-classes { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.ov-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-weight: 600;
+  cursor: pointer;
+}
+.ov-chip:hover { background: var(--color-surface-alt); }
+.ov-chip.is-active {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-accent-text);
+}
+.ov-chip--add { color: var(--color-ink-soft); font-weight: 500; }
+
+/* ---- Lägeskort: stor, lugn ingång ---- */
+.ov-modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: var(--space-3);
+}
+.ov-mode {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-l);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.ov-mode:hover { background: var(--color-surface-alt); border-color: var(--color-accent); }
+.ov-mode__icon { color: var(--color-accent-text); line-height: 0; }
+.ov-mode__title { font-weight: 600; }
+
+/* ---- Dagens planeringar ---- */
+.ov-plans { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.ov-plan {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  cursor: pointer;
+  text-align: left;
+}
+.ov-plan:hover { background: var(--color-surface-alt); }
+.ov-plan__dot { flex: none; width: 12px; height: 12px; border-radius: var(--radius-round); }
+.ov-plan__name { flex: 1; font-weight: 600; }
+.ov-plan__time { color: var(--color-ink-soft); font-size: var(--text-s); font-variant-numeric: tabular-nums; }
+
+.ov-empty { margin: 0; color: var(--color-ink-soft); }
+.ov-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--color-accent-text);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}
+
+/* ---- Integritet ---- */
+.ov-privacy { gap: var(--space-3); }
+.ov-privacy__note { margin: 0; color: var(--color-ink-soft); font-size: var(--text-s); }
+.ov-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+.ov-field { display: flex; flex-direction: column; gap: var(--space-1); }
+.ov-field__label { font-weight: 600; font-size: var(--text-s); color: var(--color-ink-soft); }
+.ov-field select { max-width: 20rem; }
+.ov-field__hint { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); }
+
+.ov-danger {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-1);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line);
+}
+.ov-danger__btn {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-line));
+}
+.ov-danger__btn:hover { background: color-mix(in srgb, var(--color-danger) 12%, var(--color-surface)); }
+.ov-danger__hint { color: var(--color-ink-soft); font-size: var(--text-s); }
+
+/* ============================================================
+   HJÄLP — genvägslista under "?" (overlay, lärarvy).
+   ============================================================ */
+.help {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+.help__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 45%);
+}
+.help__box {
+  position: relative;
+  width: min(34rem, 100%);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  box-shadow: var(--shadow-m);
+}
+.help__head { display: flex; align-items: center; gap: var(--space-2); }
+.help__head strong {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-l);
+}
+.help__head strong svg { color: var(--color-accent-text); }
+
+.help__body { overflow: auto; display: flex; flex-direction: column; gap: var(--space-4); }
+.help__group { display: flex; flex-direction: column; gap: var(--space-2); }
+.help__group h3 {
+  margin: 0;
+  font-size: var(--text-s);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-ink-soft);
+}
+.help__list { margin: 0; display: grid; gap: var(--space-2); }
+.help__row {
+  display: grid;
+  grid-template-columns: 11rem 1fr;
+  gap: var(--space-3);
+  align-items: baseline;
+}
+.help__keys { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; }
+.help__desc { margin: 0; color: var(--color-ink); }
+.help__sep { color: var(--color-ink-soft); }
+.help__foot { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); }
+
+.help kbd,
+.tl-hint kbd,
+.quick-note kbd {
+  display: inline-block;
+  padding: 1px 7px;
+  border: 1px solid var(--color-line);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-s);
+  background: var(--color-surface-alt);
+  color: var(--color-ink);
+  font-family: var(--font-family);
+  font-size: 0.82em;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .help__row { grid-template-columns: 1fr; gap: var(--space-1); }
+}

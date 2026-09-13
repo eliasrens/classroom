@@ -54,6 +54,11 @@ const PATHS = {
   download: `<path d="M12 4v11m0 0 4-4m-4 4-4-4M4 19h16"/>`,
   copy: `<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5"/>`,
   // Lektionsplanering (Läge 2)
+  // Läge 5 — Översikt, hjälp & integritet
+  help: `<circle cx="12" cy="12" r="9"/><path d="M9.4 9.2a2.6 2.6 0 0 1 5 1c0 1.7-2.4 2-2.4 3.6"/><path d="M12 17.5h.01"/>`,
+  layout: `<rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M9 9.5V20"/>`,
+  shield: `<path d="M12 3l7 3v5c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6z"/><path d="M9 12l2 2 4-4.5"/>`,
+  calendar: `<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16M8 3v4M16 3v4"/>`,
 };
 
 /**

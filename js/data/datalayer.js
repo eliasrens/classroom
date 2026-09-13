@@ -31,7 +31,7 @@
  */
 
 import { firebaseConfig, isFirebaseConfigured } from "../firebase-config.js";
-import { readCollection, writeCollection, pathFromStorageKey } from "./local.js";
+import { readCollection, writeCollection, pathFromStorageKey, collectionPathsUnder } from "./local.js";
 import { createFirestoreSync } from "./firestore-sync.js";
 
 const OUTBOX_KEY = "classroom:outbox";
@@ -152,6 +152,11 @@ export function createDataLayer({ onSyncState } = {}) {
       writeCollection(path, rest);
       notify(path);
       enqueue({ op: "delete", path, id });
+    },
+
+    /** Alla lagrade samlings-paths under ett prefix (t.ex. "classes/4a/"). */
+    async collections(prefix) {
+      return collectionPathsUnder(prefix);
     },
 
     watch(path, cb) {

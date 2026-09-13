@@ -40,3 +40,20 @@ export function writeCollection(path, docs) {
 export function pathFromStorageKey(key) {
   return key?.startsWith(PREFIX) ? key.slice(PREFIX.length) : null;
 }
+
+/**
+ * Alla lagrade samlings-paths vars path börjar med `prefix`
+ * (t.ex. "classes/4a/" → alla subkollektioner för klassen 4a).
+ * Används av "radera all data för klassen" (Läge 5) för att hitta
+ * varje kollektion under en klass utan att känna till namnen i förväg.
+ */
+export function collectionPathsUnder(prefix) {
+  const paths = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const path = pathFromStorageKey(localStorage.key(i));
+      if (path && path.startsWith(prefix)) paths.push(path);
+    }
+  } catch { /* lagring otillgänglig — inga paths */ }
+  return paths;
+}

@@ -37,7 +37,13 @@ event). Utloggning i ett fönster loggar ut alla fönster.
    laddad; sessionsmarkören i localStorage är bara offline-reserv och
    delning mellan fönster.
 
-## Säkerhetsregler (princip, byggs i Läge 5)
+## Säkerhetsregler
+
+De skarpa reglerna ligger i **[`firestore.rules`](../firestore.rules)** (rotmappen)
+— deploya med `firebase deploy --only firestore:rules`. De kräver
+inloggning (`request.auth != null`) för ALL läsning och skrivning, så
+elevdata är stängd för oautentiserad åtkomst även om klientkoden ligger
+publikt. Principen i korthet:
 
 ```
 match /teachers/{uid} {
