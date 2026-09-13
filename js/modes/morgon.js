@@ -43,8 +43,15 @@ export default {
     const stage = $(".morgon");
     const bgImg = $(".morgon__bgimg");
 
+    // Skyddsnät: om vyn redan bytts ut (routern har rensat <main> medan
+    // ett watch-callback ligger i kö) är .morgon inte längre i DOM:en —
+    // skriv då aldrig till borttagna element. Kompletterar routerns
+    // serialisering av monteringar (js/router.js).
+    const mounted = () => stage.isConnected;
+
     // ---------- Bakgrund ----------
     function showBackground(url) {
+      if (!mounted()) return;
       if (url === currentBgUrl) return;
       currentBgUrl = url;
       if (!url) { stage.dataset.bg = "color"; bgImg.removeAttribute("src"); return; }
@@ -83,6 +90,7 @@ export default {
     }
 
     function renderNametavla() {
+      if (!mounted()) return;
       const nt = $(".morgon__nametavla");
       nt.hidden = !settings.showNametavla;
       const names = settings.praise.map(praiseName).filter(Boolean);
@@ -94,6 +102,7 @@ export default {
     }
 
     function renderDisplay() {
+      if (!mounted()) return;
       renderGreeting();
       renderTasks();
       renderNametavla();
@@ -278,6 +287,7 @@ export default {
 
       // ---- Panel-synk (utan att stjäla fokus / bygga om stabila fält) ----
       syncPanel = () => {
+        if (!mounted()) return;
         panel.querySelectorAll('input[name="mg-variant"]').forEach((r) => {
           r.checked = r.value === settings.greeting.variant;
         });
@@ -299,6 +309,7 @@ export default {
       };
 
       renderTaskControls = () => {
+        if (!mounted()) return;
         taskList.innerHTML = settings.tasks.map(taskRow).join("");
         syncPanel();
       };
@@ -309,6 +320,7 @@ export default {
         });
       }
       function renderNtStudents() {
+        if (!mounted()) return;
         if (!students.length) {
           ntStudents.innerHTML = `<p class="morgon__hint">Inga elever i klassen ännu — lägg till dem i Elevlista, eller skriv fritext nedan.</p>`;
           return;

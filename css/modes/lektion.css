@@ -125,7 +125,12 @@
   --lb-paper: #ffffff;
   --lb-ink: #1f2430;
   --lb-ink-soft: #5b626e;
-  --lb-line: #e2e2df;
+  /* Avdelarlinjer: en tydlig men lugn neutral för fält inom en kolumn,
+     och en kraftigare, ämnesfärgstonad linje för de stora sektions-
+     gränserna (mellan kolumner och upp mot bottenfältet). Så ser
+     eleverna direkt var ett fält slutar och nästa börjar. */
+  --lb-line: #c4c8d0;
+  --lb-line-strong: color-mix(in srgb, var(--subj) 42%, #aab0ba);
 
   aspect-ratio: 16 / 9;
   width: 100%;
@@ -168,7 +173,7 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  border-right: 1px solid var(--lb-line);
+  border-right: 2px solid var(--lb-line-strong);
 }
 .lb-col:last-child { border-right: 0; }
 .lb-col--left  { flex: 2 1 0; }
@@ -182,7 +187,7 @@
   display: flex;
   border-top: 2px solid var(--subj);
 }
-.lb-bottom .lb-field { flex: 1 1 0; border-right: 1px solid var(--lb-line); }
+.lb-bottom .lb-field { flex: 1 1 0; border-right: 2px solid var(--lb-line-strong); }
 .lb-bottom .lb-field:last-child { border-right: 0; }
 
 /* Ett fält */
@@ -196,6 +201,8 @@
 }
 .lb-col--left .lb-field { flex: 1 1 0; border-bottom: 1px solid var(--lb-line); }
 .lb-col--left .lb-field:last-child { border-bottom: 0; }
+/* Skiljelinje upp mot bottenfältet redan finns (border-top på .lb-bottom);
+   toppfältet avgränsas av sitt ämnesfärgade band. */
 .lb-field__label {
   font-size: 0.8em;
   line-height: 1.1;
