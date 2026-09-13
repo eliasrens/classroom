@@ -9,12 +9,12 @@
  * för att Firebase saknas.
  */
 export const firebaseConfig = {
-  apiKey: "FYLL_I_API_KEY",
-  authDomain: "FYLL_I.firebaseapp.com",
-  projectId: "FYLL_I_PROJECT_ID",
-  storageBucket: "FYLL_I.appspot.com",
-  messagingSenderId: "FYLL_I",
-  appId: "FYLL_I",
+  apiKey: "AIzaSyAJoZXnidE0hCKa8Xn9b4XfQeXINugVusA",
+  authDomain: "klassrum-260913-1c02.firebaseapp.com",
+  projectId: "klassrum-260913-1c02",
+  storageBucket: "klassrum-260913-1c02.firebasestorage.app",
+  messagingSenderId: "199593708075",
+  appId: "1:199593708075:web:119cf3c67620202533386e",
 };
 
 /** true om konfigurationen ovan fortfarande är platshållaren */
