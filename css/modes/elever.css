@@ -1,0 +1,419 @@
+/* Läge 4 — Elevlista & noteringar (endast lärarvy) + snabbanteckningsrutan.
+   Allt mot designtokens: följer mörkt/ljust schema automatiskt. */
+
+/* ---- Skal & flikar ---- */
+
+.elever { display: flex; flex-direction: column; gap: var(--space-3); }
+
+.elever__tabs { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+
+.elever__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-m);
+  background: none;
+  color: var(--color-ink-soft);
+  cursor: pointer;
+}
+.elever__tab:hover { background: var(--color-surface-alt); color: var(--color-ink); }
+.elever__tab[aria-current="page"] {
+  background: var(--color-accent-soft);
+  border-color: var(--color-line);
+  color: var(--color-accent-text);
+  font-weight: 600;
+}
+
+.elever__toast {
+  position: fixed;
+  bottom: var(--space-4);
+  left: 50%;
+  transform: translate(-50%, 8px);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-m);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, transform 0.15s;
+  z-index: 40;
+}
+.elever__toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---- Chips (typer, etiketter) ---- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 1px var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+  cursor: default;
+}
+button.chip { cursor: pointer; }
+button.chip:hover { background: var(--color-surface-alt); color: var(--color-ink); }
+.chip--active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-text);
+  border-color: var(--color-accent);
+  font-weight: 600;
+}
+.chip--pos { color: var(--color-ok); border-color: var(--color-ok); }
+.chip--follow { color: var(--color-warn); border-color: var(--color-warn); }
+.chip--insats { color: var(--color-accent-text); }
+.chip--label { border-left: 3px solid var(--label-color, var(--color-line)); }
+
+/* ---- Registrera ---- */
+
+.reg { display: flex; flex-direction: column; gap: var(--space-3); }
+
+.reg__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.reg__types { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
+.reg__types-label { font-size: var(--text-s); color: var(--color-ink-soft); margin-right: var(--space-1); }
+.reg__toolbar-right { display: flex; align-items: center; gap: var(--space-3); }
+.reg__lesson {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+}
+
+.reg__hint { color: var(--color-ink-soft); font-size: var(--text-s); margin: 0; }
+
+.reg__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-2);
+}
+
+.reg__student { position: relative; display: flex; }
+
+.reg__tap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  padding-right: 34px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  cursor: pointer;
+  text-align: left;
+  min-height: 52px;
+}
+.reg__tap:hover { background: var(--color-surface-alt); border-color: var(--color-accent); }
+.reg__tap:active { background: var(--color-accent-soft); }
+
+.reg__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.reg__key,
+kbd {
+  font-family: ui-monospace, monospace;
+  font-size: var(--text-s);
+  padding: 0 5px;
+  border: 1px solid var(--color-line);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-s);
+  background: var(--color-bg);
+  color: var(--color-accent-text);
+}
+
+.reg__counts { margin-left: auto; display: inline-flex; gap: var(--space-1); }
+.reg__count {
+  min-width: 20px;
+  text-align: center;
+  padding: 0 4px;
+  border-radius: var(--radius-s);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-line);
+  font-size: var(--text-s);
+}
+.reg__count--pos { color: var(--color-ok); border-color: var(--color-ok); }
+
+.reg__pos {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  bottom: 6px;
+  width: 24px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--color-ok);
+  font-weight: 700;
+  cursor: pointer;
+}
+.reg__pos:hover { background: var(--color-surface-alt); border-color: var(--color-ok); }
+
+/* Minneslista */
+.reg__session-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.reg__session-head h2 { margin: 0; }
+.reg__session-sub { color: var(--color-ink-soft); font-size: var(--text-s); }
+.reg__empty, .ekort__empty { color: var(--color-ink-soft); font-size: var(--text-s); margin: 0; }
+
+.reg__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.reg__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-line);
+}
+.reg__row-name { font-weight: 600; min-width: 8em; }
+.reg__row-notes { flex: 1; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); }
+.reg__event { font-size: var(--text-s); color: var(--color-ink-soft); white-space: nowrap; }
+.reg__event--pos { color: var(--color-ok); }
+.reg__row-follow { align-self: center; }
+
+/* ---- Elever (roster) ---- */
+
+.roster { display: flex; flex-direction: column; gap: var(--space-3); }
+
+.roster__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.roster__add { display: flex; gap: var(--space-2); }
+.roster__add input {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-bg);
+  color: var(--color-ink);
+  min-width: 14em;
+}
+.roster__initials { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-s); color: var(--color-ink-soft); }
+
+.roster__paste summary { cursor: pointer; color: var(--color-ink-soft); }
+.roster__paste-hint { font-size: var(--text-s); color: var(--color-ink-soft); margin-top: var(--space-2); }
+.roster__paste textarea {
+  width: 100%;
+  margin-bottom: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-bg);
+  color: var(--color-ink);
+  resize: vertical;
+}
+
+.roster__dupes { color: var(--color-warn); font-size: var(--text-s); margin: 0; }
+.roster__empty { color: var(--color-ink-soft); }
+
+.roster__list { list-style: none; margin: 0; padding: 0 var(--density-pad); }
+.roster__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-line);
+}
+.roster__row:first-child { border-top: none; }
+.roster__row--archived { color: var(--color-ink-soft); }
+.roster__name { font-weight: 600; min-width: 10em; }
+.roster__initials-preview { font-size: var(--text-s); color: var(--color-ink-soft); }
+.roster__spacer { flex: 1; }
+.roster__keybtn--none { color: var(--color-ink-soft); opacity: 0.6; }
+.roster__capture { font-size: var(--text-s); color: var(--color-accent-text); }
+.roster__edit { display: flex; gap: var(--space-2); flex: 1; flex-wrap: wrap; }
+.roster__edit input {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+.roster__archived summary { cursor: pointer; color: var(--color-ink-soft); }
+.roster__archived .roster__list { margin-top: var(--space-2); }
+
+/* ---- Elevkort & sök ---- */
+
+.ekort { display: grid; grid-template-columns: minmax(230px, 300px) 1fr; gap: var(--space-3); align-items: start; }
+@media (max-width: 900px) { .ekort { grid-template-columns: 1fr; } }
+
+.ekort__search { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-3); }
+.ekort__search input[type="search"] {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+.ekort__follow { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--text-s); color: var(--color-ink-soft); }
+
+.ekort__students, .ekort__hits ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.ekort__students button, .ekort__hits button {
+  width: 100%;
+  text-align: left;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.ekort__students button:hover, .ekort__hits button:hover { background: var(--color-surface-alt); }
+.ekort__students button[aria-current="true"] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-text);
+  font-weight: 600;
+}
+.ekort__hits h3 { color: var(--color-ink-soft); font-size: var(--text-s); }
+.ekort__hits button { display: flex; flex-direction: column; gap: 1px; }
+.ekort__hits button span { font-size: var(--text-s); color: var(--color-ink-soft); }
+.ekort__hits button em { font-style: normal; font-size: var(--text-s); }
+
+.ekort__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.ekort__head h2 { margin: 0; }
+
+.ekort__insats { border: 1px solid var(--color-line); border-radius: var(--radius-m); padding: var(--space-3); margin: var(--space-3) 0; }
+.ekort__insats-hint { font-size: var(--text-s); color: var(--color-ink-soft); }
+.ekort__insats textarea, .ekort__note--editing textarea {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-bg);
+  color: var(--color-ink);
+  resize: vertical;
+}
+.ekort__insats-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-2); flex-wrap: wrap; }
+
+.ekort__export {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+  margin: var(--space-3) 0;
+}
+.ekort__export input[type="date"] {
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+.ekort__exportout { border: 1px solid var(--color-line); border-radius: var(--radius-m); margin-bottom: var(--space-3); }
+.ekort__exportout-bar { display: flex; gap: var(--space-2); padding: var(--space-2); border-bottom: 1px solid var(--color-line); }
+.ekort__exportout pre {
+  margin: 0;
+  padding: var(--space-3);
+  font-size: var(--text-s);
+  white-space: pre-wrap;
+  max-height: 40vh;
+  overflow: auto;
+}
+
+.ekort__timeline { list-style: none; margin: 0; padding: 0; }
+.ekort__note {
+  position: relative;
+  padding: var(--space-2) 0 var(--space-2) var(--space-4);
+  border-top: 1px solid var(--color-line);
+}
+.ekort__note::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 18px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-round);
+  background: var(--color-ink-soft);
+}
+.ekort__note--pos::before { background: var(--color-ok); }
+.ekort__note--insats::before { background: var(--color-accent); }
+.ekort__note-meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-size: var(--text-s); color: var(--color-ink-soft); }
+.ekort__note-lesson { font-size: var(--text-s); }
+.ekort__note-text { margin: var(--space-1) 0 0; }
+.ekort__note-helped { margin: var(--space-1) 0 0; font-size: var(--text-s); color: var(--color-ink-soft); }
+.ekort__note-actions { display: flex; gap: var(--space-1); margin-top: var(--space-1); opacity: 0.55; }
+.ekort__note:hover .ekort__note-actions, .ekort__note--editing .ekort__note-actions { opacity: 1; }
+
+/* ---- Mönster ---- */
+
+.pat { display: flex; flex-direction: column; gap: var(--space-3); }
+.pat__toolbar { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+.pat__toolbar label { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-s); color: var(--color-ink-soft); }
+.pat__sum { font-size: var(--text-s); color: var(--color-ink-soft); margin-left: auto; }
+
+.pat__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-3); }
+.pat__card h2 { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-m); }
+.pat__card-sub { font-size: var(--text-s); color: var(--color-ink-soft); }
+
+.pat__bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.pat__bars li { display: grid; grid-template-columns: 9em 1fr 2em; align-items: center; gap: var(--space-2); }
+.pat__bar-label { font-size: var(--text-s); color: var(--color-ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pat__bar-track { background: var(--color-surface-alt); border-radius: var(--radius-s); height: 12px; overflow: hidden; }
+.pat__bar { display: block; height: 100%; background: var(--color-accent); border-radius: var(--radius-s); min-width: 0; }
+.pat__bar-count { font-size: var(--text-s); text-align: right; color: var(--color-ink); }
+
+.pat__insatser h2 { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-m); }
+.pat__insatser-sub { font-size: var(--text-s); color: var(--color-ink-soft); }
+.pat__insats-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.pat__insats-list li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-line);
+  flex-wrap: wrap;
+}
+.pat__insats-meta { font-size: var(--text-s); color: var(--color-ink-soft); white-space: nowrap; }
+.pat__insats-text { flex: 1; min-width: 12em; }
+
+/* ---- Snabbanteckningsrutan (alla lägen, endast lärarfönster) ---- */
+
+.quick-note {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 60;
+}
+
+.quick-note__box {
+  width: min(26rem, calc(100vw - 2 * var(--space-4)));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  box-shadow: var(--shadow-m);
+}
+
+.quick-note__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.quick-note__hint { font-size: var(--text-s); color: var(--color-ink-soft); }
+
+.quick-note__box input[type="text"], .quick-note__box textarea {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-bg);
+  color: var(--color-ink);
+  resize: vertical;
+}
+
+.quick-note__student { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); font-weight: 600; }
+.quick-note__matches { display: flex; flex-wrap: wrap; gap: var(--space-1); max-height: 9rem; overflow: auto; }
+.quick-note__labels { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; }
+.quick-note__labels input { flex: 1; min-width: 9em; font-size: var(--text-s); }
+.quick-note__reminder { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); }
+.quick-note__actions { display: flex; justify-content: flex-end; }
