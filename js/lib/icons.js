@@ -27,12 +27,21 @@ const PATHS = {
   expand: `<path d="M15 4h5v5M9 20H4v-5M20 4l-6.5 6.5M4 20l6.5-6.5"/>`,
   "chevron-down": `<path d="M6 9.5l6 6 6-6"/>`,
   "chevron-up": `<path d="M6 14.5l6-6 6 6"/>`,
+  "chevron-left": `<path d="M14.5 6l-6 6 6 6"/>`,
+  "chevron-right": `<path d="M9.5 6l6 6-6 6"/>`,
+  // Morgonskärm (Läge 1)
+  star: `<path d="M12 3.2l2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6L3.4 9.5l6-.8z"/>`,
+  refresh: `<path d="M20 11a8 8 0 0 0-14-4.5L4 8m0 0V4m0 4h4M4 13a8 8 0 0 0 14 4.5L20 16m0 0v4m0-4h-4"/>`,
+  image: `<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M20 16.5l-4.5-4.5L6 20.5"/>`,
+  upload: `<path d="M12 15V4m0 0L8 8m4-4l4 4M4.5 15.5V18a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.5"/>`,
+  trash: `<path d="M4 6.5h16M9.5 6.5V4.5h5v2M6.5 6.5l1 13a1.5 1.5 0 0 0 1.5 1.4h6a1.5 1.5 0 0 0 1.5-1.4l1-13"/>`,
+  pencil: `<path d="M4 20h4L18.5 9.5a2 2 0 0 0 0-3l-1-1a2 2 0 0 0-3 0L4 16v4z"/>`,
   // Trafikljusur (Läge 3)
   play: `<path d="M7 5.5v13l11-6.5z"/>`,
   stop: `<rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/>`,
   reset: `<path d="M4 5.5v5h5M4.6 10.5a8 8 0 1 1-1.1 5"/>`,
   save: `<path d="M5 4h11l3 3v13H5zM8 4v5h7M8 20v-6h8v6"/>`,
-  // Läge 4 — Elevlista & noteringar
+  // Läge 4 — Elevlista & noteringar (check/x delas med Morgonskärmen)
   check: `<path d="M4.5 12.5 10 18 19.5 6.5"/>`,
   x: `<path d="m6 6 12 12M18 6 6 18"/>`,
   search: `<circle cx="11" cy="11" r="6"/><path d="m20 20-4.6-4.6"/>`,
