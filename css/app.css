@@ -214,6 +214,66 @@ html[data-theme="student"] .view {
 }
 .student-panel__actions .btn { flex: 1; justify-content: center; }
 
+/* ---- "Bra jobbat" — snabbknapp nere till vänster (nåbar från andra lägen) ---- */
+
+.praise {
+  position: fixed;
+  left: var(--space-3);
+  bottom: var(--space-3);
+  z-index: 20;
+}
+.praise__fab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: calc(var(--space-1) + 2px) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-m);
+  cursor: pointer;
+  font-weight: 600;
+}
+.praise__fab:hover { background: var(--color-surface-alt); }
+.praise__fab svg { color: var(--color-accent-text); }
+
+.praise__pop {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + var(--space-2));
+  width: 17rem;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  box-shadow: var(--shadow-m);
+}
+.praise__head { display: flex; align-items: center; gap: var(--space-2); }
+.praise__head strong { flex: 1; display: inline-flex; align-items: center; gap: var(--space-2); }
+.praise__head strong svg { color: var(--color-accent-text); }
+
+.praise__list {
+  display: grid;
+  gap: var(--space-1);
+  overflow: auto;
+  padding: var(--space-1);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-bg);
+}
+.praise__item { display: flex; align-items: center; gap: var(--space-2); cursor: pointer; }
+.praise__free { display: flex; gap: var(--space-2); }
+.praise__free input {
+  flex: 1;
+  padding: calc(var(--space-1) + 1px) var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+.praise__hint { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); }
+
 /* ---- Lösenordsvägg / login: stram och saklig ---- */
 
 .auth-gate {

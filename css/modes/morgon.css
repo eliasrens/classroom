@@ -1,0 +1,341 @@
+/* ============================================================
+   LÄGE 1 — MORGONSKÄRM
+   Helskärm med naturbild, halvgenomskinlig mörk ruta med oskärpa,
+   infällbar kontrollpanel (lärarvy) och valfri namntavla.
+   ============================================================ */
+
+/* Morgonskärmen är fullbleed — bryt vy-ytans padding/maxbredd. */
+.view:has(.morgon) { padding: 0; max-width: none; }
+
+.morgon {
+  --morgon-fallback: #2b3a34; /* lugn djupgrön om bilden inte laddar */
+  position: relative;
+  width: 100%;
+  min-height: calc(100dvh - var(--topbar-height));
+  overflow: hidden;
+  background: var(--morgon-fallback);
+  isolation: isolate;
+}
+.morgon[data-view="student"] { min-height: 100dvh; }
+
+/* ---- Bakgrund ---- */
+.morgon__bgimg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -2;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+.morgon[data-bg="image"] .morgon__bgimg { opacity: 1; }
+/* En diskret mörkning så texten alltid har grund att stå mot. */
+.morgon__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgb(0 0 0 / 18%), rgb(0 0 0 / 34%));
+}
+.morgon[data-bg="color"] .morgon__scrim { background: rgb(0 0 0 / 10%); }
+
+/* ---- Centrerad hälsningsruta ---- */
+.morgon__center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5) var(--space-4);
+  pointer-events: none; /* klick går till bakgrund/paneler; kortet slår på nedan */
+  transition: padding 0.25s ease;
+}
+/* Öppen kontrollpanel: centrera kortet i ytan TILL HÖGER om panelen. */
+.morgon:has(.morgon__panel[data-open="true"]) .morgon__center {
+  padding-left: min(22rem, 88vw);
+}
+/* Namntavlan syns → håll kortet fritt från den på breda skärmar. */
+@media (min-width: 721px) {
+  .morgon:has(.morgon__nametavla:not([hidden])) .morgon__center { padding-right: min(21rem, 28vw); }
+}
+
+.morgon__card {
+  pointer-events: auto;
+  width: min(46rem, 92vw);
+  max-height: 84dvh;
+  overflow: auto;
+  padding: clamp(var(--space-4), 4vw, var(--space-5));
+  border-radius: var(--radius-l);
+  background: rgb(18 20 26 / 52%);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  border: 1px solid rgb(255 255 255 / 14%);
+  box-shadow: 0 10px 40px rgb(0 0 0 / 28%);
+  color: #fff;
+  text-align: center;
+}
+
+.morgon__greeting {
+  margin: 0;
+  font-size: clamp(2rem, 5.2vw, 3.6rem);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: #fff;
+  text-shadow: 0 2px 12px rgb(0 0 0 / 55%);
+}
+.morgon[data-view="student"] .morgon__greeting { font-size: clamp(2.6rem, 6vw, 4.6rem); }
+
+.morgon__rule {
+  border: 0;
+  height: 2px;
+  width: 4.5rem;
+  margin: clamp(var(--space-3), 2vw, var(--space-4)) auto;
+  background: var(--hue-accent);
+  border-radius: var(--radius-round);
+  opacity: 0.9;
+}
+
+.morgon__tasks {
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+  counter-reset: mg;
+  text-align: left;
+  display: grid;
+  gap: clamp(var(--space-2), 1.4vw, var(--space-3));
+  max-width: 34rem;
+}
+.morgon__tasks li {
+  counter-increment: mg;
+  position: relative;
+  padding-left: 2.6rem;
+  font-size: clamp(1.15rem, 2.4vw, 1.7rem);
+  line-height: 1.35;
+  text-shadow: 0 1px 8px rgb(0 0 0 / 55%);
+}
+.morgon[data-view="student"] .morgon__tasks li { font-size: clamp(1.4rem, 3vw, 2.2rem); }
+.morgon__tasks li::before {
+  content: counter(mg);
+  position: absolute;
+  left: 0;
+  top: 0.05em;
+  width: 1.85rem;
+  height: 1.85rem;
+  display: grid;
+  place-items: center;
+  font-size: 0.9em;
+  font-weight: 700;
+  color: var(--color-accent-ink, #17130a);
+  background: var(--hue-accent);
+  border-radius: var(--radius-round);
+  box-shadow: 0 1px 6px rgb(0 0 0 / 35%);
+}
+.morgon__tasks-empty {
+  margin: var(--space-3) 0 0;
+  color: rgb(255 255 255 / 78%);
+  text-shadow: 0 1px 8px rgb(0 0 0 / 55%);
+}
+
+/* ---- Namntavla ---- */
+.morgon__nametavla {
+  position: absolute;
+  top: clamp(var(--space-4), 5vh, 3.5rem);
+  right: clamp(var(--space-3), 2.5vw, var(--space-5));
+  bottom: clamp(var(--space-4), 5vh, 3.5rem);
+  width: min(19rem, 26vw);
+  display: flex;
+  flex-direction: column;
+  padding: clamp(var(--space-3), 2vw, var(--space-4));
+  border-radius: var(--radius-l);
+  background: rgb(18 20 26 / 52%);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  border: 1px solid rgb(255 255 255 / 14%);
+  box-shadow: 0 10px 40px rgb(0 0 0 / 28%);
+  color: #fff;
+}
+.morgon__nt-head { display: flex; align-items: center; gap: var(--space-2); }
+.morgon__nt-title {
+  margin: 0;
+  flex: 1;
+  font-size: clamp(1.3rem, 2.4vw, 1.9rem);
+  color: #fff;
+  text-shadow: 0 2px 10px rgb(0 0 0 / 55%);
+}
+.morgon__nt-clear { color: #fff; }
+.morgon__nt-clear:hover { background: rgb(255 255 255 / 14%); }
+.morgon__nt-names {
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  overflow: auto;
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+}
+.morgon__nt-names li {
+  font-size: clamp(1.3rem, 2.6vw, 2rem);
+  font-weight: 600;
+  text-shadow: 0 1px 8px rgb(0 0 0 / 55%);
+}
+.morgon[data-view="student"] .morgon__nt-names li { font-size: clamp(1.5rem, 3vw, 2.4rem); }
+.morgon__nt-empty { font-weight: 400; opacity: 0.75; font-size: var(--text-m) !important; }
+
+/* Smala skärmar: namntavlan lägger sig under kortet i stället för bredvid. */
+@media (max-width: 720px) {
+  .morgon__nametavla {
+    position: static;
+    width: auto;
+    margin: 0 auto var(--space-4);
+  }
+  .morgon__center { position: static; min-height: calc(100dvh - var(--topbar-height)); }
+}
+
+/* ============================================================
+   KONTROLLPANEL (endast lärarvy)
+   ============================================================ */
+
+.morgon__panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(22rem, 88vw);
+  z-index: 5;
+  background: rgb(20 22 26 / 92%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-right: 1px solid var(--color-line);
+  color: var(--color-ink);
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+.morgon__panel[data-open="false"] {
+  transform: translateX(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+.morgon__panel-scroll {
+  height: 100%;
+  overflow: auto;
+  padding: var(--space-4) var(--space-3) var(--space-5);
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+}
+
+.morgon__panel-toggle {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: rgb(20 22 26 / 82%);
+  color: var(--color-ink);
+  cursor: pointer;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.morgon__panel-toggle svg { transition: transform 0.25s ease; }
+.morgon__panel-toggle[data-open="false"] svg { transform: rotate(180deg); }
+/* Dold panel → knappen bleknar nästan bort tills man pekar på den. */
+.morgon__panel-toggle[data-open="false"] { opacity: 0.22; left: var(--space-2); }
+.morgon__panel-toggle[data-open="false"]:hover,
+.morgon__panel-toggle[data-open="false"]:focus-visible { opacity: 1; }
+/* När panelen är öppen sitter knappen inne i panelens överkant. */
+.morgon__panel-toggle[data-open="true"] { left: calc(min(22rem, 88vw) - 34px - var(--space-3)); }
+
+.morgon__section { display: grid; gap: var(--space-2); }
+.morgon__section h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-s);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-ink-soft);
+}
+.morgon__section h3 svg { color: var(--color-accent-text); }
+
+.morgon__variant { display: flex; gap: var(--space-3); }
+.morgon__variant label,
+.morgon__show,
+.morgon__ntstudent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+.morgon__show { font-weight: 600; }
+
+.morgon__panel input[type="text"],
+.morgon__panel input[type="url"] {
+  width: 100%;
+  padding: calc(var(--space-1) + 2px) var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+
+.morgon__hint { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); }
+
+/* Uppgiftsrader */
+.morgon__tasklist { display: grid; gap: var(--space-1); }
+.morgon__task {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+}
+.morgon__task-main { display: flex; align-items: center; gap: var(--space-2); flex: 1; cursor: pointer; min-width: 0; }
+.morgon__task-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.morgon__weekday { padding: 2px var(--space-1); }
+.morgon__task-actions { display: inline-flex; gap: 2px; flex: none; }
+.morgon__task-btn {
+  display: inline-grid;
+  place-items: center;
+  padding: 3px;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-soft);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+.morgon__task-btn:hover { background: var(--color-surface-alt); color: var(--color-ink); }
+
+/* input + plus-knapp på rad */
+.morgon__addtask { display: flex; gap: var(--space-2); }
+.morgon__addtask input { flex: 1; }
+
+.morgon__ntstudents {
+  display: grid;
+  gap: var(--space-1);
+  max-height: 12rem;
+  overflow: auto;
+  padding: var(--space-1);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+}
+
+.morgon__bg-upload { position: relative; justify-content: center; }
+
+/* Panelen kör alltid mörkt (den ligger på bilden) — även i ljust schema
+   för lärarvyn ska den vara läsbar mot en godtycklig naturbild. */
+.morgon__panel {
+  --color-bg: #14161a;
+  --color-surface: #1b1e24;
+  --color-surface-alt: #23272f;
+  --color-ink: #e4e6e9;
+  --color-ink-soft: #969ea9;
+  --color-line: #2b303a;
+}

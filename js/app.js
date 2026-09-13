@@ -14,6 +14,7 @@ import { createRouter } from "./router.js";
 import { MODES, isStudentMode } from "./modes/registry.js";
 import { initClassPicker, ACTIVE_CLASS_KEY } from "./ui/class-picker.js";
 import { initStudentPanel } from "./ui/student-panel.js";
+import { initPraise } from "./ui/praise.js";
 import { createSyncBus, isPreviewWindow, announceStudentScreen, watchStudentScreen } from "./sync.js";
 import { icon } from "./lib/icons.js";
 
@@ -182,6 +183,9 @@ function startApp() {
 
   // Panel i lärarvyn: indikator + live-förhandsvisning + enskärmsläge.
   initStudentPanel({ store, openStudentWindow });
+
+  // "Bra jobbat" — snabbknapp för namntavlan, nåbar från andra lägen.
+  initPraise({ store, data });
 
   // Ljust/mörkt läge i lärarvyn
   $("#toggle-scheme").addEventListener("click", () => {
