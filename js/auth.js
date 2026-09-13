@@ -26,13 +26,30 @@
  *   auth.offlineBlocked          true = Firebase-läge, offline, aldrig inloggad här
  *   auth.subscribe(fn)           fn(auth) direkt + vid varje förändring
  *   auth.setupPassword(pw)       lokalt läge, första start
- *   auth.signIn({email?, password})
+ *   auth.signIn({name?, password})
  *   auth.signOut()               loggar ut ALLA fönster
+ *
+ * INLOGGNING I FIREBASE-LÄGE: läraren skriver bara sitt FÖRNAMN (eller
+ * initialer) — inte en e-postadress. Firebase Auth kräver e-post bakom
+ * kulisserna, så förnamnet mappas mot en FAST, dold domän
+ * (@klassrum.local): "elias" → "elias@klassrum.local". Domänen visas
+ * aldrig i gränssnittet. Kontona skapas i Firebase-konsolen med samma
+ * mönster (se docs/DRIFTSATTNING.md); inga konton/lösenord i koden.
  */
 
 import { firebaseConfig, isFirebaseConfigured } from "./firebase-config.js";
 
 const SDK_BASE = "https://www.gstatic.com/firebasejs/10.12.2";
+
+/** Fast, dold e-postdomän för lärarkonton (läraren skriver bara förnamn). */
+export const TEACHER_EMAIL_DOMAIN = "klassrum.local";
+
+/** Förnamn/initialer → intern Firebase-e-post. "Elias" → "elias@klassrum.local". */
+export function nameToEmail(name) {
+  const id = String(name ?? "").trim().toLowerCase();
+  if (!id) return "";
+  return id.includes("@") ? id : `${id}@${TEACHER_EMAIL_DOMAIN}`;
+}
 
 export const SESSION_KEY = "classroom:auth:session"; // 'local' eller Firebase-uid
 const LOCAL_HASH_KEY = "classroom:auth:localHash";
@@ -84,7 +101,7 @@ export function createAuth() {
       setSignedIn("local");
     },
 
-    async signIn({ email, password }) {
+    async signIn({ name, password }) {
       if (mode === "local") {
         if ((await hashPassword(password)) !== readLS(LOCAL_HASH_KEY)) {
           throw new Error("Fel lösenord.");
@@ -93,6 +110,8 @@ export function createAuth() {
         return;
       }
       if (!fbAuth) throw new Error("Ingen anslutning — första inloggningen kräver nät.");
+      // Läraren skriver bara förnamn — bygg den interna e-posten mot den fasta domänen.
+      const email = nameToEmail(name);
       const cred = await fbAuth.api
         .signInWithEmailAndPassword(fbAuth.auth, email, password)
         .catch((err) => { throw new Error(friendlyFirebaseError(err)); });
@@ -157,7 +176,7 @@ export function createAuth() {
 function friendlyFirebaseError(err) {
   const code = err?.code ?? "";
   if (code.includes("invalid-credential") || code.includes("wrong-password") || code.includes("user-not-found")) {
-    return "Fel e-post eller lösenord.";
+    return "Fel förnamn eller lösenord.";
   }
   if (code.includes("too-many-requests")) return "För många försök — vänta en stund.";
   if (code.includes("network-request-failed")) return "Ingen anslutning till inloggningstjänsten.";

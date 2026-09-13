@@ -6,7 +6,11 @@
  *    lärardata. Fönstret släpps in automatiskt (storage-event) när
  *    läraren loggar in i sitt fönster.
  *  - Lokalt läge, första start: "skapa lösenord".
- *  - Annars: lösenordsformulär (+ e-postfält i Firebase-läge).
+ *  - Annars: lösenordsformulär (+ förnamnsfält i Firebase-läge).
+ *
+ * I Firebase-läge loggar läraren in med bara FÖRNAMN (eller initialer),
+ * aldrig en e-postadress. Den fasta domänen läggs på i js/auth.js
+ * (nameToEmail) och visas aldrig här.
  */
 
 export function renderLogin(el, { auth, view }) {
@@ -33,8 +37,9 @@ export function renderLogin(el, { auth, view }) {
            Det behövs varje gång appen öppnas i en ny webbläsare.</p>`
         : `<p class="auth__intro">Logga in för att fortsätta.</p>`}
       ${isFirebase ? `
-        <label class="auth__field">E-post
-          <input type="email" name="email" required autocomplete="username" autofocus>
+        <label class="auth__field">Förnamn
+          <input type="text" name="name" required autocomplete="username"
+                 autocapitalize="none" spellcheck="false" autofocus>
         </label>` : ""}
       <label class="auth__field">${isSetup ? "Nytt lösenord" : "Lösenord"}
         <input type="password" name="password" required minlength="4"
@@ -72,7 +77,7 @@ export function renderLogin(el, { auth, view }) {
     submitBtn.disabled = true;
     try {
       if (isSetup) await auth.setupPassword(password);
-      else await auth.signIn({ email: fd.get("email"), password });
+      else await auth.signIn({ name: fd.get("name"), password });
       // Lyckad inloggning → auth-prenumeranten i app.js tar över.
     } catch (err) {
       showError(err.message || "Något gick fel — försök igen.");

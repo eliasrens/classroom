@@ -10,7 +10,7 @@ förbi".
 
 | | Lokalt läge (Firebase ej ifylld) | Firebase-läge |
 |---|---|---|
-| Identitet | Ett lokalt app-lösenord, satt av läraren vid **första start** ("skapa lösenord"), SHA-256-hashat i localStorage | **Firebase Authentication**, e-post + lösenord |
+| Identitet | Ett lokalt app-lösenord, satt av läraren vid **första start** ("skapa lösenord"), SHA-256-hashat i localStorage | **Firebase Authentication**. Läraren skriver bara **förnamn** (eller initialer) + lösenord; appen lägger på en fast, dold domän (`förnamn@klassrum.local`, se `nameToEmail` i `js/auth.js`) innan `signInWithEmailAndPassword`. |
 | Offline | Fungerar alltid | SDK:ns persistens (IndexedDB) håller sessionen; kan SDK:n inte ens laddas släpps en **tidigare inloggad** lärare in via lokal sessionsmarkör. Endast **första** inloggningen på en ny enhet kräver nät — appen låser sig aldrig för en redan inloggad lärare. |
 | Konton | Single-user | Konton skapas i Firebase-konsolen (ingen självregistrering). Fler lärare = fler konton; data delas via Firestore. |
 

@@ -19,10 +19,11 @@ Eller lägg repot direkt på GitHub Pages. Ingen bundler, inga beroenden.
 
 Hela appen ligger bakom en lösenordsvägg — inget renderas före
 inloggning. Utan Firebase: läraren väljer ett lokalt app-lösenord vid
-första start. Med Firebase: e-post + lösenord via Firebase Auth
-(konton skapas i konsolen; en redan inloggad lärare kan fortsätta
-offline). Elevskärmen ärver lärarens session och visar aldrig någon
-inloggning. Detaljer: [docs/AUTH.md](docs/AUTH.md).
+första start. Med Firebase: läraren loggar in med bara **förnamn** +
+lösenord via Firebase Auth (den fasta domänen `@klassrum.local` läggs
+på i bakgrunden; konton skapas i konsolen; en redan inloggad lärare kan
+fortsätta offline). Elevskärmen ärver lärarens session och visar aldrig
+någon inloggning. Detaljer: [docs/AUTH.md](docs/AUTH.md).
 
 ## Firebase (valfritt)
 
