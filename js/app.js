@@ -19,9 +19,10 @@ import { initPraise } from "./ui/praise.js";
 import { createSyncBus, isPreviewWindow, announceStudentScreen, watchStudentScreen } from "./sync.js";
 import { icon } from "./lib/icons.js";
 import { runRetention } from "./lib/privacy.js";
-import { getProjectorScreen, screenOpenFeatures, enterFullscreenOnProjector } from "./lib/screens.js";
+import { getProjectorScreen, screenOpenFeatures } from "./lib/screens.js";
 import { initHelp } from "./ui/help.js";
 import { initShortcuts } from "./ui/shortcuts.js";
+import { initFullscreenPrompt } from "./ui/fullscreen-prompt.js";
 
 const $ = (sel) => document.querySelector(sel);
 const appEl = $("#app");
@@ -112,12 +113,15 @@ function startApp() {
   // anrop — annars agerar ett elevfönster lärare i en blink vid start.
   store.set({ view: currentView() });
 
-  // Elevfönster som öppnats på projektorn med ?autofs=1: gå i helskärm på
-  // den skärmen direkt. Best-effort — fönstret ärver klick-gesten från
-  // "Öppna elevskärm", men lyckas det inte finns dubbelklick kvar. Aldrig
-  // i förhandsvisnings-iframen (den är inbäddad i lärarvyn).
+  // Elevfönster som öppnats på projektorn med ?autofs=1: visa ett stort
+  // ett-kliks helskärmslager. requestFullscreen() kräver en transient
+  // användargest i DETTA fönster — klick-gesten från "Öppna elevskärm"
+  // följer inte med hit, så ett auto-anrop avvisas tyst. Ett riktigt klick
+  // på lagret ger en giltig gest → äkta helskärm på skärm 2. Dubbelklick
+  // och screens.js-positioneringen är kvar. Aldrig i förhandsvisnings-
+  // iframen (inbäddad i lärarvyn) och aldrig i lärarvyn.
   if (!preview && currentView() === "student" && wantsAutoFullscreen()) {
-    void enterFullscreenOnProjector().catch(() => { /* helskärm är en bonus */ });
+    try { initFullscreenPrompt(); } catch { /* helskärm är en bonus */ }
   }
 
   // INTEGRITET: auto-radering av gamla noteringar (Läge 5). Körs bara i
