@@ -3,8 +3,7 @@
  *
  * Morgonskärmens tillstånd lever i klassens inställningar under nyckeln
  * "morningScreen" (se DATAMODELL.md: classes/{id}/settings/morningScreen).
- * Både lärarvyn, elevvyn och snabb-panelen "Bra jobbat" (nåbar från
- * andra lägen, js/ui/praise.js) läser och skriver via detta lager, så
+ * Både lärarvyn och elevvyn läser och skriver via detta lager, så
  * allt syncar automatiskt genom datalagret + storage-eventet.
  *
  * Ingenting här rör DOM — bara ren datamodell och härledningar.
@@ -127,20 +126,4 @@ export async function loadMorning(data, classId) {
 export async function saveMorning(data, classId, settings) {
   if (!classId) return; // ingen klass vald — ändringar blir efemära
   await data.put(settingsPath(classId), { id: MORNING_KEY, value: settings });
-}
-
-/**
- * Kryssa "Bra jobbat" på en elev direkt (nåbar från andra lägen).
- * Togglar eleven i namntavlelistan och slår PÅ namntavlan. Läser
- * färskt tillstånd så den är säker att anropa var som helst.
- */
-export async function togglePraiseStudent(data, classId, studentId) {
-  if (!classId || !studentId) return;
-  const s = await loadMorning(data, classId);
-  const exists = s.praise.some((p) => p.kind === "student" && p.studentId === studentId);
-  s.praise = exists
-    ? s.praise.filter((p) => !(p.kind === "student" && p.studentId === studentId))
-    : [...s.praise, { id: studentId, kind: "student", studentId }];
-  if (!exists) s.showNametavla = true;
-  await saveMorning(data, classId, s);
 }
