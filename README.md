@@ -1,8 +1,8 @@
 # Klassrumsverktyget
 
 Webbaserat klassrumsverktyg för mellanstadiet (åk 4) — morgonskärm,
-lektionsplanering, trafikljusur för övergångar, elevlista med noteringar och en
-översiktsvy. Ren frontend (HTML5 + CSS + Vanilla JS, **inget byggsteg**), delad
+lektionsplanering, trafikljusur för övergångar, elevlista med noteringar, en
+översiktsvy och Statistik med veckoarkiv (vyerna börjar om rent varje måndag). Ren frontend (HTML5 + CSS + Vanilla JS, **inget byggsteg**), delad
 data mellan lärare via Firebase/Firestore med **offline-first**-datalager.
 
 ## Köra
@@ -58,7 +58,8 @@ js/
   lib/icons.js          linje-ikoner (inline-SVG) — inga emoji i gränssnittet
   lib/names.js          elevnamn: endast förnamn, valfri tag, initial-läge
   lib/privacy.js        integritet: auto-radering av noteringar + radera all klassdata
-  modes/                de fem lägena + registret (Läge 5 = oversikt.js: startvyn)
+  modes/                lägena + registret (oversikt.js = startvyn, statistik.js = veckoarkivet)
+  lib/week.js           veckologik (måndag 00:00) · lib/week-rhythm.js  rent varje måndag
   ui/login.js           login-vy + elevskärmens väntevy
   ui/class-picker.js    klassval i topbaren
   ui/help.js            genvägslista under "?" · ui/shortcuts.js  globala tangentgenvägar

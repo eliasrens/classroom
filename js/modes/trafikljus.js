@@ -381,7 +381,11 @@ export default {
     // -- Statistik: filter (lärare + typ), veckosummering, rekord, historik --
 
     /** Lärarna som loggat trafikljuspass i klassen (för filtret). */
-    const teacherOptions = () => sharedTeacherOptions(sessions.filter((s) => s.type === "trafikljus"));
+    // Funktionsdeklaration (hoistas): drawStats anropas redan från
+    // settings-watchen ovan, innan den här raden har körts.
+    function teacherOptions() {
+      return sharedTeacherOptions(sessions.filter((s) => s.type === "trafikljus"));
+    }
 
     function drawStats() {
       const statsKind = kindOf(statsFilter.kind ?? kind);
