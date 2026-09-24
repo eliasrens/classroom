@@ -118,3 +118,31 @@
 @media (max-width: 640px) {
   .stat-kinds { grid-template-columns: 1fr; }
 }
+
+/* ---- Veckoresultat + veckomål per typ (issue #35) ---- */
+.stat-goal {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-m);
+  background: var(--color-surface-alt);
+  font-size: var(--text-s);
+  font-variant-numeric: tabular-nums;
+}
+.stat-goal p { margin: 0 0 var(--space-1); }
+.stat-goal p:last-child { margin-bottom: 0; }
+.stat-goal__label { color: var(--color-ink-soft); margin-right: 0.35em; }
+.stat-goal-ok { font-weight: 600; color: var(--color-ok); }
+.stat-goal svg { width: 1em; height: 1em; vertical-align: -0.12em; }
+.stat-trend__m { color: var(--color-ok); }
+.stat-goal-no { color: var(--color-ink-soft); }
+.stat-trend {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+}
+.stat-trend li { display: inline-flex; gap: 0.35em; color: var(--color-ink-soft); }
+.stat-trend li[aria-current="true"] { color: var(--color-ink); font-weight: 600; }
+.stat-trend__m { min-width: 1.2em; }

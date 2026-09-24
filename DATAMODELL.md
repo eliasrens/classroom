@@ -106,11 +106,26 @@ classes/{classId}/settings/trafikljus   — Läge 3:s gränser, per passtyp
     overgang: { yellowSec, redSec }   — standard 60 / 120
     datorer:  { yellowSec, redSec }   — standard 180 / 300 (grönt <3:00,
                                         gult 3:00–5:00, rött från 5:00)
+    goalMetric, showGoalToStudents    — veckomålet, se nedan
   }
                      — bakåtkompatibelt: en äldre config utan typ
                        ({ yellowSec, redSec } på toppnivån) läses som
                        "overgang" och skrivs om till typad form vid
                        nästa ändring. Saknad typ får standardvärden.
+    goalMetric: { overgang: "avg"|"best"|"total", datorer: … }
+                     — veckomålets mått per typ (issue #35), standard "avg"
+                       (snitt per pass). Målet = förra veckans värde i
+                       måttet; klaras när veckans värde är UNDER det.
+    showGoalToStudents: bool
+                     — "Visa veckomålet för eleverna": en diskret rad under
+                       klockan på elevskärmen ("Veckans mål: snitt under
+                       2:40"). Standard av. Inga lärarnamn/statistik där.
+                     — veckoresultaten LAGRAS INTE: de räknas fram ur
+                       sessions per vecka (js/lib/week-goal.js), så ett
+                       sent synkat pass hamnar alltid i rätt vecka.
+                       "Förra veckan" = närmast föregående vecka MED pass
+                       av typen (en lovvecka hoppas över och det syns).
+                       Test: node docs/test-week-goal.mjs
 
 classes/{classId}/settings/trafikljusState — Läge 3:s live-tillstånd
   value: { timer: { startedAt, pausedAt|null } | null,
