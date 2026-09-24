@@ -1,9 +1,13 @@
 /**
- * Läge 3 — TRAFIKLJUSUR (övergångar).
+ * Läge 3 — TRAFIKLJUSUR (övergångar + datorer).
  *
  * Huvudvyn för undanplockning vid lektionsslut. Timern räknar UPPÅT
  * från 00:00 och bakgrunden skiftar fas grön → gul → röd vid
  * justerbara sekundgränser. Tonen mot eleverna är lugn och saklig.
+ *
+ * Två passtyper (KINDS) med egna gränser: "overgang" (vanlig övergång)
+ * och "datorer" (plocka undan datorer — tar längre tid). Läraren väljer
+ * typ innan start; statistik och rekord räknas ALDRIG över typgränsen.
  *
  * Bygger på:
  *  - js/lib/timer.js  → tidsstämpel-baserad tid (rätt i bakgrundsflik)
@@ -19,17 +23,30 @@
 
 import { createTicker } from "../lib/timer.js";
 import { icon } from "../lib/icons.js";
-import { attribution } from "../data/plans.js";
+import { SUBJECTS } from "../lib/color.js";
+import { attribution, currentUid } from "../data/plans.js";
 import { currentLessonBlock, teacherLabel, escapeHtml } from "./elever/shared.js";
 
-const CONFIG_ID = "trafikljus";       // settings/trafikljus  → { value: {yellowSec, redSec} }
-const STATE_ID = "trafikljusState";   // settings/trafikljusState → { value: {timer} }
+const CONFIG_ID = "trafikljus";       // settings/trafikljus  → { value: { overgang:{yellowSec, redSec}, datorer:{…} } }
+const STATE_ID = "trafikljusState";   // settings/trafikljusState → { value: {timer, kind} }
 
 const settingsPath = (classId) => `classes/${classId}/settings`;
 const sessionsPath = (classId) => `classes/${classId}/sessions`;
 
-const DEFAULT_CONFIG = { yellowSec: 60, redSec: 120 };
 const MIN_SEC = 5;
+
+/** Passtyper. Gamla pass/config utan typ räknas som "overgang". */
+const KINDS = {
+  overgang: { key: "overgang", label: "Övergång", icon: "signal",  defaults: { yellowSec: 60,  redSec: 120 } },
+  datorer:  { key: "datorer",  label: "Datorer",  icon: "monitor", defaults: { yellowSec: 180, redSec: 300 } },
+};
+const KIND_KEYS = Object.keys(KINDS);
+const DEFAULT_KIND = "overgang";
+
+/** Giltig typnyckel (allt okänt/saknat → "overgang"). */
+const kindOf = (k) => (KINDS[k] ? k : DEFAULT_KIND);
+/** Ett loggat pass typ — gamla pass utan `kind` är övergångar. */
+const sessionKind = (s) => kindOf(s?.kind);
 
 /** Faser: bara färg + etikett. Ingen instruktionstext visas på skärmen
     — den stora klockan och färgskiftet räcker (saklig ton mot eleverna). */
@@ -63,12 +80,26 @@ function phaseFor(sec, cfg) {
   return PHASES.green;
 }
 
-/** Normalisera/validera config (gult < rött, golv MIN_SEC). */
-function normalizeConfig(raw) {
-  const yellowSec = Math.max(MIN_SEC, Math.round(Number(raw?.yellowSec) || DEFAULT_CONFIG.yellowSec));
-  let redSec = Math.max(MIN_SEC, Math.round(Number(raw?.redSec) || DEFAULT_CONFIG.redSec));
+/** Normalisera/validera EN typs gränser (gult < rött, golv MIN_SEC). */
+function normalizeLimits(raw, defaults) {
+  const yellowSec = Math.max(MIN_SEC, Math.round(Number(raw?.yellowSec) || defaults.yellowSec));
+  let redSec = Math.max(MIN_SEC, Math.round(Number(raw?.redSec) || defaults.redSec));
   if (redSec <= yellowSec) redSec = yellowSec + MIN_SEC;
   return { yellowSec, redSec };
+}
+
+/**
+ * Normalisera hela configen till { overgang:{…}, datorer:{…} }.
+ * Bakåtkompatibelt: en gammal config utan typ ({yellowSec, redSec} på
+ * toppnivån) migreras till "overgang"; saknade typer får standardvärden.
+ */
+function normalizeConfig(raw) {
+  const legacy = raw && raw.overgang == null && (raw.yellowSec != null || raw.redSec != null)
+    ? { yellowSec: raw.yellowSec, redSec: raw.redSec }
+    : null;
+  return Object.fromEntries(
+    KIND_KEYS.map((k) => [k, normalizeLimits(k === DEFAULT_KIND && legacy ? legacy : raw?.[k], KINDS[k].defaults)]),
+  );
 }
 
 /** Måndag 00:00 (lokal tid) för given tidpunkt — start på innevarande vecka. */
@@ -81,12 +112,16 @@ function startOfWeek(now = Date.now()) {
 }
 
 /**
- * Veckostatistik ur loggade pass: antal per färg, snabbaste gröna
- * stopp (veckans rekord) och de fem senaste passen (alla veckor).
+ * Veckostatistik för EN passtyp ur loggade pass: antal per färg,
+ * snabbaste gröna stopp (veckans rekord) och alla pass nyast först.
+ * Typerna blandas aldrig — datorer jämförs aldrig med övergångar.
+ * `filter` (valfri) begränsar vidare, t.ex. till en viss lärare.
  */
-function computeStats(sessions, now = Date.now()) {
+function computeStats(sessions, kind = DEFAULT_KIND, { now = Date.now(), filter = null } = {}) {
   const weekStart = startOfWeek(now);
-  const tl = sessions.filter((s) => s.type === "trafikljus" && s.result);
+  const tl = sessions.filter(
+    (s) => s.type === "trafikljus" && s.result && sessionKind(s) === kindOf(kind) && (!filter || filter(s)),
+  );
   const week = tl.filter((s) => (s.startedAt ?? 0) >= weekStart);
 
   const counts = { green: 0, yellow: 0, red: 0 };
@@ -101,12 +136,41 @@ function computeStats(sessions, now = Date.now()) {
     }
   }
 
-  const latest = [...tl].sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0)).slice(0, 5);
+  const latest = [...tl].sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
   return { counts, recordSec, recordId, latest, weekTotal: week.length };
 }
 
-const fmtDate = (ts) =>
-  new Date(ts).toLocaleDateString("sv-SE", { weekday: "short", day: "numeric", month: "short" });
+/** "tis 10:15" inom innevarande vecka, annars "tis 15 sep 10:15". */
+function fmtWhen(ts, now = Date.now()) {
+  const d = new Date(ts);
+  const day = d.toLocaleDateString("sv-SE", { weekday: "short" }).replace(/\.$/, "");
+  const time = d.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
+  if (ts >= startOfWeek(now) && ts < startOfWeek(now) + 7 * 86_400_000) return `${day} ${time}`;
+  const date = d.toLocaleDateString("sv-SE", { day: "numeric", month: "short" }).replace(/\.$/, "");
+  return `${day} ${date} ${time}`;
+}
+
+/** Lektionsnamn ur passets snapshot: blockets titel, annars ämnets namn. */
+function lessonLabel(lesson, subjects) {
+  if (!lesson) return "";
+  if (lesson.title) return lesson.title;
+  return subjects.find((x) => x.id === lesson.subjectId)?.name ?? lesson.subjectId ?? "";
+}
+
+/** "m:ss" för gränsvisning (180 → "3:00"). */
+const fmtLimit = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+
+/** Inbyggda ämnen + klassens egna (settings/subjects, se Läge 2). */
+function mergedSubjects(settingsDocs) {
+  const custom = settingsDocs.find((d) => d.id === "subjects")?.value?.list ?? [];
+  const seen = new Set(SUBJECTS.map((s) => s.id));
+  return [...SUBJECTS, ...custom.filter((s) => s?.id && !seen.has(s.id))];
+}
+
+const HISTORY_PAGE = 8; // pass per "sida" i historiken
+
+// Statistikfiltret (lärare + typ) överlever byte av läge under sessionen.
+const statsFilter = { teacher: "all", kind: null };
 
 // ---- Mode-objektet --------------------------------------------------------
 
@@ -134,11 +198,16 @@ export default {
     const isStudent = view === "student";
 
     // Delat, muterbart tillstånd för vyn.
-    let config = { ...DEFAULT_CONFIG };
-    let timer = null;            // { startedAt, pausedAt|null } | null
+    let config = normalizeConfig(null); // { overgang:{yellowSec, redSec}, datorer:{…} }
+    let kind = DEFAULT_KIND;            // vald passtyp — låst medan ett pass pågår/är stoppat
+    let timer = null;                   // { startedAt, pausedAt|null } | null
     let sessions = [];
-    let savedCurrent = false;    // aktuellt (stoppat) pass redan loggat?
-    let celebrateRecord = false; // visa "Nytt rekord!" tills nästa start/återställ
+    let subjects = SUBJECTS;            // inbyggda + klassens egna ämnen (för lektionsnamn)
+    let savedCurrent = false;           // aktuellt (stoppat) pass redan loggat?
+    let celebrateRecord = false;        // visa "Nytt rekord!" tills nästa start/återställ
+    let shown = HISTORY_PAGE;           // antal pass som visas i historiken
+
+    const limits = () => config[kind];
 
     const unsubs = [];
     // Städfunktionen sätts direkt: kraschar mount halvvägs stoppar
@@ -151,18 +220,23 @@ export default {
 
     const stageEl = el.querySelector(".tl-stage");
     const clockEl = el.querySelector(".tl-clock");
+    const kindTagEl = el.querySelector(".tl-kind-tag");
 
     // -- Ritning (både vyer) -----------------------------------------------
 
     function drawTimer() {
       const now = Date.now();
       const sec = Math.floor(elapsedMs(timer, now) / 1000);
-      const phase = phaseFor(sec, config);
+      const phase = phaseFor(sec, limits());
       clockEl.textContent = fmtMMSS(elapsedMs(timer, now));
       // Fasen styr bara färgen (data-phase) — ingen instruktionstext.
       stageEl.dataset.phase = phase.key;
+      stageEl.dataset.kind = kind;
       stageEl.dataset.running = String(!!timer && timer.pausedAt == null);
       stageEl.dataset.stopped = String(!!timer && timer.pausedAt != null);
+      // Diskret etikett så eleverna vet vilket ljus som gäller (bara för
+      // datorer — en vanlig övergång är standardfallet och visas rent).
+      kindTagEl.hidden = kind === DEFAULT_KIND;
       if (!isStudent) drawControls();
     }
 
@@ -181,6 +255,7 @@ export default {
           const st = docs.find((d) => d.id === STATE_ID)?.value;
           config = normalizeConfig(cfg);
           timer = st?.timer ?? null;
+          kind = kindOf(st?.kind);
           drawTimer();
         }),
       );
@@ -188,6 +263,7 @@ export default {
       unsubs.push(
         sync.on("trafikljus:timer", ({ payload }) => {
           timer = payload?.timer ?? null;
+          kind = kindOf(payload?.kind);
           drawTimer();
         }),
       );
@@ -196,14 +272,17 @@ export default {
       return;
     }
 
-    // -- Lärarvy: kontroller, inställningar, statistik -----------------------
+    // -- Lärarvy: typväxlare, kontroller, inställningar, statistik -----------
 
+    const kindBtns = [...el.querySelectorAll(".tl-kind-opt[data-kind]")];
     const startBtn = el.querySelector('[data-act="start"]');
     const stopBtn = el.querySelector('[data-act="stop"]');
     const resetBtn = el.querySelector('[data-act="reset"]');
     const saveBtn = el.querySelector('[data-act="save"]');
     const yellowInput = el.querySelector('[data-cfg="yellow"]');
     const redInput = el.querySelector('[data-cfg="red"]');
+    const settingsKindEl = el.querySelector(".tl-settings-kind");
+    const kindHintEl = el.querySelector(".tl-kind-hint");
     const statsEl = el.querySelector(".tl-stats");
 
     function drawControls() {
@@ -214,12 +293,44 @@ export default {
       resetBtn.disabled = !timer;
       saveBtn.disabled = !stopped || savedCurrent;
       saveBtn.querySelector("span").textContent = savedCurrent ? "Pass sparat" : "Spara pass";
+      // Typen väljs INNAN start och ligger fast tills passet återställs.
+      for (const b of kindBtns) {
+        const on = b.dataset.kind === kind;
+        b.setAttribute("aria-checked", String(on));
+        b.tabIndex = on ? 0 : -1;
+        b.disabled = !!timer && !on;
+      }
+      kindHintEl.hidden = !timer;
+    }
+
+    /** Växlarens gränsrad och inställningsfälten för vald typ. */
+    function drawLimits() {
+      for (const b of kindBtns) {
+        const l = config[b.dataset.kind];
+        b.querySelector(".tl-kind-limits").textContent = `gult ${fmtLimit(l.yellowSec)} · rött ${fmtLimit(l.redSec)}`;
+      }
+      settingsKindEl.textContent = KINDS[kind].label.toLowerCase();
+      if (document.activeElement !== yellowInput) yellowInput.value = limits().yellowSec;
+      if (document.activeElement !== redInput) redInput.value = limits().redSec;
     }
 
     // Skriv live-tillstånd till datalagret OCH publicera på sync-bussen.
     async function pushState() {
-      sync.publish("trafikljus:timer", { timer });
-      await data.put(settingsPath(classId), { id: STATE_ID, value: { timer } });
+      sync.publish("trafikljus:timer", { timer, kind });
+      await data.put(settingsPath(classId), { id: STATE_ID, value: { timer, kind } });
+    }
+
+    function setKind(next) {
+      next = kindOf(next);
+      if (next === kind || timer) return; // låst medan ett pass finns
+      kind = next;
+      // Statistiken följer växlaren (den kan sedan filtreras fritt).
+      statsFilter.kind = kind;
+      celebrateRecord = false;
+      drawLimits();
+      drawTimer();
+      drawStats();
+      void pushState();
     }
 
     function start() {
@@ -257,10 +368,13 @@ export default {
     async function savePass() {
       if (!timer || timer.pausedAt == null || savedCurrent) return;
       const durationSec = Math.floor(elapsedMs(timer, timer.pausedAt) / 1000);
-      const color = phaseFor(durationSec, config).key;
-      const before = computeStats(sessions);
+      const passLimits = { ...limits() };
+      const color = phaseFor(durationSec, passLimits).key;
+      // Rekordet är klassens (alla lärare) — men bara inom samma typ.
+      const before = computeStats(sessions, kind);
       celebrateRecord =
         color === "green" && (before.recordSec == null || durationSec < before.recordSec);
+      if (celebrateRecord) statsFilter.kind = kind;
       savedCurrent = true;
       drawControls();
       // Attribution: vem loggade passet + snapshot av pågående block ur den
@@ -268,98 +382,190 @@ export default {
       const lesson = await currentLessonBlock(data, classId);
       await data.put(sessionsPath(classId), {
         type: "trafikljus",
+        kind,
         startedAt: timer.startedAt,
         endedAt: timer.pausedAt,
-        result: { color, durationSec },
+        result: { color, durationSec, limits: passLimits },
         lesson,
         ...attribution(),
       });
       // sessions-watch ritar om statistiken (med ev. rekordmarkering).
     }
 
+    for (const b of kindBtns) b.addEventListener("click", () => setKind(b.dataset.kind));
+    // Radiogrupp: piltangenter flyttar valet (samma mönster som native radio).
+    el.querySelector(".tl-kind").addEventListener("keydown", (e) => {
+      if (!/^Arrow(Left|Right|Up|Down)$/.test(e.key) || timer) return;
+      e.preventDefault();
+      const i = KIND_KEYS.indexOf(kind);
+      const step = e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 1;
+      const next = KIND_KEYS[(i + step + KIND_KEYS.length) % KIND_KEYS.length];
+      setKind(next);
+      kindBtns.find((b) => b.dataset.kind === next)?.focus();
+    });
     startBtn.addEventListener("click", start);
     stopBtn.addEventListener("click", stop);
     resetBtn.addEventListener("click", reset);
     saveBtn.addEventListener("click", () => void savePass());
 
-    // -- Inställningar: gränser i sekunder (kan sänkas progressivt) ---------
+    // -- Inställningar: gränser i sekunder per typ (kan sänkas progressivt) --
 
     function applyConfigFromInputs() {
-      const next = normalizeConfig({ yellowSec: yellowInput.value, redSec: redInput.value });
+      const next = normalizeLimits({ yellowSec: yellowInput.value, redSec: redInput.value }, KINDS[kind].defaults);
+      config = { ...config, [kind]: next };
       yellowInput.value = next.yellowSec;
       redInput.value = next.redSec;
-      config = next;
+      drawLimits();
       drawTimer();
-      void data.put(settingsPath(classId), { id: CONFIG_ID, value: next });
+      // Hela den typade configen skrivs — en gammal typlös config
+      // migreras därmed till { overgang, datorer } vid första ändring.
+      void data.put(settingsPath(classId), { id: CONFIG_ID, value: config });
     }
     yellowInput.addEventListener("change", applyConfigFromInputs);
     redInput.addEventListener("change", applyConfigFromInputs);
 
     // -- Config + live-tillstånd från datalagret ----------------------------
-    // Lärarvyn äger `timer` lokalt; datalagret bidrar med config och en
-    // ENGÅNGS-återställning av en klocka som gick när läget lämnades.
+    // Lärarvyn äger `timer` och `kind` lokalt; datalagret bidrar med config
+    // och en ENGÅNGS-återställning av en klocka som gick när läget lämnades.
     let restoredTimer = false;
+    let subjectsKey = null;
     unsubs.push(
       data.watch(settingsPath(classId), (docs) => {
         const cfg = docs.find((d) => d.id === CONFIG_ID)?.value;
         config = normalizeConfig(cfg);
-        yellowInput.value = config.yellowSec;
-        redInput.value = config.redSec;
+        // Statistiken ritas bara om när ämneslistan faktiskt ändrats —
+        // live-tillståndet skrivs vid varje start/stopp och ska inte
+        // rycka fokus från filtret.
+        const nextSubjectsKey = JSON.stringify(docs.find((d) => d.id === "subjects")?.value ?? null);
+        const subjectsChanged = nextSubjectsKey !== subjectsKey;
+        subjectsKey = nextSubjectsKey;
+        if (subjectsChanged) subjects = mergedSubjects(docs);
         if (!restoredTimer) {
           restoredTimer = true;
           const st = docs.find((d) => d.id === STATE_ID)?.value;
+          kind = kindOf(st?.kind);
           // Återuppta en klocka som gick/frös när läget lämnades — men
           // hoppa över en GAMMAL igångvarande klocka (t.ex. glömd sedan
           // förra lektionen) så inget spökpass räknar upp vid nästa start.
           const fresh = st?.timer && (st.timer.pausedAt != null || elapsedMs(st.timer) < 30 * 60_000);
           if (fresh && !timer) { timer = st.timer; savedCurrent = st.timer.pausedAt != null; }
-        }
+          if (statsFilter.kind == null) statsFilter.kind = kind;
+          drawStats();
+        } else if (subjectsChanged) drawStats();
+        drawLimits();
         drawTimer();
       }),
     );
 
-    // -- Statistik: veckosummering, rekord, senaste fem ---------------------
+    // -- Statistik: filter (lärare + typ), veckosummering, rekord, historik --
+
+    /** Lärarna som loggat trafikljuspass i klassen (för filtret). */
+    function teacherOptions() {
+      const byUid = new Map();
+      let unknown = false;
+      for (const s of sessions) {
+        if (s.type !== "trafikljus") continue;
+        if (!s.createdBy) { unknown = true; continue; }
+        if (!byUid.has(s.createdBy) || s.createdByName) byUid.set(s.createdBy, teacherLabel(s));
+      }
+      byUid.delete(currentUid()); // "Mina" täcker den inloggade läraren
+      const opts = [...byUid].sort((a, b) => a[1].localeCompare(b[1], "sv")).map(([uid, name]) => ({ value: `t:${uid}`, name }));
+      if (unknown) opts.push({ value: "unknown", name: "Okänd lärare" });
+      return opts;
+    }
+
+    function teacherFilterFn(value) {
+      if (value === "mine") return (s) => s.createdBy === currentUid();
+      if (value === "unknown") return (s) => !s.createdBy;
+      if (value?.startsWith("t:")) { const uid = value.slice(2); return (s) => s.createdBy === uid; }
+      return null; // "all"
+    }
 
     function drawStats() {
-      const { counts, recordSec, recordId, latest, weekTotal } = computeStats(sessions);
+      const statsKind = kindOf(statsFilter.kind ?? kind);
+      const others = teacherOptions();
+      if (statsFilter.teacher.startsWith("t:") || statsFilter.teacher === "unknown") {
+        if (!others.some((o) => o.value === statsFilter.teacher)) statsFilter.teacher = "all";
+      }
+      const filterOn = statsFilter.teacher !== "all";
+      const { counts, recordSec, recordId, latest, weekTotal } =
+        computeStats(sessions, statsKind, { filter: teacherFilterFn(statsFilter.teacher) });
+
       const dot = (c) => `<span class="tl-dot" data-phase="${c}"></span>`;
       const recordLine =
         recordSec == null
           ? `<span class="tl-stat-empty">Inget grönt avslut ännu i veckan.</span>`
           : `<strong class="tl-record-time">${fmtMMSS(recordSec * 1000)}</strong>
-             ${celebrateRecord ? `<span class="tl-badge">Nytt rekord!</span>` : ""}`;
+             ${celebrateRecord && statsKind === kind ? `<span class="tl-badge">Nytt rekord!</span>` : ""}`;
 
+      const rows = latest.slice(0, shown);
       const latestRows =
-        latest.length === 0
-          ? `<li class="tl-stat-empty">Inga sparade pass ännu.</li>`
-          : latest
-              .map(
-                (s) => `<li class="tl-pass${s.id === recordId ? " is-record" : ""}">
-                  ${dot(s.result.color)}
-                  <span class="tl-pass-time">${fmtMMSS(s.result.durationSec * 1000)}</span>
-                  <span class="tl-pass-date">${fmtDate(s.startedAt)}</span>
-                  <span class="tl-pass-teacher">${escapeHtml(teacherLabel(s))}</span>
-                </li>`,
-              )
+        rows.length === 0
+          ? `<li class="tl-stat-empty">${filterOn ? "Inga sparade pass för det här urvalet." : "Inga sparade pass ännu."}</li>`
+          : rows
+              .map((s) => {
+                const lesson = lessonLabel(s.lesson, subjects);
+                return `<li class="tl-pass${s.id === recordId ? " is-record" : ""}">
+                  <span class="tl-pass-who">
+                    <span class="tl-pass-teacher">${escapeHtml(teacherLabel(s))}</span>
+                    <span class="tl-pass-date">${escapeHtml(fmtWhen(s.startedAt ?? s.createdAt ?? 0))}</span>
+                    ${lesson ? `<span class="tl-pass-lesson">${escapeHtml(lesson)}</span>` : ""}
+                  </span>
+                  <span class="tl-pass-result">
+                    ${dot(s.result.color)}
+                    <span class="tl-pass-time">${fmtMMSS(s.result.durationSec * 1000)}</span>
+                  </span>
+                </li>`;
+              })
               .join("");
 
+      const teacherOpt = (value, name) =>
+        `<option value="${escapeHtml(value)}"${statsFilter.teacher === value ? " selected" : ""}>${escapeHtml(name)}</option>`;
+      const kindOpts = KIND_KEYS.map(
+        (k) => `<button type="button" class="tl-filter-kind" data-stats-kind="${k}" aria-pressed="${k === statsKind}">${KINDS[k].label}</button>`,
+      ).join("");
+
       statsEl.innerHTML = `
+        <div class="tl-stats-filter" role="group" aria-label="Filtrera statistiken">
+          <div class="tl-filter-kinds" role="group" aria-label="Typ">${kindOpts}</div>
+          <select class="tl-filter-teacher" data-stats-teacher aria-label="Lärare">
+            ${teacherOpt("all", "Alla lärare")}
+            ${teacherOpt("mine", "Mina pass")}
+            ${others.map((o) => teacherOpt(o.value, o.name)).join("")}
+          </select>
+        </div>
         <div class="tl-stats-week">
-          <h3>Den här veckan</h3>
+          <h3>Den här veckan · ${KINDS[statsKind].label}</h3>
           <ul class="tl-tally" aria-label="Avslut denna vecka">
             <li>${dot("green")}<span class="tl-tally-n">${counts.green}</span><span class="tl-tally-l">gröna</span></li>
             <li>${dot("yellow")}<span class="tl-tally-n">${counts.yellow}</span><span class="tl-tally-l">gula</span></li>
             <li>${dot("red")}<span class="tl-tally-n">${counts.red}</span><span class="tl-tally-l">röda</span></li>
           </ul>
           <p class="tl-record"><span class="tl-record-label">Veckans rekord</span> ${recordLine}</p>
-          <p class="tl-week-total">${weekTotal} ${weekTotal === 1 ? "pass" : "pass"} loggade i veckan.</p>
+          <p class="tl-week-total">${weekTotal} pass loggade i veckan.</p>
         </div>
         <div class="tl-stats-latest">
-          <h3>Senaste fem passen</h3>
+          <h3>Senaste passen · ${KINDS[statsKind].label}</h3>
           <ul class="tl-passes">${latestRows}</ul>
+          ${latest.length > shown ? `<button type="button" class="btn btn--ghost tl-more" data-stats-more>Visa fler (${latest.length - shown} till)</button>` : ""}
         </div>`;
     }
 
+    // Filtren ritas om med statistiken — lyssna via delegering.
+    statsEl.addEventListener("click", (e) => {
+      const kindBtn = e.target.closest("[data-stats-kind]");
+      if (kindBtn) { statsFilter.kind = kindBtn.dataset.statsKind; shown = HISTORY_PAGE; drawStats(); return; }
+      if (e.target.closest("[data-stats-more]")) { shown += HISTORY_PAGE; drawStats(); }
+    });
+    statsEl.addEventListener("change", (e) => {
+      if (!e.target.matches("[data-stats-teacher]")) return;
+      statsFilter.teacher = e.target.value;
+      shown = HISTORY_PAGE;
+      drawStats();
+      statsEl.querySelector("[data-stats-teacher]")?.focus();
+    });
+
+    // Delat mellan lärarna i realtid: sessions-watchen speglar Firestore.
     unsubs.push(
       data.watch(sessionsPath(classId), (docs) => {
         sessions = docs;
@@ -379,6 +585,7 @@ export default {
     unsubs.push(() => window.removeEventListener("keydown", onKey));
 
     // Allt (knappar, watchers) är nu på plats — starta ritsignalen.
+    drawLimits();
     unsubs.push(createTicker(drawTimer));
   },
 
@@ -392,9 +599,11 @@ export default {
 
 function stageMarkup() {
   // Ren scen: bara stor klocka + färgfas (bakgrunden via data-phase).
-  // Ingen instruktionstext per fas — färgen och tiden räcker.
+  // Ingen instruktionstext per fas — färgen och tiden räcker. Etiketten
+  // "Datorer" är diskret och syns bara när datorljuset gäller.
   return `
-    <div class="tl-stage" data-phase="green" data-running="false" data-stopped="false">
+    <div class="tl-stage" data-phase="green" data-kind="${DEFAULT_KIND}" data-running="false" data-stopped="false">
+      <div class="tl-kind-tag" hidden>${icon("monitor")}<span>${KINDS.datorer.label}</span></div>
       <div class="tl-clock" role="timer" aria-live="off">00:00</div>
     </div>`;
 }
@@ -404,8 +613,18 @@ function studentMarkup() {
 }
 
 function teacherMarkup() {
+  const kindOption = (k) => `
+    <button type="button" class="tl-kind-opt" role="radio" data-kind="${k}" aria-checked="${k === DEFAULT_KIND}">
+      <span class="tl-kind-name">${icon(KINDS[k].icon)}<span>${KINDS[k].label}</span></span>
+      <span class="tl-kind-limits"></span>
+    </button>`;
   return `
     <section class="tl tl--teacher">
+      <div class="tl-kind-row teacher-only">
+        <div class="tl-kind" role="radiogroup" aria-label="Typ av pass">${KIND_KEYS.map(kindOption).join("")}</div>
+        <p class="tl-kind-hint" hidden>Återställ för att byta typ.</p>
+      </div>
+
       ${stageMarkup()}
 
       <div class="tl-controls teacher-only" role="group" aria-label="Timerkontroller">
@@ -418,8 +637,8 @@ function teacherMarkup() {
 
       <div class="tl-panels teacher-only">
         <section class="card tl-settings" aria-label="Tidsmål">
-          <h3>Tidsmål för klassen</h3>
-          <p class="tl-settings-help">Gränserna anges i sekunder — sänk dem stegvis för att göra övergångarna snabbare.</p>
+          <h3>Tidsmål för <span class="tl-settings-kind">övergång</span></h3>
+          <p class="tl-settings-help">Gränserna anges i sekunder och gäller vald typ — sänk dem stegvis för att göra övergångarna snabbare.</p>
           <div class="tl-fields">
             <label class="tl-field">
               <span class="tl-field-label">${icon("signal")} Gult vid</span>
@@ -432,7 +651,7 @@ function teacherMarkup() {
           </div>
         </section>
 
-        <section class="card tl-stats" aria-label="Klassrekord och veckostatistik"></section>
+        <section class="card tl-stats" aria-label="Statistik och historik"></section>
       </div>
     </section>`;
 }
