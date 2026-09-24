@@ -169,6 +169,12 @@ teachers/{uid}/classes/{classId}/lessonPlans/{planId}
   Vyerna visar aldrig förra veckans lista, inte heller innan tömningen hunnit
   sparas (t.ex. offline).
 - **Lektionsplaneringar rörs aldrig** av veckorytmen.
+- **Känd risk — enhetsklockor** (last-write-wins på klientklockor är ett
+  medvetet val): en enhet vars klocka går FÖRE rullar veckan tidigt för alla
+  (arkiverar + tömmer Bra jobbat innan måndag). Dessutom får dess skrivningar
+  ett `updatedAt` i framtiden, som vinner LWW mot alla andra tills realtiden
+  hunnit ikapp. En `weekOf` i framtiden rörs inte (ingen tömning). En klocka
+  som går EFTER påverkar inte veckoskiftet.
 
 ## Motivering
 
