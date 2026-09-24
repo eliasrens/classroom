@@ -17,8 +17,14 @@
  *                       (settings/trafikljusState) och loggade pass
  *                       (sessions). Se DATAMODELL.md / docs/SYNC.md.
  *
+ * Veckomål (issue #35): förra veckans resultat per typ (snitt, bästa,
+ * total) är den här veckans mål att slå — se js/lib/week-goal.js. Måttet
+ * väljs per typ och sparas delat i settings/trafikljus (goalMetric).
+ *
  * Kontrakt: samma modul renderar lärarvy och elevvy — förgrenar på
- * ctx.view. Elevvyn är REN: bara den stora klockan och färgfasen.
+ * ctx.view. Elevvyn är REN: bara den stora klockan och färgfasen, plus
+ * (om läraren slagit på "Visa veckomålet för eleverna") en diskret målrad
+ * — aldrig lärarstatistik eller lärarnamn.
  */
 
 import { createTicker } from "../lib/timer.js";
@@ -30,10 +36,15 @@ import {
 } from "../lib/trafikljus-stats.js";
 import { attribution } from "../data/plans.js";
 import { serverNow } from "../lib/clock.js";
+import { startOfWeek, weekLabel } from "../lib/week.js";
+import {
+  GOAL_METRICS, GOAL_METRIC_KEYS, normalizeGoalSettings, weekGoalStatus, passGoalMark, fmtSec, fmtDiff,
+} from "../lib/week-goal.js";
 import { teacherOptions as sharedTeacherOptions, teacherFilterFn, validTeacherFilter } from "../lib/teacher-filter.js";
 import { currentLessonBlock, teacherLabel, escapeHtml } from "./elever/shared.js";
 
-const CONFIG_ID = "trafikljus";       // settings/trafikljus  → { value: { overgang:{yellowSec, redSec}, datorer:{…} } }
+const CONFIG_ID = "trafikljus";       // settings/trafikljus  → { value: { overgang:{yellowSec, redSec}, datorer:{…},
+                                     //                                   goalMetric:{overgang, datorer}, showGoalToStudents } }
 const STATE_ID = "trafikljusState";   // settings/trafikljusState → { value: {timer, kind} }
 
 const settingsPath = (classId) => `classes/${classId}/settings`;
@@ -91,6 +102,9 @@ const fmtLimit = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2
 
 const HISTORY_PAGE = 8; // pass per "sida" i historiken
 
+/** "snitt under 2:40" — målet i klartext (lärarvy och elevskärmens rad). */
+const goalText = (goal) => `${GOAL_METRICS[goal.metric].short} under ${fmtSec(goal.targetSec)}`;
+
 // Statistikfiltret (lärare + typ) överlever byte av läge under sessionen.
 const statsFilter = { teacher: "all", kind: null };
 
@@ -127,9 +141,15 @@ export default {
     let subjects = SUBJECTS;            // inbyggda + klassens egna ämnen (för lektionsnamn)
     let savedCurrent = false;           // aktuellt (stoppat) pass redan loggat?
     let celebrateRecord = false;        // visa "Nytt rekord!" tills nästa start/återställ
+    let goalCfg = normalizeGoalSettings(null); // { goalMetric:{overgang, datorer}, showGoalToStudents }
+    let goalMark = null;                // { kind, mark: "met"|"beat" } efter sparat pass, tills nästa start/återställ
+    let goalWeek = null;                // veckan målet senast ritades för (veckoskifte → rita om)
     let shown = HISTORY_PAGE;           // antal pass som visas i historiken
 
     const limits = () => config[kind];
+    // Hela settings/trafikljus-värdet: gränser + veckomålets inställningar
+    // (samma dokument — skrivs alltid i sin helhet så inget fält tappas).
+    const configValue = () => ({ ...config, ...goalCfg });
 
     const unsubs = [];
     // Städfunktionen sätts direkt: kraschar mount halvvägs stoppar
@@ -143,6 +163,7 @@ export default {
     const stageEl = el.querySelector(".tl-stage");
     const clockEl = el.querySelector(".tl-clock");
     const kindTagEl = el.querySelector(".tl-kind-tag");
+    const goalLineEl = el.querySelector(".tl-goal-line"); // bara i elevvyn
 
     // -- Ritning (både vyer) -----------------------------------------------
 
@@ -169,6 +190,29 @@ export default {
     // -- Elevvy: bara lyssna --------------------------------------------------
 
     if (isStudent) {
+      // Veckomålets rad under klockan — bara när läraren slagit på det.
+      // Passen läses då enbart för att räkna fram målet; inga namn eller
+      // annan statistik visas (spärren i docs/SYNC.md).
+      let offSessions = null;
+      function drawGoalLine() {
+        goalWeek = startOfWeek(serverNow());
+        const goal = goalCfg.showGoalToStudents
+          ? weekGoalStatus(sessions, kind, goalCfg.goalMetric[kind], goalWeek).goal
+          : null;
+        goalLineEl.hidden = !goal;
+        goalLineEl.textContent = goal ? `Veckans mål: ${goalText(goal)}` : "";
+      }
+      function watchSessions(on) {
+        if (on && !offSessions) {
+          offSessions = data.watch(sessionsPath(classId), (docs) => { sessions = docs; drawGoalLine(); });
+        } else if (!on && offSessions) {
+          offSessions();
+          offSessions = null;
+          sessions = [];
+        }
+      }
+      unsubs.push(() => watchSessions(false));
+
       // Config + live-tillstånd via datalagret (speglas cross-window och
       // överlever omladdning av elevskärmen).
       unsubs.push(
@@ -176,8 +220,11 @@ export default {
           const cfg = docs.find((d) => d.id === CONFIG_ID)?.value;
           const st = docs.find((d) => d.id === STATE_ID)?.value;
           config = normalizeConfig(cfg);
+          goalCfg = normalizeGoalSettings(cfg);
           timer = st?.timer ?? null;
           kind = kindOf(st?.kind);
+          watchSessions(goalCfg.showGoalToStudents);
+          drawGoalLine();
           drawTimer();
         }),
       );
@@ -186,9 +233,13 @@ export default {
         sync.on("trafikljus:timer", ({ payload }) => {
           timer = payload?.timer ?? null;
           kind = kindOf(payload?.kind);
+          drawGoalLine();
           drawTimer();
         }),
       );
+      // Ny vecka medan elevskärmen står öppen → nytt mål.
+      const weekTick = setInterval(() => { if (startOfWeek(serverNow()) !== goalWeek) drawGoalLine(); }, 30_000);
+      unsubs.push(() => clearInterval(weekTick));
 
       unsubs.push(createTicker(drawTimer));
       return;
@@ -204,6 +255,7 @@ export default {
     const yellowInput = el.querySelector('[data-cfg="yellow"]');
     const redInput = el.querySelector('[data-cfg="red"]');
     const settingsKindEl = el.querySelector(".tl-settings-kind");
+    const showGoalInput = el.querySelector("[data-show-goal]");
     const kindHintEl = el.querySelector(".tl-kind-hint");
     const statsEl = el.querySelector(".tl-stats");
 
@@ -249,6 +301,7 @@ export default {
       // Statistiken följer växlaren (den kan sedan filtreras fritt).
       statsFilter.kind = kind;
       celebrateRecord = false;
+      goalMark = null;
       drawLimits();
       drawTimer();
       drawStats();
@@ -260,6 +313,7 @@ export default {
       timer = { startedAt: serverNow(), pausedAt: null };
       savedCurrent = false;
       celebrateRecord = false;
+      goalMark = null;
       drawTimer();
       drawStats();
       void pushState();
@@ -277,6 +331,7 @@ export default {
       timer = null;
       savedCurrent = false;
       celebrateRecord = false;
+      goalMark = null;
       drawTimer();
       drawStats();
       void pushState();
@@ -297,20 +352,24 @@ export default {
       celebrateRecord =
         color === "green" && (before.recordSec == null || durationSec < before.recordSec);
       if (celebrateRecord) statsFilter.kind = kind;
-      savedCurrent = true;
-      drawControls();
-      // Attribution: vem loggade passet + snapshot av pågående block ur den
-      // inloggade lärarens planering (null om inget block pågår just nu).
-      const lesson = await currentLessonBlock(data, classId);
-      await data.put(sessionsPath(classId), {
+      const pass = {
         type: "trafikljus",
         kind,
         startedAt: timer.startedAt,
         endedAt: timer.pausedAt,
         result: { color, durationSec, limits: passLimits },
-        lesson,
-        ...attribution(),
-      });
+      };
+      // Veckomålet (hela klassen, samma typ): klarades det nu, eller var
+      // passet i sig under målet? Kort, lugn markering som "Nytt rekord!".
+      const mark = passGoalMark(sessions, kind, goalCfg.goalMetric[kind], pass);
+      goalMark = mark ? { kind, mark } : null;
+      if (goalMark) statsFilter.kind = kind;
+      savedCurrent = true;
+      drawControls();
+      // Attribution: vem loggade passet + snapshot av pågående block ur den
+      // inloggade lärarens planering (null om inget block pågår just nu).
+      const lesson = await currentLessonBlock(data, classId);
+      await data.put(sessionsPath(classId), { ...pass, lesson, ...attribution() });
       // sessions-watch ritar om statistiken (med ev. rekordmarkering).
     }
 
@@ -341,20 +400,37 @@ export default {
       drawTimer();
       // Hela den typade configen skrivs — en gammal typlös config
       // migreras därmed till { overgang, datorer } vid första ändring.
-      void data.put(settingsPath(classId), { id: CONFIG_ID, value: config });
+      void data.put(settingsPath(classId), { id: CONFIG_ID, value: configValue() });
     }
     yellowInput.addEventListener("change", applyConfigFromInputs);
     redInput.addEventListener("change", applyConfigFromInputs);
+
+    // Veckomålet: mått per typ (i statistikpanelen) + visning för eleverna.
+    function setGoalSettings(next) {
+      goalCfg = normalizeGoalSettings({ ...goalCfg, ...next });
+      goalSettingsKey = JSON.stringify(goalCfg);
+      showGoalInput.checked = goalCfg.showGoalToStudents;
+      drawStats();
+      void data.put(settingsPath(classId), { id: CONFIG_ID, value: configValue() });
+    }
+    showGoalInput.addEventListener("change", () => setGoalSettings({ showGoalToStudents: showGoalInput.checked }));
 
     // -- Config + live-tillstånd från datalagret ----------------------------
     // Lärarvyn äger `timer` och `kind` lokalt; datalagret bidrar med config
     // och en ENGÅNGS-återställning av en klocka som gick när läget lämnades.
     let restoredTimer = false;
     let subjectsKey = null;
+    let goalSettingsKey = null;
     unsubs.push(
       data.watch(settingsPath(classId), (docs) => {
         const cfg = docs.find((d) => d.id === CONFIG_ID)?.value;
         config = normalizeConfig(cfg);
+        // Veckomålets inställningar (delade — en annan lärare kan byta mått).
+        goalCfg = normalizeGoalSettings(cfg);
+        const nextGoalKey = JSON.stringify(goalCfg);
+        const goalChanged = nextGoalKey !== goalSettingsKey;
+        goalSettingsKey = nextGoalKey;
+        showGoalInput.checked = goalCfg.showGoalToStudents;
         // Statistiken ritas bara om när ämneslistan faktiskt ändrats —
         // live-tillståndet skrivs vid varje start/stopp och ska inte
         // rycka fokus från filtret.
@@ -373,7 +449,7 @@ export default {
           if (fresh && !timer) { timer = st.timer; savedCurrent = st.timer.pausedAt != null; }
           if (statsFilter.kind == null) statsFilter.kind = kind;
           drawStats();
-        } else if (subjectsChanged) drawStats();
+        } else if (subjectsChanged || goalChanged) drawStats();
         drawLimits();
         drawTimer();
       }),
@@ -439,6 +515,7 @@ export default {
             ${others.map((o) => teacherOpt(o.value, o.name)).join("")}
           </select>
         </div>
+        ${goalMarkup(statsKind)}
         <div class="tl-stats-week">
           <h3>Den här veckan · ${KINDS[statsKind].label}</h3>
           <ul class="tl-tally" aria-label="Avslut denna vecka">
@@ -457,6 +534,52 @@ export default {
         </div>`;
     }
 
+    /**
+     * Veckomålet för en typ: förra veckans resultat (snitt · bästa · total
+     * på n pass) och den här veckans värde mot målet. Hela klassens pass —
+     * lärarfiltret gäller inte målet.
+     */
+    function goalMarkup(k) {
+      goalWeek = startOfWeek(serverNow());
+      const metric = goalCfg.goalMetric[k];
+      const { summary, goal, progress } = weekGoalStatus(sessions, k, metric, goalWeek);
+      const metricOpts = GOAL_METRIC_KEYS.map((m) =>
+        `<option value="${m}"${m === metric ? " selected" : ""}>${GOAL_METRICS[m].label}</option>`).join("");
+      const picker = `
+        <label class="tl-goal-metric">
+          <span>Mål att slå</span>
+          <select data-goal-metric="${k}" aria-label="Mått för veckomålet (${KINDS[k].label.toLowerCase()})">${metricOpts}</select>
+        </label>`;
+
+      if (!goal) {
+        return `
+          <div class="tl-goal" data-goal-state="none">
+            <div class="tl-goal-head"><h3>Veckomål</h3>${picker}</div>
+            <p class="tl-goal-empty">Inget mål ännu — det sätts av första veckan med sparade pass (${KINDS[k].label.toLowerCase()}).</p>
+          </div>`;
+      }
+      const p = goal.prev;
+      const prevName = p.adjacent ? `Förra veckan (${weekLabel(p.weekStart)})` : `${weekLabel(p.weekStart)}, senaste veckan med pass`;
+      const ps = p.summary;
+      let status;
+      if (!summary) status = `<span class="tl-goal-wait">Inga pass ännu den här veckan.</span>`;
+      else if (progress.met) status = `just nu ${fmtSec(progress.valueSec)} <span class="tl-goal-ok" role="img" aria-label="Målet klarat">${icon("check")}</span>`;
+      else if (goal.metric === "total") status = `just nu ${fmtSec(progress.valueSec)} · <span class="tl-goal-left">${fmtDiff(progress.diffSec)} över målet</span>`;
+      else status = `just nu ${fmtSec(progress.valueSec)} · <span class="tl-goal-left">${fmtDiff(progress.diffSec)} kvar till målet</span>`;
+      const mark = goalMark && goalMark.kind === k
+        ? `<span class="tl-badge">${goalMark.mark === "met" ? "Veckomålet klarat!" : "Under målet!"}</span>`
+        : "";
+      return `
+        <div class="tl-goal" data-goal-state="${progress.met ? "met" : "open"}">
+          <div class="tl-goal-head"><h3>Veckomål</h3>${picker}</div>
+          <p class="tl-goal-prev"><strong>${escapeHtml(prevName)}:</strong>
+            snitt ${fmtSec(ps.avgSec)} · bästa ${fmtSec(ps.bestSec)} · totalt ${fmtSec(ps.totalSec)} på ${ps.count} pass</p>
+          <p class="tl-goal-now">${icon("flag")} <strong>Mål den här veckan: ${goalText(goal)}</strong>,
+            ${status}${summary ? ` <span class="tl-goal-count">(${summary.count} pass)</span>` : ""} ${mark}</p>
+          ${goal.metric === "total" ? `<p class="tl-goal-note">Totaltiden jämförs rättvist bara om antalet pass är ungefär lika (förra veckan ${ps.count} pass).</p>` : ""}
+        </div>`;
+    }
+
     // Filtren ritas om med statistiken — lyssna via delegering.
     statsEl.addEventListener("click", (e) => {
       const kindBtn = e.target.closest("[data-stats-kind]");
@@ -464,6 +587,12 @@ export default {
       if (e.target.closest("[data-stats-more]")) { shown += HISTORY_PAGE; drawStats(); }
     });
     statsEl.addEventListener("change", (e) => {
+      const metricSel = e.target.closest("[data-goal-metric]");
+      if (metricSel) {
+        setGoalSettings({ goalMetric: { ...goalCfg.goalMetric, [metricSel.dataset.goalMetric]: metricSel.value } });
+        statsEl.querySelector("[data-goal-metric]")?.focus();
+        return;
+      }
       if (!e.target.matches("[data-stats-teacher]")) return;
       statsFilter.teacher = e.target.value;
       shown = HISTORY_PAGE;
@@ -490,6 +619,10 @@ export default {
     window.addEventListener("keydown", onKey);
     unsubs.push(() => window.removeEventListener("keydown", onKey));
 
+    // Ny vecka medan läget står öppet → nytt mål och ny veckostatistik.
+    const weekTick = setInterval(() => { if (startOfWeek(serverNow()) !== goalWeek) drawStats(); }, 30_000);
+    unsubs.push(() => clearInterval(weekTick));
+
     // Allt (knappar, watchers) är nu på plats — starta ritsignalen.
     drawLimits();
     unsubs.push(createTicker(drawTimer));
@@ -503,7 +636,7 @@ export default {
 
 // ---- Markup-mallar --------------------------------------------------------
 
-function stageMarkup() {
+function stageMarkup(extra = "") {
   // Ren scen: bara stor klocka + färgfas (bakgrunden via data-phase).
   // Ingen instruktionstext per fas — färgen och tiden räcker. Etiketten
   // "Datorer" är diskret och syns bara när datorljuset gäller.
@@ -511,11 +644,14 @@ function stageMarkup() {
     <div class="tl-stage" data-phase="green" data-kind="${DEFAULT_KIND}" data-running="false" data-stopped="false">
       <div class="tl-kind-tag" hidden>${icon("monitor")}<span>${KINDS.datorer.label}</span></div>
       <div class="tl-clock" role="timer" aria-live="off">00:00</div>
+      ${extra}
     </div>`;
 }
 
 function studentMarkup() {
-  return `<section class="tl tl--student">${stageMarkup()}</section>`;
+  // Målraden (veckomålet) ligger under klockan och syns bara när läraren
+  // slagit på "Visa veckomålet för eleverna" och det finns ett mål.
+  return `<section class="tl tl--student">${stageMarkup(`<p class="tl-goal-line" hidden></p>`)}</section>`;
 }
 
 function teacherMarkup() {
@@ -555,6 +691,10 @@ function teacherMarkup() {
               <span class="tl-field-input"><input type="number" name="tl-red" inputmode="numeric" min="${MIN_SEC}" step="5" data-cfg="red"><span class="tl-unit">sek</span></span>
             </label>
           </div>
+          <label class="tl-show-goal">
+            <input type="checkbox" data-show-goal>
+            <span>Visa veckomålet för eleverna <span class="tl-show-goal-help">(en diskret rad under klockan, t.ex. "Veckans mål: snitt under 2:40")</span></span>
+          </label>
         </section>
 
         <section class="card tl-stats" aria-label="Statistik och historik"></section>

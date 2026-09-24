@@ -5,6 +5,8 @@
  * innevarande vecka). Här finns alla veckor: välj "Denna vecka" eller en
  * tidigare vecka och se
  *   - trafikljuspass per typ (övergång / datorer) med lärare och lektion,
+ *     veckoresultat (snitt, bästa, total), om veckomålet nåddes och en
+ *     trendrad över de senaste veckorna (issue #35, js/lib/week-goal.js),
  *   - noteringar och elevstatistik per elev (alfabetiskt — aldrig rangordnat),
  *   - veckans Bra jobbat (ögonblicksbilden i praiseArchive, se week-rhythm.js).
  * Filter per lärare: Alla, Mina eller en viss lärare. Allt är delat mellan
@@ -28,6 +30,7 @@ import {
   KINDS, KIND_KEYS, computeStats, sessionTime, fmtMMSS, fmtWhen, lessonLabel, mergedSubjects,
 } from "../lib/trafikljus-stats.js";
 import { teacherOptions, teacherFilterFn, validTeacherFilter } from "../lib/teacher-filter.js";
+import { GOAL_METRICS, normalizeGoalSettings, weekGoalStatus, goalTrend, fmtSec } from "../lib/week-goal.js";
 import { MORNING_KEY, normalize as normalizeMorning, currentPraise } from "../lib/morning.js";
 import { praiseArchivePath } from "../lib/week-rhythm.js";
 import { escapeHtml, noteTypeById, teacherLabel } from "./elever/shared.js";
@@ -75,6 +78,7 @@ export default {
     let subjects = mergedSubjects([]);
     let initials = false;
     let morning = normalizeMorning(null);
+    let goalCfg = normalizeGoalSettings(null);
 
     el.innerHTML = `<div class="stat"></div>`;
     const root = el.querySelector(".stat");
@@ -176,7 +180,7 @@ export default {
 
         <section class="stat-section" aria-label="Trafikljus">
           <h2 class="stat-h2">${icon("signal")} Trafikljus</h2>
-          <div class="stat-kinds">${KIND_KEYS.map((k) => kindCard(k, stats[k])).join("")}</div>
+          <div class="stat-kinds">${KIND_KEYS.map((k) => kindCard(k, stats[k], ws, cur)).join("")}</div>
         </section>
 
         <section class="stat-section" aria-label="Noteringar per elev">
@@ -198,13 +202,55 @@ export default {
     const tile = (n, label) =>
       `<li class="stat-tile"><span class="stat-tile__n">${n}</span><span class="stat-tile__l">${escapeHtml(label)}</span></li>`;
 
-    function kindCard(k, { counts, recordSec, recordId, latest }) {
+    /**
+     * Veckoresultat + veckomål (issue #35) för en typ och vecka. Hela
+     * klassens pass — lärarfiltret gäller inte målet. Måttet är klassens
+     * nuvarande val (settings/trafikljus → goalMetric).
+     */
+    function goalBlock(k, ws, cur) {
+      const metric = goalCfg.goalMetric[k];
+      const { summary, goal, progress } = weekGoalStatus(sessions, k, metric, ws);
+      const trend = goalTrend(sessions, k, metric, ws, 6);
+      const field = GOAL_METRICS[metric].field;
+      const result = summary
+        ? `snitt ${fmtSec(summary.avgSec)} · bästa ${fmtSec(summary.bestSec)} · totalt ${fmtSec(summary.totalSec)} på ${summary.count} pass`
+        : "Inga pass";
+      let goalLine;
+      if (!goal) goalLine = "Inget mål (ingen tidigare vecka med pass).";
+      else {
+        const from = goal.prev.adjacent ? "förra veckan" : `${weekLabel(goal.prev.weekStart)}, senaste veckan med pass`;
+        const verdict = !summary
+          ? `<span class="stat-goal-no">— ${ws === cur ? "inga pass ännu" : "inga pass den veckan"}</span>`
+          : progress.met
+          ? `<span class="stat-goal-ok">${icon("check")} ${ws === cur ? "klarat hittills" : "nått"}</span>`
+          : `<span class="stat-goal-no">— ${ws === cur ? "inte klarat än" : "inte nått"}</span>`;
+        goalLine = `Mål: ${GOAL_METRICS[metric].short} under ${fmtSec(goal.targetSec)} (${escapeHtml(from)}) ${verdict}`;
+      }
+      const trendRow = trend.length > 1 ? `
+        <ol class="stat-trend" aria-label="Trend, ${GOAL_METRICS[metric].short} per vecka">
+          ${trend.map((w) => `<li${w.weekStart === ws ? ` aria-current="true"` : ""}>
+            <span class="stat-trend__w">${escapeHtml(weekLabel(w.weekStart))}</span>
+            <span class="stat-trend__v">${fmtSec(w.summary[field])}</span>
+            <span class="stat-trend__m">${w.progress == null ? "" : w.progress.met ? `<span role="img" aria-label="nått">${icon("check")}</span>` : `<span aria-label="inte nått">—</span>`}</span>
+          </li>`).join("")}
+        </ol>` : "";
+      return `
+        <div class="stat-goal">
+          <p class="stat-goal__result"><span class="stat-goal__label">Veckoresultat</span> ${result}</p>
+          <p class="stat-goal__goal">${goalLine}</p>
+          ${trendRow}
+          ${ui.teacher !== "all" ? `<p class="stat-note">Veckoresultat och mål gäller hela klassen.</p>` : ""}
+        </div>`;
+    }
+
+    function kindCard(k, { counts, recordSec, recordId, latest }, ws, cur) {
       const dot = (c) => `<span class="tl-dot" data-phase="${c}"></span>`;
       const all = ui.allPasses.has(k);
       const rows = all ? latest : latest.slice(0, PASS_PAGE);
       return `
         <article class="card stat-card stat-kind">
           <h3>${icon(KINDS[k].icon)} ${KINDS[k].label}</h3>
+          ${goalBlock(k, ws, cur)}
           <ul class="tl-tally" aria-label="Avslut ${KINDS[k].label.toLowerCase()}">
             <li>${dot("green")}<span class="tl-tally-n">${counts.green}</span><span class="tl-tally-l">gröna</span></li>
             <li>${dot("yellow")}<span class="tl-tally-n">${counts.yellow}</span><span class="tl-tally-l">gula</span></li>
@@ -378,6 +424,7 @@ export default {
       subjects = mergedSubjects(settingsDocs);
       initials = docs.find((d) => d.id === "display")?.value?.nameDisplay === "initials";
       morning = normalizeMorning(docs.find((d) => d.id === MORNING_KEY)?.value);
+      goalCfg = normalizeGoalSettings(docs.find((d) => d.id === "trafikljus")?.value);
       scheduleRender();
     }));
 
