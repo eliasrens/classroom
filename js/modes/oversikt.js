@@ -28,6 +28,7 @@ import { startOfWeek, inWeek, weekLabel, weekRangeLabel } from "../lib/week.js";
 import { KIND_KEYS, KINDS, computeStats } from "../lib/trafikljus-stats.js";
 import { MORNING_KEY, normalize as normalizeMorning, currentPraise } from "../lib/morning.js";
 import { serverNow } from "../lib/clock.js";
+import { isMentorTime } from "../lib/week-recap.js";
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -189,6 +190,9 @@ export default {
           <p class="ov-hero__sub">${cls
             ? `Vald klass: <strong>${esc(cls.name)}</strong>. Välj ett läge nedan.`
             : `Välj en klass för att komma igång.`}</p>
+          ${cls && isMentorTime() ? `
+          <button class="btn btn--ghost ov-mentor" data-mode="vecka">${icon("star")}
+            <span>Mentorstid? Visa veckans övergångar</span></button>` : ""}
         </header>
 
         <section class="ov-section" aria-label="Klass">

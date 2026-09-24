@@ -5,7 +5,7 @@
  * (timer i trafikljus.js, snabbanteckning i quick-note.js, elevtangenter
  * i elever.js). Genvägslistan visas under "?" (js/ui/help.js).
  *
- *   1–6   byt läge (i menyordning)
+ *   1–7   byt läge (i menyordning)
  *   E     öppna/fokusera elevskärmen
  *   ?     visa genvägslistan
  *
@@ -16,7 +16,7 @@
  *    se typingInField.)
  *  - Inte medan snabbanteckningen eller hjälprutan är öppen (de äger
  *    tangenterna då).
- *  - 1–6 och E är AVSTÄNGDA i Elevlistans Registrera-flik: där är
+ *  - 1–7 och E är AVSTÄNGDA i Elevlistans Registrera-flik: där är
  *    enskilda bokstäver/siffror elevernas egna snabbtangenter, så vi
  *    krockar aldrig med dem.
  */
@@ -68,11 +68,11 @@ export function initShortcuts({ store, openStudentWindow, openHelp }) {
     if (dialogOpen()) return;
 
     // I Elevlistans Registrera-flik äger elevernas snabbtangenter
-    // enskilda tecken — lämna 1–6 och E därhän så inget krockar.
+    // enskilda tecken — lämna 1–7 och E därhän så inget krockar.
     if (inRegisterTab(store)) return;
 
-    // 1–6: byt läge i menyordning.
-    if (/^[1-6]$/.test(e.key)) {
+    // 1–7: byt läge i menyordning.
+    if (/^[1-7]$/.test(e.key)) {
       const mode = MODES[Number(e.key) - 1];
       if (mode) {
         e.preventDefault();

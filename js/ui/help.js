@@ -21,7 +21,7 @@ export const SHORTCUT_GROUPS = [
   {
     title: "Överallt",
     items: [
-      { keys: ["1", "–", "6"], text: "Byt läge (Morgon, Lektion, Trafikljus, Elever, Översikt, Statistik)" },
+      { keys: ["1", "–", "7"], text: "Byt läge (Morgon, Lektion, Trafikljus, Elever, Översikt, Statistik, Veckans övergångar)" },
       { keys: ["E"], text: "Öppna eller fokusera elevskärmen" },
       { keys: ["F9"], text: "Snabbanteckning om en elev" },
       { keys: ["?"], text: "Visa den här genvägslistan" },
@@ -36,9 +36,16 @@ export const SHORTCUT_GROUPS = [
     ],
   },
   {
+    title: "Veckans övergångar",
+    items: [
+      { keys: ["←", "→"], text: "Bläddra mellan sidorna (även PageUp/PageDown från en presentationsklickare)" },
+      { keys: ["Home", "End"], text: "Första / sista sidan" },
+    ],
+  },
+  {
     title: "Elevlista — Registrera",
     items: [
-      { keys: ["Elevens tangent"], text: "Snabbnotering på eleven (1–6 och E byter inte läge här — klicka i menyn)" },
+      { keys: ["Elevens tangent"], text: "Snabbnotering på eleven (1–7 och E byter inte läge här — klicka i menyn)" },
       { keys: ["Shift", "+", "tangent"], text: "Positiv notering i stället" },
       { keys: ["Ctrl", "+", "Z"], text: "Ångra senaste noteringen" },
     ],

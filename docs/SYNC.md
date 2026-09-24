@@ -75,6 +75,14 @@ ctx.sync.publish("trafikljus:timer", null);       // stoppa
 const off = ctx.sync.on("trafikljus:timer", ({ payload }) => render(payload));
 ```
 
+Ett läge med "sidor" följer samma mönster: Veckans övergångar
+(`js/modes/vecka.js`) publicerar `vecka:view` med `{ week, kind, page }`
+när läraren bläddrar, och sparar samma värde i `settings/vecka` så att
+en nyöppnad elevskärm hamnar på rätt sida (regel 3). I enskärmsläget
+("Helskärm här") är elevvyn lärarens eget fönster — där tar läget emot
+bläddertangenterna och publicerar själv (`isSingleScreenWindow()`,
+`js/sync.js`); ett separat elevfönster gör det aldrig.
+
 Regler:
 
 1. Payload = ren JSON (structured clone — inga funktioner/DOM-noder).
@@ -126,7 +134,7 @@ mot `startedAt`, så den är korrekt även efter minuter i bakgrunden.
 Fyra lager, alla aktiva samtidigt:
 
 1. **Routern** vägrar montera annat än `STUDENT_MODE_IDS`
-   (`js/modes/registry.js`: morgon, lektion, trafikljus) i elevvyn —
+   (`js/modes/registry.js`: morgon, lektion, trafikljus, vecka) i elevvyn —
    även om någon skriver `#/elev/elever` för hand.
 2. **Utskicks-logiken** (`present`) skickar bara ut elev-visningsbara
    lägen: "Visa på elevskärm" är avstängd på Elevlista/Översikt, och
