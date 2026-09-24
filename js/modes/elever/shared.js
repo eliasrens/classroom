@@ -14,6 +14,7 @@
  */
 
 import { plansPath as plansPathFor, attribution } from "../../data/plans.js";
+import { serverNow } from "../../lib/clock.js";
 
 // ---- Paths ----
 
@@ -70,7 +71,7 @@ export async function saveNameDisplay(data, cid, initials) {
 
 // ---- Pågående lektion (läses ur Läge 2:s lessonPlans) ----
 
-export const todayISO = (d = new Date()) => {
+export const todayISO = (d = new Date(serverNow())) => {
   const p = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 };
@@ -90,7 +91,7 @@ export async function currentLessonBlock(data, cid) {
   try {
     const plans = await data.list(plansPathFor(cid));
     const date = todayISO();
-    const now = new Date();
+    const now = new Date(serverNow());
     const nowMin = now.getHours() * 60 + now.getMinutes();
     for (const plan of plans) {
       if (plan.date !== date) continue;

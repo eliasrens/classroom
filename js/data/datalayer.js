@@ -9,7 +9,8 @@
  *   2. Skrivningar läggs samtidigt i en OUTBOX-kö.
  *   3. Om firebase-config.js är ifylld synkas kön mot Firestore när
  *      det finns anslutning, och fjärrändringar mergas in lokalt
- *      (last-write-wins per dokument via fältet `updatedAt`).
+ *      (last-write-wins per dokument via fältet `updatedAt`, satt med
+ *      servertid och skyddat mot framtida tidsstämplar — js/lib/clock.js).
  *      onSnapshot-lyssnare gör att en lärares ändringar syns hos ALLA
  *      andra inloggade lärare/flikar i realtid. En server-snapshot är
  *      auktoritativ: dokument som en annan lärare raderat tas bort även
@@ -39,6 +40,7 @@
 import { firebaseConfig, isFirebaseConfigured } from "../firebase-config.js";
 import { readCollection, writeCollection, pathFromStorageKey, collectionPathsUnder } from "./local.js";
 import { createFirestoreSync } from "./firestore-sync.js";
+import { serverNow, remoteWins } from "../lib/clock.js";
 
 const OUTBOX_PREFIX = "classroom:outbox:";      // en nyckel per op
 const OUTBOX_KEY = "classroom:outbox";          // gammal array-kö (före #30), töms bara
@@ -264,10 +266,16 @@ export function createDataLayer({ onSyncState, createSync = createFirestoreSync 
     const local = readCollection(path);
     const merged = { ...local };
     let changed = false;
+    let pending = null; // läses bara om någon tidsstämpel ligger i framtiden
+    const now = serverNow();
 
-    // Ta in/uppdatera fjärrdokument — last-write-wins per dokument via updatedAt.
+    // Ta in/uppdatera fjärrdokument — last-write-wins per dokument via
+    // updatedAt. En framtida tidsstämpel (fel klocka på någon enhet) vinner
+    // aldrig mot en riktig: då gäller servern, utom mot en egen opushad
+    // ändring (se remoteWins i js/lib/clock.js).
     for (const [id, doc] of Object.entries(remoteDocs)) {
-      if (!local[id] || (doc.updatedAt ?? 0) >= (local[id].updatedAt ?? 0)) {
+      const isPending = () => (pending ??= pendingIdsFor(path)).has(id);
+      if (remoteWins(local[id], doc, { now, pending: isPending })) {
         const remote = { ...doc, id };
         if (JSON.stringify(local[id]) !== JSON.stringify(remote)) {
           merged[id] = remote;
@@ -312,7 +320,7 @@ export function createDataLayer({ onSyncState, createSync = createFirestoreSync 
 
     async put(path, doc) {
       const id = doc.id ?? newId();
-      const now = Date.now();
+      const now = serverNow();
       const existing = readCollection(path)[id];
       const full = { createdAt: existing?.createdAt ?? now, ...doc, id, updatedAt: now };
       writeCollection(path, { ...readCollection(path), [id]: full });
@@ -324,7 +332,7 @@ export function createDataLayer({ onSyncState, createSync = createFirestoreSync 
     async patch(path, id, partial) {
       const docs = readCollection(path);
       if (!docs[id]) return;
-      const full = { ...docs[id], ...partial, id, updatedAt: Date.now() };
+      const full = { ...docs[id], ...partial, id, updatedAt: serverNow() };
       writeCollection(path, { ...docs, [id]: full });
       notify(path);
       enqueue({ op: "patch", path, id, doc: full });
@@ -336,7 +344,7 @@ export function createDataLayer({ onSyncState, createSync = createFirestoreSync 
       const { [id]: _gone, ...rest } = docs;
       writeCollection(path, rest);
       notify(path);
-      enqueue({ op: "delete", path, id, at: Date.now() }); // at: LWW mot servern
+      enqueue({ op: "delete", path, id, at: serverNow() }); // at: LWW mot servern
     },
 
     /** Alla lagrade samlings-paths under ett prefix (t.ex. "classes/4a/"). */
@@ -358,7 +366,7 @@ export function createDataLayer({ onSyncState, createSync = createFirestoreSync 
      */
     async once(path, id, plan, { allowLocal = false } = {}) {
       const stamp = (writes) => {
-        const now = Date.now();
+        const now = serverNow();
         return writes.map(({ path: p, doc }) => ({
           path: p,
           doc: { createdAt: doc.createdAt ?? now, ...doc, updatedAt: now },

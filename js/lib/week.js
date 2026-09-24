@@ -5,16 +5,19 @@
  * att vyerna FILTRERAR på innevarande vecka — ingen data raderas; äldre
  * veckor visas i arkivet under Statistik (js/modes/statistik.js).
  *
- * Alla funktioner tar tiden som parameter (standard Date.now()) så att
- * de går att testa med falsk klocka och räkna på valfri vecka.
+ * Alla funktioner tar tiden som parameter (standard serverNow() — den
+ * korrigerade klockan, js/lib/clock.js) så att de går att testa med falsk
+ * klocka och räkna på valfri vecka.
  * Veckostegning går via Date#setDate — rätt även över sommartidsbyten
  * (en vecka är då inte exakt 7 × 24 h).
  */
 
+import { serverNow } from "./clock.js";
+
 const pad2 = (n) => String(n).padStart(2, "0");
 
 /** Måndag 00:00 (lokal tid) för given tidpunkt — start på dess vecka. */
-export function startOfWeek(now = Date.now()) {
+export function startOfWeek(now = serverNow()) {
   const d = new Date(now);
   d.setHours(0, 0, 0, 0);
   const monday = (d.getDay() + 6) % 7; // mån = 0
@@ -36,7 +39,7 @@ export function inWeek(ts, weekStart) {
 }
 
 /** ISO-8601-vecka { year, week } för en tidpunkt (lokal tid). */
-export function isoWeek(ts = Date.now()) {
+export function isoWeek(ts = serverNow()) {
   const d = new Date(startOfWeek(ts));
   d.setDate(d.getDate() + 3); // veckans torsdag avgör året
   const year = d.getFullYear();
@@ -46,7 +49,7 @@ export function isoWeek(ts = Date.now()) {
 }
 
 /** Stabil veckonyckel, t.ex. "2026-W39" — används som dokument-id. */
-export function weekKey(ts = Date.now()) {
+export function weekKey(ts = serverNow()) {
   const { year, week } = isoWeek(ts);
   return `${year}-W${pad2(week)}`;
 }
@@ -60,7 +63,7 @@ export function weekStartFromKey(key) {
 }
 
 /** "v.39" — med år om veckan tillhör ett annat (ISO-)år än nu. */
-export function weekLabel(ts, now = Date.now()) {
+export function weekLabel(ts, now = serverNow()) {
   const { year, week } = isoWeek(ts);
   return year === isoWeek(now).year ? `v.${week}` : `v.${week} ${year}`;
 }

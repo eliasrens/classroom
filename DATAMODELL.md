@@ -129,6 +129,10 @@ teachers/{uid}                          — lärarprofil (se docs/AUTH.md)
                        lokala del ("elias@…" → "Elias") och används för
                        attribution (createdByName) på pass/noteringar
 
+teachers/{uid}/meta/clock               — klockmätning (issue #31, js/lib/clock.js)
+  at                 — serverTimestamp() vid senaste mätningen
+  localAt            — enhetens lokala tid när mätningen skickades (felsökning)
+
 teachers/{uid}/classes/{classId}/lessonPlans/{planId}
                      — lektionsplanering (Läge 2). PRIVAT per lärare:
                        ligger under lärarens uid, inte under den delade
@@ -172,7 +176,9 @@ outboxen som `js/data/datalayer.js` tömmer mot Firestore. Semantik:
   (`classroom:outbox-lease`, 15 s utgångstid) som reserv.
 - **Idempotent push**: varje op skrivs i en last-write-wins-transaktion
   (`firestore-sync.js`) som hoppar över op:en om servern har nyare
-  `updatedAt`. Råkar samma op pushas två gånger är det ofarligt.
+  `updatedAt`. Råkar samma op pushas två gånger är det ofarligt. Ett
+  `updatedAt` i framtiden kan varken blockera eller skrivas (se
+  Tidsstämplar och klocka nedan).
 - **Fel**: transaktionskonflikt (`failed-precondition`/`aborted`) ger
   retry med backoff (0,3 s → 30 s), op:en ligger kvar och synkstatusen
   påverkas inte (loggas med `console.info`). Övriga fel = synkstatus
@@ -211,12 +217,73 @@ outboxen som `js/data/datalayer.js` tömmer mot Firestore. Semantik:
   Vyerna visar aldrig förra veckans lista, inte heller innan tömningen hunnit
   sparas (t.ex. offline).
 - **Lektionsplaneringar rörs aldrig** av veckorytmen.
-- **Känd risk — enhetsklockor** (last-write-wins på klientklockor är ett
-  medvetet val): en enhet vars klocka går FÖRE rullar veckan tidigt för alla
-  (arkiverar + tömmer Bra jobbat innan måndag). Dessutom får dess skrivningar
-  ett `updatedAt` i framtiden, som vinner LWW mot alla andra tills realtiden
-  hunnit ikapp. En `weekOf` i framtiden rörs inte (ingen tömning). En klocka
-  som går EFTER påverkar inte veckoskiftet.
+- **Enhetsklockor** (issue #31): veckan räknas på servertid (`serverNow()`,
+  se Tidsstämplar och klocka nedan), och med Firebase körs veckorytmen först
+  när klockan är mätt mot servern. En dator vars klocka går fel rullar alltså
+  inte veckan för tidigt (eller för sent) för de andra. En `weekOf` i
+  FRAMTIDEN (skriven med fel klocka) räknas som ogiltig: nästa lärarvy rättar
+  den till innevarande vecka och behåller listan, precis som äldre data utan
+  `weekOf`. Samma väntan gäller auto-raderingen av gamla noteringar.
+
+## Tidsstämplar och klocka (issue #31)
+
+`updatedAt` avgör last-write-wins, så en enda dator med fel klocka kunde
+förr låsa ett delat dokument för alla: skrevs det med en tid fyra dagar
+fram vann den versionen mot varje riktig ändring tills realtiden hunnit
+ikapp. (Det hände 4A:s `settings/morningScreen` under testet av #29.)
+Skyddet, i `js/lib/clock.js`:
+
+- **Servertid som sanning.** `serverNow()` = `Date.now()` + offset, där
+  offseten mäts mot Firestore: klienten skriver `serverTimestamp()` i
+  `teachers/{uid}/meta/clock` (lärarens privata subträd) och läser tillbaka
+  det från servern. Felet är högst halva tur-och-returtiden (mätningar med
+  mer än 5 s tur-och-retur kastas). Mätning sker vid uppkoppling (första
+  pushen väntar högst 4 s på den), var 10:e minut och när nätet kommer
+  tillbaka. Offseten delas med andra fönster via localStorage
+  (`classroom:clockOffset`). `serverNow()` används överallt där
+  `updatedAt`, `createdAt`, `at`, `startedAt`/`pausedAt`, `archivedAt`,
+  `sessionStart` och veckan sätts. Offline innan någon mätning finns gäller
+  lokal tid, och då skyddar klämningen.
+- **Framtida tidsstämpel** = mer än 5 min efter `serverNow()`
+  (`isFutureStamp`). Toleransen tål vanlig klockdrift, och en sådan
+  tidsstämpel kan bara komma från en klocka som går fel.
+- **Klämning vid skrivning** (push-transaktionen, `firestore-sync.js`): en
+  egen op med framtida `updatedAt`/`createdAt`/`at` (skriven offline med
+  fel klocka innan offseten var känd) räknas som "nu" och skrivs till
+  servern med `serverNow()`. Ett framtida `updatedAt` på SERVERN kan aldrig
+  blockera en op. Då vinner op:en och dokumentet skrivs med korrekt tid
+  (självläkning).
+- **Merge** (`mergeRemote` → `remoteWins`): är exakt en av den lokala och
+  fjärrversionen framtida gäller **servern**, utom mot en egen ännu ej
+  pushad ändring. Den står då kvar, och pushen ovan skriver den till servern
+  med korrekt tid. Annars gäller vanlig LWW (lika = fjärr vinner). Efter en
+  lyckad klockmätning prövas senaste fjärrläget om, så att en lokal kopia
+  som stämplats innan klockan var känd läks.
+- **Varför klämma och inte `serverTimestamp()` i `updatedAt`**: datalagret är
+  offline-first. En op stämplas lokalt när läraren gör ändringen och behöver
+  kunna jämföras direkt, även offline, och `serverTimestamp()` finns inte
+  förrän servern svarat. Skyddet håller därför LWW på `updatedAt` i
+  epoch-ms, och klämningen tar bort de tidsstämplar som inte kan vara
+  riktiga.
+- **Ingen divergens.** Regeln beror bara på serverdatan, den egna outboxen
+  och servertiden, som alla mätta enheter är överens om. Med tom outbox
+  hamnar därför varje enhet på serverns version, oavsett hur deras
+  lokala klockor går. Ett framtida dokument ersätts på alla enheter av den
+  första riktiga ändringen, och ingen enhet håller fast vid den framtida
+  kopian. Kvarvarande gränsfall: en enhet som ALDRIG når
+  servern kan inte mäta sin klocka, men dess skrivningar kläms ändå när
+  de väl pushas (då är servern nådd och klockan mätt).
+- **Varning i lärarvyn**: skiljer sig datorns klocka mer än 2 min från
+  servern visas "Datorns klocka går fel — kontrollera tid och datum" i
+  topbaren, som aldrig visas på elevskärmen. Skrivningarna blir rätt ändå,
+  men datorns egen klocka (t.ex. i Windows) är fortfarande fel.
+- **Klassval**: försvinner den aktiva klassen (raderad på annan enhet eller i
+  ett test) går klassväljaren till "Välj klass…". Den väljer inte tyst en
+  annan riktig klass, där vyerna annars skulle fortsätta skriva.
+- Test: `node docs/test-clock.mjs` (fjärrdokument 4 dygn fram mot ny lokal
+  ändring, klient med klockan 1 dygn fel, offline med fel klocka, läkning på
+  en annan enhet och veckorytm). Testrutin mot riktig Firestore finns i
+  `docs/TESTRUTIN.md`.
 
 ## Motivering
 
@@ -237,8 +304,9 @@ outboxen som `js/data/datalayer.js` tömmer mot Firestore. Semantik:
   översikt vill lista senaste noteringar för hela klassen med EN
   lyssnare; filtrering per elev görs på `studentId`.
 - **`updatedAt`/`createdAt` (epoch ms) sätts automatiskt** av
-  datalagret på alla dokument och används för last-write-wins-merge
-  vid synk.
+  datalagret på alla dokument, med servertid (`serverNow()`), och används
+  för last-write-wins-merge vid synk. Framtida tidsstämplar vinner aldrig
+  (se Tidsstämplar och klocka).
 - **Mjuk borttagning av elever** (`active: false`) så att gamla
   pass/noteringar aldrig pekar på obefintliga elever.
 - **Endast förnamn på elever** — medvetet integritetsval: skärmen

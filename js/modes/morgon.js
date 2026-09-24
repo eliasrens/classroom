@@ -20,6 +20,7 @@ import {
 } from "../lib/morning.js";
 import { rolloverPraise } from "../lib/week-rhythm.js";
 import { weekKey } from "../lib/week.js";
+import { serverNow } from "../lib/clock.js";
 
 const PANEL_KEY = "classroom:morgon:panelOpen";
 // Ny slumpad bild per sidladdning, men stabil inom sessionen (per klass).
@@ -204,7 +205,7 @@ export default {
         if (cb) {
           const next = clone();
           const t = next.tasks.find((x) => x.id === cb.dataset.task);
-          if (t) { t.checked = cb.checked; if (cb.checked) t.checkedAt = Date.now(); }
+          if (t) { t.checked = cb.checked; if (cb.checked) t.checkedAt = serverNow(); }
           commit(next);
           return;
         }
@@ -245,7 +246,7 @@ export default {
         next.tasks.push({
           id: crypto.randomUUID?.() ?? String(Date.now() + Math.random()),
           kind: "custom", label: text, studentText: text,
-          checked: true, checkedAt: Date.now(), // auto-ikryssad, hamnar sist
+          checked: true, checkedAt: serverNow(), // auto-ikryssad, hamnar sist
         });
         addInput.value = "";
         commit(next).then(renderTaskControls);

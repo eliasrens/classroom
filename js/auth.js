@@ -38,6 +38,7 @@
  */
 
 import { firebaseConfig, isFirebaseConfigured } from "./firebase-config.js";
+import { serverNow } from "./lib/clock.js";
 
 const SDK_BASE = "https://www.gstatic.com/firebasejs/10.12.2";
 
@@ -165,7 +166,7 @@ export function createAuth() {
         const db = fsApi.getFirestore(app);
         await fsApi.setDoc(
           fsApi.doc(db, "teachers", user.uid),
-          { email: user.email ?? null, displayName: name || null, updatedAt: Date.now() },
+          { email: user.email ?? null, displayName: name || null, updatedAt: serverNow() },
           { merge: true },
         );
       } catch (err) {

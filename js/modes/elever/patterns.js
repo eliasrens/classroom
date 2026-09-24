@@ -17,6 +17,7 @@ import {
   MOMENT_BUCKETS, momentOf, weekdayOf, hourOf, WEEKDAYS, fmtDateTime,
 } from "./shared.js";
 import { startOfWeek } from "../../lib/week.js";
+import { serverNow } from "../../lib/clock.js";
 
 // Veckorytm: "Denna vecka" är standard — mönstren börjar om varje måndag.
 // Längre perioder väljs aktivt (och gäller bara tills läget lämnas);
@@ -33,7 +34,7 @@ export function renderPatterns(el, api) {
   const scope = api._patScope ?? "class"; // "class" | studentId
   const rangeId = api._patRange ?? "vecka";
   const range = RANGES.find((r) => r.id === rangeId) ?? RANGES[0];
-  const cutoff = range.week ? startOfWeek() : range.days ? Date.now() - range.days * 864e5 : 0;
+  const cutoff = range.week ? startOfWeek() : range.days ? serverNow() - range.days * 864e5 : 0;
 
   const student = scope === "class" ? null : api.studentById(scope);
   const inScope = api.notes.filter((n) =>
