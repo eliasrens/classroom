@@ -20,13 +20,15 @@ import { SUBJECTS } from "../lib/color.js";
 import { ACTIVE_CLASS_KEY } from "../ui/class-picker.js";
 import { loadNameDisplay, saveNameDisplay } from "./elever/shared.js";
 import {
-  loadPrivacy, savePrivacy, RETENTION_OPTIONS, deleteAllClassData,
+  savePrivacy, runRetention, RETENTION_OPTIONS, DEFAULT_RETENTION_WEEKS, deleteAllClassData,
 } from "../lib/privacy.js";
 import { plansPath as plansPathFor } from "../data/plans.js";
 import { createClass } from "../data/classes.js";
 import { startOfWeek, inWeek, weekLabel, weekRangeLabel } from "../lib/week.js";
 import { KIND_KEYS, KINDS, computeStats } from "../lib/trafikljus-stats.js";
-import { MORNING_KEY, normalize as normalizeMorning, currentPraise } from "../lib/morning.js";
+import { PRAISE_DOC, praisePath, normalize as normalizeMorning, currentPraise } from "../lib/morning.js";
+import { noteStatsPath } from "./elever/shared.js";
+import { moveStudentDataFromCloud } from "../data/cloud-cleanup.js";
 import { serverNow } from "../lib/clock.js";
 import { isMentorTime } from "../lib/week-recap.js";
 
@@ -81,8 +83,10 @@ export default {
     let plans = [];
     let settingsDocs = [];
     let initials = false;
-    let retentionWeeks = null;
-    let notes = [];
+    let retentionWeeks = DEFAULT_RETENTION_WEEKS;
+    let retentionAwaiting = false; // uppgraderingsskydd: gallring pausad tills läraren valt
+    let noteStats = [];      // klassens anonyma streck (moln, issue #32)
+    let praiseBoard = null;  // lokala Bra jobbat-listan
     let sessions = [];
     const activeId = () => store.get().classId ?? null;
 
@@ -120,12 +124,35 @@ export default {
       void saveNameDisplay(data, cid, on);
     }
 
-    // ---- Integritet: auto-radering av noteringar ----
-    function setRetention(value) {
+    // ---- Integritet: lokal gallring av noteringar (per dator) ----
+    // Ett aktivt val häver uppgraderingsskyddet; kör gallringen direkt
+    // så att "starta gallringen" i bekräftelsen stämmer.
+    async function setRetention(value) {
       const cid = activeId();
       if (!cid) return;
-      const weeks = value === "" ? null : Number(value);
-      void savePrivacy(data, cid, { noteRetentionWeeks: weeks });
+      await savePrivacy(data, cid, { noteRetentionWeeks: Number(value) });
+      await runRetention(data, cid);
+    }
+
+    // ---- Integritet: flytta elevdata från molnet (engångs, issue #32) ----
+    async function migrateCloud() {
+      const ok = confirm(
+        "Flytta elevdata från molnet?\n\n" +
+        "Detta gäller ALLA klasser i molnet:\n" +
+        "• Gamla noteringar räknas om till anonym klasstatistik (utan elever och texter).\n" +
+        "• Elevlistor, noteringar och Bra jobbat-arkiv RADERAS ur molnet.\n\n" +
+        "Varje lärardator behåller sin egen lokala kopia. Datorer som inte har " +
+        "öppnat appen med den nya versionen ännu behåller sin cache och migrerar " +
+        "den lokalt vid nästa start.");
+      if (!ok) return;
+      try {
+        const report = await moveStudentDataFromCloud();
+        const lines = report.map((r) => `${r.name}: ${r.notes} noteringar → anonym statistik, ${r.deleted} dokument raderade`);
+        alert(`Klart — elevdata är flyttad från molnet.\n\n${lines.join("\n")}`);
+      } catch (err) {
+        console.warn("[oversikt] flytt av elevdata från molnet misslyckades:", err);
+        alert(`Kunde inte slutföra flytten: ${err?.message ?? err}\n\nInget lokalt har gått förlorat — försök igen.`);
+      }
     }
 
     // ---- Integritet: radera all data för klassen ----
@@ -148,13 +175,15 @@ export default {
     }
 
     // ---- Veckans siffror (veckorytm: bara innevarande vecka) ----
+    // Klassnivå ur molnets anonyma streck (noteStats) — Bra jobbat ur
+    // den lokala listan (issue #32).
     function weekSection(cls) {
       if (!cls) return "";
       const ws = startOfWeek();
-      const weekNotes = notes.filter((n) => inWeek(n.createdAt ?? 0, ws));
-      const typ = weekNotes.filter((n) => n.kind === "typ");
+      const weekStats = noteStats.filter((n) => inWeek(n.createdAt ?? 0, ws));
+      const typ = weekStats.filter((n) => (n.kind ?? "typ") === "typ");
       const neg = typ.filter((n) => !n.positive).length;
-      const praise = currentPraise(normalizeMorning(settingsDocs.find((d) => d.id === MORNING_KEY)?.value));
+      const praise = currentPraise(normalizeMorning({ praise: praiseBoard?.praise, weekOf: praiseBoard?.weekOf }));
       const tile = (n, label) =>
         `<li class="stat-tile"><span class="stat-tile__n">${n}</span><span class="stat-tile__l">${esc(label)}</span></li>`;
       return `
@@ -240,8 +269,11 @@ export default {
 
         <section class="ov-section ov-privacy card" aria-label="Integritet och data">
           <h2 class="ov-section__title">${icon("shield")} Integritet &amp; data</h2>
-          <p class="ov-privacy__note">Endast elevernas förnamn lagras. Noteringar och
-            anteckningar visas aldrig på elevskärmen.</p>
+          <p class="ov-privacy__note"><strong>Elevnoteringar sparas bara på den här datorn.</strong>
+            Elevlistan, noteringarna och Bra jobbat lämnar aldrig datorn — molnet får enbart
+            klasstatistik (trafikljus och anonyma räkningar). Det som ska sparas långsiktigt
+            dokumenteras i skolans system. Endast elevernas förnamn lagras, och noteringar
+            visas aldrig på elevskärmen.</p>
           ${!cls ? `<p class="ov-empty">Välj en klass för att ändra inställningarna.</p>` : `
           <label class="ov-toggle">
             <input type="checkbox" data-initials ${initials ? "checked" : ""}>
@@ -252,15 +284,29 @@ export default {
             <span class="ov-field__label">Radera noteringar automatiskt efter</span>
             <select data-retention>
               ${RETENTION_OPTIONS.map((o) => `
-                <option value="${o.weeks ?? ""}" ${(o.weeks ?? null) === retentionWeeks ? "selected" : ""}>${esc(o.label)}</option>`).join("")}
+                <option value="${o.weeks}" ${o.weeks === retentionWeeks ? "selected" : ""}>${esc(o.label)}</option>`).join("")}
             </select>
           </label>
-          <p class="ov-field__hint">Gäller klassens noteringar från Läge 4. Rensningen körs
-            automatiskt när klassen öppnas.</p>
+          <p class="ov-field__hint">Lokal gallring på den här datorn (standard 12 veckor — en termin).
+            Rensningen körs automatiskt när klassen öppnas. Klassens anonyma statistik i molnet påverkas inte.</p>
+          ${retentionAwaiting ? `
+          <div class="ov-retention-pause">
+            <p><strong>Gallringen är pausad.</strong> Den här datorn hade tidigare
+              "Spara tills vidare", så inga noteringar raderas förrän du bekräftar
+              en lagringstid ovan. Äldre noteringar än den valda tiden raderas då
+              från den här datorn.</p>
+            <button class="btn" data-confirm-retention>Bekräfta ${retentionWeeks} veckor och starta gallringen</button>
+          </div>` : ""}
+
+          <div class="ov-danger">
+            <button class="btn" data-migrate>${icon("upload")} Flytta elevdata från molnet</button>
+            <span class="ov-danger__hint">Engångsflytt (alla klasser): räknar om molnets gamla noteringar till
+              anonym klasstatistik och raderar elevlistor, noteringar och Bra jobbat-arkiv ur molnet.</span>
+          </div>
 
           <div class="ov-danger">
             <button class="btn ov-danger__btn" data-del>${icon("trash")} Radera all data för ${esc(cls.name)}</button>
-            <span class="ov-danger__hint">Elever, planeringar, noteringar, pass — allt. Kan inte ångras.</span>
+            <span class="ov-danger__hint">Elever, planeringar, noteringar, pass — allt, både på datorn och i molnet. Kan inte ångras.</span>
           </div>`}
         </section>`;
 
@@ -275,7 +321,10 @@ export default {
       rootEl.querySelector("[data-initials]")?.addEventListener("change", (e) =>
         toggleInitials(e.target.checked));
       rootEl.querySelector("[data-retention]")?.addEventListener("change", (e) =>
-        setRetention(e.target.value));
+        void setRetention(e.target.value));
+      rootEl.querySelector("[data-confirm-retention]")?.addEventListener("click", () =>
+        void setRetention(retentionWeeks));
+      rootEl.querySelector("[data-migrate]")?.addEventListener("click", () => void migrateCloud());
       rootEl.querySelector("[data-del]")?.addEventListener("click", () => void deleteClass());
     }
 
@@ -286,13 +335,23 @@ export default {
     if (cid) {
       // Planeringar är privata per lärare — visa bara den inloggades egna.
       this._offs.push(data.watch(plansPathFor(cid), (docs) => { plans = docs; render(); }));
-      this._offs.push(data.watch(`classes/${cid}/notes`, (docs) => { notes = docs; render(); }));
+      this._offs.push(data.watch(noteStatsPath(cid), (docs) => { noteStats = docs; render(); }));
+      this._offs.push(data.watch(praisePath(cid), (docs) => {
+        praiseBoard = docs.find((d) => d.id === PRAISE_DOC) ?? null;
+        render();
+      }));
       this._offs.push(data.watch(`classes/${cid}/sessions`, (docs) => { sessions = docs; render(); }));
       this._offs.push(data.watch(`classes/${cid}/settings`, (docs) => {
         settingsDocs = docs;
         initials = docs.find((d) => d.id === "display")?.value?.nameDisplay === "initials";
-        const weeks = docs.find((d) => d.id === "privacy")?.value?.noteRetentionWeeks;
-        retentionWeeks = Number.isFinite(weeks) && weeks > 0 ? weeks : null;
+        render();
+      }));
+      // Gallringsinställningen är LOKAL per dator (issue #32).
+      this._offs.push(data.watch(`classes/${cid}/privacy`, (docs) => {
+        const value = docs.find((d) => d.id === "privacy")?.value;
+        const weeks = value?.noteRetentionWeeks;
+        retentionWeeks = Number.isFinite(weeks) && weeks > 0 ? weeks : DEFAULT_RETENTION_WEEKS;
+        retentionAwaiting = Boolean(value?.awaitingChoice);
         render();
       }));
     }

@@ -35,9 +35,13 @@ i realtid (onSnapshot). Appen kraschar aldrig utan Firebase.
 Steg-för-steg för idrifttagning — config, inbjudan av fler lärare och
 deploy av säkerhetsreglerna: **[docs/DRIFTSATTNING.md](docs/DRIFTSATTNING.md)**.
 
-Delat mellan alla inloggade lärare: klasser, elever, noteringar, pass och
-klassinställningar. Privat per lärare: lektionsplaneringar. Se
-[DATAMODELL.md](DATAMODELL.md).
+**All elevdata är bara lokal** (issue #32): elevlistor, noteringar och
+Bra jobbat lagras enbart i webbläsaren på varje lärardator och lämnar
+aldrig den. Delat mellan alla inloggade lärare (molnet): klasser,
+trafikljuspass, **anonyma noteringsräkningar** (`noteStats` — utan
+elev-id, utan text) och klassinställningar. Privat per lärare:
+lektionsplaneringar. Se [DATAMODELL.md](DATAMODELL.md) och
+[docs/DATASKYDD.md](docs/DATASKYDD.md).
 
 ## Arkitektur
 

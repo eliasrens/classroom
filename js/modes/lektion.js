@@ -33,7 +33,7 @@ import { icon } from "../lib/icons.js";
 import { readableTextColor, SUBJECTS } from "../lib/color.js";
 import { plansPath as plansPathFor, currentUid } from "../data/plans.js";
 import { createPraiseBoard } from "../ui/praise-board.js";
-import { normalize as normalizeMorning, MORNING_KEY } from "../lib/morning.js";
+import { normalize as normalizeMorning, PRAISE_DOC, praisePath } from "../lib/morning.js";
 import { studentLabel } from "../lib/names.js";
 import { serverNow } from "../lib/clock.js";
 
@@ -378,7 +378,8 @@ export default {
     let subjects = SUBJECTS;
     let activeId = null;
 
-    // "Bra jobbat"-namnen: samma delade data som morgonskärmen.
+    // "Bra jobbat"-namnen: samma LOKALA data som morgonskärmen (issue #32) —
+    // listan innehåller elevdata och lagras bara på den här datorn.
     let praiseItems = [];
     let students = [];
     let initials = false;
@@ -418,9 +419,17 @@ export default {
     function applySharedSettings(docs) {
       this._settings = docs;
       subjects = mergedSubjects(docs);
-      praiseItems = normalizeMorning(docs.find((d) => d.id === MORNING_KEY)?.value).praise;
       initials = docs.find((d) => d.id === "display")?.value?.nameDisplay === "initials";
     }
+
+    // Bra jobbat läses ur den lokala lagringen (aldrig molnet).
+    const watchPraise = (onChange) => {
+      this._offs.push(data.watch(praisePath(activeClass.id), (docs) => {
+        const board = docs.find((d) => d.id === PRAISE_DOC);
+        praiseItems = normalizeMorning({ praise: board?.praise }).praise;
+        onChange();
+      }));
+    };
 
     // Tavlans storlek följer ytan → anpassa om texten när ytan ändras.
     const observeStage = (stage) => {
@@ -460,6 +469,7 @@ export default {
         renderStudent();
       }));
       watchStudents(renderStudent);
+      watchPraise(renderStudent);
       return;
     }
 
@@ -894,6 +904,7 @@ export default {
       refreshPraise();
     }));
     watchStudents(refreshPraise);
+    watchPraise(refreshPraise);
 
     this._offs.push(data.watch(plansPath, async (docs) => {
       plans = docs;

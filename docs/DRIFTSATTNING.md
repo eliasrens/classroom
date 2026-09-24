@@ -80,9 +80,12 @@ Du skapar därför kontona med samma mönster i konsolen:
 > `anna` och `annab` (eller initialer) — det läraren skriver måste
 > matcha delen före `@klassrum.local` i kontot.
 
-Alla inloggade lärare delar samma klasser, elever, noteringar, pass och
-klassinställningar och ser varandras ändringar i realtid. **Lektions­-
-planeringar är privata** per lärare — var och en ser bara sina egna.
+Alla inloggade lärare delar samma klasser, pass, anonyma noterings­-
+räkningar och klassinställningar och ser varandras ändringar i realtid.
+**Elevdata (elevlistor, noteringar, Bra jobbat) finns bara lokalt på
+varje lärardator** och delas aldrig (issue #32, se docs/DATASKYDD.md).
+**Lektionsplaneringar är privata** per lärare — var och en ser bara
+sina egna.
 
 > Vill en lärare byta lösenord: gör det i **Authentication → Users**
 > (tre prickar → återställ lösenord).
