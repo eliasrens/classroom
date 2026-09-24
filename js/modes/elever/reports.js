@@ -211,7 +211,8 @@ function exportHtml(api, st) {
   const inP = api.notes.filter((n) => n.studentId && (n.createdAt ?? 0) >= period.from && (n.createdAt ?? 0) < period.to
     && (st.scope === "class" || n.studentId === st.scope));
   const follow = inP.filter((n) => n.followUp).length;
-  const who = st.scope === "class" ? `${new Set(inP.map((n) => n.studentId)).size} elever` : api.label(api.studentById(st.scope));
+  const nStudents = new Set(inP.map((n) => n.studentId)).size;
+  const who = st.scope === "class" ? `${nStudents} ${nStudents === 1 ? "elev" : "elever"}` : api.label(api.studentById(st.scope));
   const custom = st.custom ?? { from: isoDate(period.from), to: isoDate(period.to - 1) };
   return `
     <section class="rap__card card" aria-labelledby="rap-export-h">
@@ -423,6 +424,7 @@ const REASON_TEXT = {
   name: "Samma namn",
   ambiguous: "Flera möjliga — välj",
   none: "Ingen träff — välj eller håll isär",
+  manual: "Vald av dig",
 };
 
 function targetOptions(api, selected, { sepLabel }) {

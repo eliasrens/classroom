@@ -37,7 +37,9 @@ deploy av säkerhetsreglerna: **[docs/DRIFTSATTNING.md](docs/DRIFTSATTNING.md)**
 
 **All elevdata är bara lokal** (issue #32): elevlistor, noteringar och
 Bra jobbat lagras enbart i webbläsaren på varje lärardator och lämnar
-aldrig den. Delat mellan alla inloggade lärare (molnet): klasser,
+aldrig den via appen. Rapporter per elev eller klass laddas ned som
+**krypterade `.klassrum`-filer** (Elevlista → Rapporter) och kan slås
+samman med kollegors filer — helt lokalt, filerna flyttas för hand (#33). Delat mellan alla inloggade lärare (molnet): klasser,
 trafikljuspass, **anonyma noteringsräkningar** (`noteStats` — utan
 elev-id, utan text) och klassinställningar. Privat per lärare:
 lektionsplaneringar. Se [DATAMODELL.md](DATAMODELL.md) och
@@ -62,6 +64,10 @@ js/
   lib/icons.js          linje-ikoner (inline-SVG) — inga emoji i gränssnittet
   lib/names.js          elevnamn: endast förnamn, valfri tag, initial-läge
   lib/privacy.js        integritet: auto-radering av noteringar + radera all klassdata
+  lib/report-crypto.js  krypterade rapportfiler (.klassrum): WebCrypto AES-GCM + PBKDF2
+  modes/elever/report-*.js, reports.js
+                        Elevlista → Rapporter: ladda ned krypterad rapport/utskrift,
+                        öppna och slå samman flera lärares filer (helt lokalt)
   modes/                lägena + registret (oversikt.js = startvyn, statistik.js = veckoarkivet,
                         vecka.js = Veckans övergångar — elevvänlig veckosammanfattning för mentorstiden)
   lib/week.js           veckologik (måndag 00:00) · lib/week-rhythm.js  rent varje måndag

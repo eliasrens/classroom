@@ -5,7 +5,7 @@ så modellen gäller oavsett om Firebase är anslutet eller ej.
 
 **ELEVDATA ÄR ENDAST LOKAL (issue #32).** Ingenting om enskilda elever
 lämnar lärardatorn: samlingarna `students`, `notes`, `praise`,
-`praiseArchive` och `privacy` under en klass routas av datalagret till
+`praiseArchive`, `privacy` och `reports` under en klass routas av datalagret till
 en egen lokal lagring (`js/data/local-only.js`, prefix
 `classroom:local:`) som aldrig går via outboxen eller Firestore.
 Molnet innehåller bara klasstatistik: `sessions` (trafikljuspass) och
@@ -111,6 +111,26 @@ classes/{classId}/privacy/privacy       — lokal gallring — ENDAST LOKALT
                        förrän läraren bekräftat en lagringstid i
                        Översikten (annars hade lokala noteringar äldre
                        än 12 veckor raderats tyst vid första öppningen).
+
+classes/{classId}/reports/{id}          — elevrapporter (issue #33) — ENDAST LOKALT
+  log:       { exports: [ { at, from, to, students: null | [studentId] } ] }
+                     — vilka perioder som laddats ned (krypterad fil eller
+                       utskrift), för hela klassen (students null) eller
+                       vissa elever. Styr att påminnelserna inte tjatar.
+  reminders: { monday: "2026-W38", retention: ["2026-W27", …] }
+                     — avvisade påminnelser (måndagsbannern per vecka,
+                       gallringspåminnelsen per uppsättning veckor)
+  matches:   { pairs: [ { teacherUid, name, tag, localId } ] }
+                     — bekräftade namnpar vid sammanslagning ("Catalins
+                       'Mohammad' = min elev s_moh"). BARA namn ↔ lokalt
+                       id — aldrig notisdata. Dekrypterade rapporter och
+                       sammanställningar sparas ALDRIG (bara i minnet).
+
+  Rapportfilerna (.klassrum) lagras inte av appen alls: de laddas ned
+  och flyttas för hand. Format: js/lib/report-crypto.js (container:
+  AES-GCM 256, nyckel via PBKDF2-SHA-256 ≥ 600 000 iterationer, slumpad
+  salt + IV per fil; klartextdelen är bara lärare/klass/period/antal) och
+  js/modes/elever/report-data.js (nyttolasten, formatVersion 1).
 
 classes/{classId}/settings/{key}        — inställningar per klass
                                           (dokument-id = inställningens namn,
@@ -263,7 +283,7 @@ outboxen som `js/data/datalayer.js` tömmer mot Firestore. Semantik:
   och räkningar per lektion — men aldrig något om enskilda elever.
 - **ENDAST LOKALT per lärardator** (aldrig via outboxen/Firestore, se
   `js/data/local-only.js`): elevlistan, noteringarna, Bra jobbat med
-  arkiv och gallringsinställningen. Elevskärmen i samma webbläsare
+  arkiv, gallringsinställningen och rapportloggen (issue #33). Elevskärmen i samma webbläsare
   läser samma lokala lagring (livespegling via storage-eventet).
   Varje notering skapar samtidigt ett anonymt `noteStats`-streck i
   molnet (`js/modes/elever/shared.js` → `createNote`).
