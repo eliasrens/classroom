@@ -8,6 +8,14 @@ så modellen gäller oavsett om Firebase är anslutet eller ej.
 ```
 classes/{classId}                       — en klass (4A, 4B, …)
   name: "4A"
+                     — {classId} är för nya klasser ett DETERMINISTISKT
+                       id härlett ur namnet ("4B" → "4b", se
+                       js/data/classes.js) så att två enheter som skapar
+                       samma klass oberoende av varandra skriver samma
+                       dokument — klasser kan aldrig dubbleras. Äldre
+                       klasser med UUID-id fortsätter gälla; skapande
+                       med ett namn som redan finns återanvänder alltid
+                       den befintliga klassen.
 
 classes/{classId}/students/{studentId}  — elev i klassen
   firstName          — ENDAST förnamn. Det finns AVSIKTLIGT inget
@@ -24,8 +32,22 @@ classes/{classId}/students/{studentId}  — elev i klassen
 classes/{classId}/sessions/{sessionId}  — genomförda pass/resultat
                                           (trafikljuspass, aktiviteter; Läge 3/5)
   type: "trafikljus" | …
+  kind               — endast type "trafikljus": "overgang" | "datorer".
+                       Gamla pass UTAN kind räknas som "overgang".
+                       Statistik och rekord räknas alltid separat per
+                       kind (datorer jämförs aldrig med övergångar).
   startedAt, endedAt
-  result: { … }      — passtypens egna data (t.ex. antal varningar)
+  result: { … }      — passtypens egna data (t.ex. antal varningar).
+                       Trafikljus: { color: "green"|"yellow"|"red",
+                       durationSec, limits: { yellowSec, redSec } }
+                       (limits = gränserna som gällde, saknas på äldre pass)
+  lesson             — SNAPSHOT av pågående block ur den inloggade
+                       lärarens lessonPlans vid sparandet (samma format
+                       som noteringarnas): { date, start, end,
+                       subjectId, title } | null om inget block pågår
+  createdBy          — lärarens uid
+  createdByName      — lärarens visningsnamn ("Elias"); gamla dokument
+                       utan fältet visas som "okänd lärare"
 
 classes/{classId}/notes/{noteId}        — noteringar om elever (Läge 4)
   studentId
@@ -43,7 +65,9 @@ classes/{classId}/notes/{noteId}        — noteringar om elever (Läge 4)
   lesson             — SNAPSHOT av pågående block ur lessonPlans vid
                        skapandet: { date, start, end, subjectId, title } | null
                        (grund för mönstervyerna: moment/veckodag/tid/ämne)
-  createdBy          — lärarens uid/e-post
+  createdBy          — lärarens uid
+  createdByName      — lärarens visningsnamn ("Elias"); gamla dokument
+                       utan fältet visas som "okänd lärare"
   createdAt          — epoch ms; tillsammans med klass-kopplingen i pathen
                        gör tidsstämpeln central auto-radering (Läge 5) möjlig
 
@@ -62,14 +86,33 @@ classes/{classId}/settings/elevlista    — Läge 4:s inställningar
                        denna. "Nollställ inför nästa lektion" = nu.
   }
 
+classes/{classId}/settings/trafikljus   — Läge 3:s gränser, per passtyp
+  value: {
+    overgang: { yellowSec, redSec }   — standard 60 / 120
+    datorer:  { yellowSec, redSec }   — standard 180 / 300 (grönt <3:00,
+                                        gult 3:00–5:00, rött från 5:00)
+  }
+                     — bakåtkompatibelt: en äldre config utan typ
+                       ({ yellowSec, redSec } på toppnivån) läses som
+                       "overgang" och skrivs om till typad form vid
+                       nästa ändring. Saknad typ får standardvärden.
+
+classes/{classId}/settings/trafikljusState — Läge 3:s live-tillstånd
+  value: { timer: { startedAt, pausedAt|null } | null,
+           kind: "overgang" | "datorer" }
+                     — speglas till elevskärmen (även via sync-bussen);
+                       kind styr gränserna och etiketten "Datorer"
+
 classes/{classId}/settings/display      — namnvisning (togglas i lärarvyn)
   value: { nameDisplay: "first" | "initials" }
                      — "initials" = reservläget: initialer räknas
                        fram ur förnamnet (js/lib/names.js), lagras ej
 
 teachers/{uid}                          — lärarprofil (se docs/AUTH.md)
-  email, displayName
-  classIds: ["…"]    — klasser läraren undervisar (för behörighetsregler)
+  email, displayName — skrivs/uppdateras automatiskt vid inloggning
+                       (js/auth.js); displayName härleds ur e-postens
+                       lokala del ("elias@…" → "Elias") och används för
+                       attribution (createdByName) på pass/noteringar
 
 teachers/{uid}/classes/{classId}/lessonPlans/{planId}
                      — lektionsplanering (Läge 2). PRIVAT per lärare:
@@ -82,8 +125,9 @@ teachers/{uid}/classes/{classId}/lessonPlans/{planId}
   show: { … }        — vilka fält som visas på tavlan; show.praise = visa
                        "Bra jobbat"-rutan i högerkolumnen (namnen läses ur
                        den DELADE classes/{id}/settings/morningScreen → praise)
-                     — planeringar raderas aldrig automatiskt (inte heller
-                       av någon veckostädning); bara läraren tar bort dem
+                     — planeringar skapas och raderas aldrig automatiskt
+                       (ingen testdata/auto-seed, ingen veckostädning);
+                       bara läraren själv skapar, kopierar och tar bort
 ```
 
 ## Delat kontra privat

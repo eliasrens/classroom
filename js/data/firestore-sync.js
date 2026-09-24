@@ -14,6 +14,7 @@
  */
 
 const SDK_BASE = "https://www.gstatic.com/firebasejs/10.12.2";
+const LISTENER_RETRY_MS = 5000;
 
 export function createFirestoreSync({ firebaseConfig, onRemoteDocs, onStatus }) {
   let fs = null;         // { db, api } när uppkopplad
@@ -65,8 +66,13 @@ export function createFirestoreSync({ firebaseConfig, onRemoteDocs, onStatus }) 
           onStatus?.(snap.metadata.fromCache ? "offline" : "online");
         },
         (err) => {
-          console.warn(`[data/sync] lyssnare för "${path}" föll:`, err);
+          // En lyssnare som faller (t.ex. permission-denied innan auth-token
+          // hunnit komma fram i ett nyöppnat elevfönster) är död för gott —
+          // koppla en ny efter en stund i stället för att tappa realtiden.
+          console.warn(`[data/sync] lyssnare för "${path}" föll — försöker igen:`, err);
           onStatus?.("offline");
+          watched.set(path, null);
+          setTimeout(() => { if (fs && watched.get(path) === null) attachListener(path); }, LISTENER_RETRY_MS);
         },
       );
       watched.set(path, unsub);
@@ -82,14 +88,40 @@ export function createFirestoreSync({ firebaseConfig, onRemoteDocs, onStatus }) 
     if (fs) attachListener(path);
   }
 
-  /** Skriv en outbox-operation. Kastar vid fel (datalagret behåller op:en i kön). */
+  /**
+   * Skriv en outbox-operation. Kastar vid fel (datalagret behåller op:en i kön).
+   *
+   * Last-write-wins per dokument gäller även MOT SERVERN: en op som legat i
+   * kön (t.ex. medan läraren var offline) får inte skriva över en annan
+   * lärares nyare version. Därför en transaktion som läser serverns
+   * updatedAt först — är den nyare än op:ens tidsstämpel hoppas op:en över
+   * och den nyare versionen når oss via lyssnaren (mergeRemote). Utan
+   * detta blir det dessutom glapp: lyssnarna ignorerar den äldre versionen
+   * hos lärare som redan har den nyare, så enheterna skulle se olika data.
+   */
   async function push(op) {
     if (!fs) throw new Error("Firestore ej uppkopplat");
     const { db, api } = fs;
     const ref = api.doc(db, ...op.path.split("/"), op.id);
-    if (op.op === "delete") await api.deleteDoc(ref);
-    else await api.setDoc(ref, op.doc, { merge: op.op === "patch" });
+    const opTime = op.op === "delete" ? op.at : op.doc?.updatedAt;
+    await api.runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      const serverTime = snap.exists() ? (snap.data().updatedAt ?? 0) : 0;
+      if (opTime != null && serverTime > opTime) {
+        console.info(`[data/sync] hoppar över ${op.op} av ${op.path}/${op.id} — servern har nyare data`);
+        return;
+      }
+      if (op.op === "delete") tx.delete(ref);
+      else tx.set(ref, op.doc, { merge: op.op === "patch" });
+    });
   }
 
-  return { start, watch, push, get connected() { return fs != null; } };
+  /** Nollställ "SDK:n gick inte att ladda" så nästa start() försöker igen
+   *  (anropas när webbläsaren kommer online igen — kallstart offline ska
+   *  inte låsa appen i lokalt läge för resten av sessionen). */
+  function reset() {
+    if (!fs) startFailed = false;
+  }
+
+  return { start, watch, push, reset, get connected() { return fs != null; } };
 }

@@ -55,6 +55,23 @@
   font-size: clamp(4.5rem, 20vw, 13rem);
 }
 
+/* Diskret typetikett ("Datorer") — syns bara när datorljuset gäller,
+   så eleverna vet vilka gränser som räknas. Ärver scenens bläckfärg. */
+.tl-kind-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-round);
+  background: rgb(255 255 255 / 18%);
+  font-size: var(--text-s);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+}
+.tl--student .tl-kind-tag { font-size: clamp(1rem, 2.2vw, 1.6rem); padding: var(--space-1) var(--space-3); }
+.tl--student .tl-kind-tag svg { width: 1.1em; height: 1.1em; }
+
 /* ---- Elevvy: scenen fyller skärmen, extra stor ---- */
 
 .tl--student {
@@ -68,6 +85,55 @@
   border-radius: var(--radius-l);
 }
 .tl--student .tl-clock { font-size: clamp(6rem, 26vw, 24rem); }
+
+/* ---- Typväxlare: Övergång / Datorer (väljs innan start) ---- */
+
+.tl-kind-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2) var(--space-3);
+}
+.tl-kind {
+  display: inline-flex;
+  padding: 4px;
+  gap: 4px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-l);
+  background: var(--color-surface-alt);
+}
+.tl-kind-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 10rem;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--color-ink-soft);
+  font: inherit;
+  cursor: pointer;
+}
+.tl-kind-opt:hover:not(:disabled) { color: var(--color-ink); background: var(--color-surface); }
+.tl-kind-opt[aria-checked="true"] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+.tl-kind-opt[aria-checked="true"]:hover { background: var(--color-accent); color: var(--color-accent-ink); }
+.tl-kind-opt:disabled { opacity: 0.4; cursor: default; }
+.tl-kind-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-l);
+  font-weight: 700;
+}
+.tl-kind-limits { font-size: var(--text-s); font-variant-numeric: tabular-nums; opacity: 0.85; }
+.tl-kind-hint { margin: 0; color: var(--color-ink-soft); font-size: var(--text-s); }
 
 /* ---- Kontroller ---- */
 
@@ -203,6 +269,35 @@
 .tl-week-total { margin: 0; color: var(--color-ink-soft); font-size: var(--text-s); }
 .tl-stat-empty { color: var(--color-ink-soft); font-size: var(--text-s); }
 
+/* Filter: typ (segment) + lärare (Alla / Mina / en viss lärare). */
+.tl-stats-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.tl-filter-kinds {
+  display: inline-flex;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  overflow: hidden;
+}
+.tl-filter-kind {
+  padding: var(--space-1) var(--space-3);
+  border: none;
+  background: transparent;
+  color: var(--color-ink-soft);
+  font: inherit;
+  font-size: var(--text-s);
+  font-weight: 600;
+  cursor: pointer;
+}
+.tl-filter-kind + .tl-filter-kind { border-left: 1px solid var(--color-line); }
+.tl-filter-kind[aria-pressed="true"] { background: var(--color-accent-soft); color: var(--color-accent-text); }
+.tl-filter-teacher { margin-left: auto; font-size: var(--text-s); }
+
+.tl-stats-latest { margin-top: var(--space-3); }
 .tl-passes { list-style: none; margin: 0; padding: 0; }
 .tl-pass {
   display: flex;
@@ -212,14 +307,34 @@
   border-bottom: 1px solid var(--color-line);
 }
 .tl-pass:last-child { border-bottom: none; }
+/* "Catalin · tis 10:15 · Matte" — punkten ritas mellan delarna. */
+.tl-pass-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  min-width: 0;
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+}
+.tl-pass-who > * + *::before { content: "·"; margin: 0 0.45em; }
+.tl-pass-teacher { color: var(--color-ink); font-weight: 600; }
+.tl-pass-result {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
 .tl-pass-time {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  min-width: 4ch;
+  min-width: 5ch;
+  text-align: right;
 }
-.tl-pass-date { color: var(--color-ink-soft); font-size: var(--text-s); margin-left: auto; }
 .tl-pass.is-record .tl-pass-time { color: var(--color-accent-text); }
+.tl-more { margin-top: var(--space-2); font-size: var(--text-s); }
 
 @media (max-width: 640px) {
   .tl-btn { flex-basis: 40%; }
+  .tl-kind { width: 100%; }
+  .tl-kind-opt { flex: 1 1 0; min-width: 0; padding-inline: var(--space-2); }
 }

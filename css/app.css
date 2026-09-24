@@ -124,6 +124,10 @@ html[data-theme="student"] .teacher-only { display: none !important; }
   margin: 0 auto;
 }
 
+/* Routerns behållare per montering (js/router.js) — layoutmässigt osynlig:
+   lägets innehåll beter sig som om det låg direkt i <main>. */
+.view__slot { display: contents; }
+
 html[data-theme="student"] .view {
   display: flex;
   flex-direction: column;

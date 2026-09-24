@@ -303,66 +303,6 @@ function refitBoard(container, praise) {
 }
 
 /* ============================================================
-   TESTDATA — byggs in så det syns direkt att allt fungerar.
-   Fält som saknas i en lektion lämnas okryssade → visar reflow.
-   ============================================================ */
-
-function seedPlans() {
-  const on = (...keys) => {
-    const s = { subject: true, time: true, vad: false, hur: false, varfor: false, attGora: false, narKlar: false, duBehover: false, mal: false };
-    for (const k of keys) s[k] = true;
-    return s;
-  };
-  return [
-    {
-      name: "SO – Demokrati", subjectId: "so", start: "13:30", end: "14:30",
-      fields: {
-        vad: "Demokrati", hur: "Filmserie", varfor: "Träna på demokrati",
-        attGora: ["Toa / drick vatten / tyst läsning / ritbok", "Samling", "\"Om Sverige var en diktatur?\"-serie", "Elevråd (Kayden får ordet)", "Avslut"],
-        narKlar: "", duBehover: "", mal: "Lära mer om demokrati.",
-      },
-      show: on("vad", "hur", "varfor", "attGora", "mal"),
-    },
-    {
-      name: "Matte – Talsorter", subjectId: "ma", start: "08:30", end: "09:20",
-      fields: {
-        vad: "Talsorter", hur: "Mattebok + häfte", varfor: "Träna på de olika talsorterna",
-        attGora: ["Genomgång", "Sidorna 14–15 i matteboken (skriv i räknehäftet)", "Avslut"],
-        narKlar: "Matteboken sid 32–33", duBehover: "Mattebok + häfte", mal: "",
-      },
-      show: on("vad", "hur", "varfor", "attGora", "narKlar", "duBehover"),
-    },
-    {
-      name: "SO – Grej of the week", subjectId: "so", start: "09:50", end: "10:40",
-      fields: {
-        vad: "Grej", hur: "Genomgång / diskussion / skriva", varfor: "",
-        attGora: ["Tyst läsning", "Grej of the week-gissningar", "Genomgång", "Bild + tavla", "Skriva i egen bok", "Klistermärken"],
-        narKlar: "Tyst läsning / ritbok", duBehover: "", mal: "",
-      },
-      show: on("vad", "hur", "attGora", "narKlar"),
-    },
-    {
-      name: "Matte – Talsorter (dator)", subjectId: "ma", start: "11:40", end: "12:40",
-      fields: {
-        vad: "Talsorter", hur: "Dator", varfor: "",
-        attGora: ["Samling", "Röstning", "Magma övning 2", "Plocka ihop + klistermärken"],
-        narKlar: "Magma extra 1", duBehover: "Dator", mal: "",
-      },
-      show: on("vad", "hur", "attGora", "narKlar", "duBehover"),
-    },
-    {
-      name: "SO – Lilla Aktuellt", subjectId: "so", start: "08:00", end: "08:40",
-      fields: {
-        vad: "Lilla Aktuellt", hur: "Lilla Aktuellt på projektor", varfor: "Se vad som händer i världen",
-        attGora: ["Lilla Aktuellt", "Svara på frågor", "Rörelse"],
-        narKlar: "", duBehover: "", mal: "",
-      },
-      show: on("vad", "hur", "varfor", "attGora"),
-    },
-  ].map((p) => ({ ...p, date: todayISO() }));
-}
-
-/* ============================================================
    LISTAN — gruppering per vecka + sök/filter
    ============================================================ */
 
@@ -404,16 +344,6 @@ function groupByWeek(list) {
   });
 }
 
-/* Testdata seedas BARA i rent lokalt läge (ingen Firebase) och bara
-   FÖRSTA gången per lärare + klass. Med Firebase går det inte att skilja
-   "läraren har inga planeringar" från "molndatan har inte kommit än"
-   (första watch-anropet kommer från den lokala cachen) — att seeda då
-   skulle lägga in dubbletter bland lärarens riktiga planeringar. Minnet
-   gör att en lärare som tagit bort allt inte får tillbaka testdatan. */
-const seededKey = (cid) => `classroom:lektion:seeded:${currentUid()}:${cid}`;
-function wasSeeded(cid) { try { return localStorage.getItem(seededKey(cid)) === "1"; } catch { return false; } }
-function markSeeded(cid) { try { localStorage.setItem(seededKey(cid), "1"); } catch { /* ok */ } }
-
 /* ============================================================
    MODEN
    ============================================================ */
@@ -446,7 +376,6 @@ export default {
     let plans = [];
     let subjects = SUBJECTS;
     let activeId = null;
-    let seeded = data.syncState !== "local" || wasSeeded(activeClass.id);
 
     // "Bra jobbat"-namnen: samma delade data som morgonskärmen.
     let praiseItems = [];
@@ -967,15 +896,9 @@ export default {
 
     this._offs.push(data.watch(plansPath, async (docs) => {
       plans = docs;
-      if (docs.length > 0 && !seeded) { seeded = true; markSeeded(activeClass.id); }
-      // Lokalt läge, första gången: seeda testdata om klassen saknar planeringar
-      // (aldrig igen — en lärare som tagit bort allt ska få en tom lista).
-      if (docs.length === 0 && !seeded) {
-        seeded = true;
-        markSeeded(activeClass.id);
-        for (const p of seedPlans()) await data.put(plansPath, normalizePlan(p));
-        return; // watch kör igen med de nya
-      }
+      // (Ingen auto-seed av testplaneringar längre: planeringarna är
+      // PRIVATA per lärare — varje ny lärare/enhet fick annars fem
+      // fejkplaneringar skapade i sitt namn. En ny lärare börjar tomt.)
       if (!activeId || !plans.some((p) => p.id === activeId)) {
         const first = sortedPlans()[0];
         if (first) { activeId = first.id; void setActive(first.id); }

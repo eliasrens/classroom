@@ -19,11 +19,16 @@
  * därmed samma uid, så den ser lärarens egna planeringar på projektorn.
  */
 
-import { SESSION_KEY } from "../auth.js";
+import { SESSION_KEY, currentTeacherName } from "../auth.js";
 
 /** Nuvarande lärares id (Firebase-uid, eller "local" utan Firebase). */
 export function currentUid() {
   try { return localStorage.getItem(SESSION_KEY) || "local"; } catch { return "local"; }
+}
+
+/** Attributionsfält för nya delade dokument (pass, noteringar). */
+export function attribution() {
+  return { createdBy: currentUid(), createdByName: currentTeacherName() };
 }
 
 /** Path till en lärares privata lektionsplaneringar för en klass. */
