@@ -30,7 +30,9 @@ import { noteStatFor } from "../modes/elever/shared.js";
 const SDK_BASE = "https://www.gstatic.com/firebasejs/10.12.2";
 const BATCH_LIMIT = 400; // Firestore-gräns 500 — marginal
 
-export async function moveStudentDataFromCloud({ onProgress = () => {} } = {}) {
+/** classIds (valfri): begränsa till vissa klasser — används av tester
+ *  (verifiera i en testklass INNAN riktiga klasser rensas). */
+export async function moveStudentDataFromCloud({ onProgress = () => {}, classIds = null } = {}) {
   if (!isFirebaseConfigured()) throw new Error("Firebase är inte konfigurerat");
   const [appMod, fs] = await Promise.all([
     import(`${SDK_BASE}/firebase-app.js`),
@@ -55,6 +57,7 @@ export async function moveStudentDataFromCloud({ onProgress = () => {} } = {}) {
 
   for (const cls of classesSnap.docs) {
     const cid = cls.id;
+    if (classIds && !classIds.includes(cid)) continue;
     const name = cls.data()?.name ?? cid;
     onProgress(`Rensar ${name}…`);
     const now = serverNow();
