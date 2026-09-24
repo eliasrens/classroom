@@ -133,6 +133,9 @@ export function reportFileName({ className, period, teacherName, merged = false 
   return `${parts.join("-")}.klassrum`;
 }
 
+/** Svensk genitiv: "Catalin" → "Catalins", "Elias" → "Elias". */
+export const genitive = (name) => (/[sxz]$/i.test(String(name ?? "")) ? String(name) : `${name}s`);
+
 // ---- Noteringar → exportform ----
 
 const inPeriod = (ts, period) => typeof ts === "number" && ts >= period.from && ts < period.to;
@@ -140,7 +143,7 @@ const inPeriod = (ts, period) => typeof ts === "number" && ts >= period.from && 
 export function kindName(n) {
   if (n.kind === "typ") return n.typeName || noteTypeById(n.typeId)?.name || "Notering";
   if (n.kind === "insats") return "Insats";
-  return n.followUp ? "Uppföljning" : "Anteckning";
+  return "Anteckning"; // uppföljning visas som egen markering bredvid
 }
 
 /** Noteringen som den står i filen — med etikett och ämnesnamn inbakade (mottagaren saknar våra inställningar). */
@@ -431,7 +434,8 @@ export function mergedToPayload(merged, { className, classId = null, teacher, no
     exporter: { uid: teacher.uid, name: teacher.name },
     exportedAt: now,
     period,
-    sources: merged.sources,
+    // "Den här datorn" gäller bara här — i filen är det en vanlig källa.
+    sources: merged.sources.map(({ thisComputer, ...src }) => src),
     students: merged.students.map((s, i) => ({
       localId: s.localId ?? `m${i + 1}`,
       name: s.name,

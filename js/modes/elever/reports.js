@@ -35,7 +35,7 @@ import {
   PERIOD_PRESETS, periodFor, periodLabel, periodFileTag, isoDate, reportFileName,
   buildReportPayload, reportMeta, upgradePayload, suggestMatch, updateSavedPairs,
   mergeReports, mergedToPayload, logExport, mondayReminder, retentionReminder,
-  reportsPath, REPORTS_LOG_ID, REPORTS_REMINDERS_ID, REPORTS_MATCHES_ID, normName,
+  reportsPath, REPORTS_LOG_ID, REPORTS_REMINDERS_ID, REPORTS_MATCHES_ID, normName, genitive,
 } from "./report-data.js";
 import { renderReportDocument, renderStudentReport, renderClassSummary, renderSources, studentName } from "./report-view.js";
 import { openPrintView, closePrintView } from "./report-print.js";
@@ -452,7 +452,7 @@ function fileHtml(api, entry, ws) {
     return `
       <li class="rap-file card">${head}
         <form class="rap-file__unlock" data-rap-unlock="${entry.key}">
-          <label><span>Lösenord för ${esc(meta.teacherName ?? "filen")}s fil</span>
+          <label><span>Lösenord för ${meta.teacherName ? `${esc(genitive(meta.teacherName))} fil` : "filen"}</span>
             <input type="password" name="pw" autocomplete="off" spellcheck="false" required ${entry.busy ? "disabled" : ""}></label>
           <button class="btn btn--primary" type="submit" ${entry.busy ? "disabled" : ""}>${icon("lock")}${entry.busy ? "Öppnar…" : "Öppna"}</button>
         </form>
@@ -474,7 +474,7 @@ function fileHtml(api, entry, ws) {
     const pairs = p.students.map((rs) => {
       const t = entry.targets[rs.localId];
       const local = t?.startsWith("local:") ? api.studentById(t.slice(6)) : null;
-      return `<li>${esc(from)}s <strong>${esc(studentName(rs))}</strong> = ${local ? `din <strong>${api.label(local)}</strong>` : "<em>hålls isär</em>"}</li>`;
+      return `<li>${esc(genitive(from))} <strong>${esc(studentName(rs))}</strong> = ${local ? `din <strong>${api.label(local)}</strong>` : "<em>hålls isär</em>"}</li>`;
     }).join("");
     return `
       <li class="rap-file card is-confirmed">${head}${classWarn}${dupNote}
@@ -493,7 +493,7 @@ function fileHtml(api, entry, ws) {
           <select data-rap-target="${entry.key}" data-remote="${esc(rs.localId)}">
             ${targetOptions(api, entry.targets[rs.localId], { sepLabel: "Ingen av mina elever — håll isär" })}
           </select></label>
-        <span class="rap__sub">I ${esc(from)}s fil: "${esc(studentName(rs))}" · ${rs.notes.length} noteringar ·
+        <span class="rap__sub">I ${esc(genitive(from))} fil: "${esc(studentName(rs))}" · ${rs.notes.length} noteringar ·
           ${esc(REASON_TEXT[entry.reasons[rs.localId]] ?? "")}</span>
       </div>`;
   } else if (p.students.length === 0) {
@@ -502,7 +502,7 @@ function fileHtml(api, entry, ws) {
     match = `
       <div class="rap-match__wrap">
         <table class="rap-match">
-          <thead><tr><th>I ${esc(from)}s fil</th><th>Din elev</th><th>Förslag</th></tr></thead>
+          <thead><tr><th>I ${esc(genitive(from))} fil</th><th>Din elev</th><th>Förslag</th></tr></thead>
           <tbody>${p.students.map((rs) => `
             <tr>
               <td><strong>${esc(studentName(rs))}</strong> <span class="rap__sub">${rs.notes.length} not.</span></td>
@@ -540,6 +540,7 @@ async function buildMerged(api, ws) {
     const from = Math.min(...confirmed.map((f) => f.payload.period.from));
     const to = Math.max(...confirmed.map((f) => f.payload.period.to));
     const own = await ownPayload(api, { from, to, label: periodLabel({ from, to }) });
+    own.sources = own.sources.map((s) => ({ ...s, thisComputer: true }));
     sources.unshift({ key: "own", payload: own, targets: identityTargets(own) });
   }
   return mergeReports(sources, { locals: api.students });
@@ -658,7 +659,7 @@ function renderAnalysis(slot, api, st, merged) {
         <select data-rap-view>
           <option value="">Hela klassen (${merged.students.length} elever)</option>
           ${merged.students.map((s) => `<option value="${esc(s.key)}" ${s.key === ws.view ? "selected" : ""}>${esc(studentName(s))}${
-            s.fromFile ? ` (${esc(s.fromFile)}s fil)` : ""} — ${s.notes.length} not.</option>`).join("")}
+            s.fromFile ? ` (${esc(genitive(s.fromFile))} fil)` : ""} — ${s.notes.length} not.</option>`).join("")}
         </select>
       </label>
       <div class="rap__actions">
@@ -674,8 +675,8 @@ function renderAnalysis(slot, api, st, merged) {
           ${merged.students.map((s) => {
             const fu = s.notes.filter((n) => n.followUp).length;
             return `<li><button class="rap-student" data-rap-open="${esc(s.key)}">
-              <strong>${esc(studentName(s))}</strong>${s.fromFile ? ` <span class="rap__sub">(${esc(s.fromFile)}s fil)</span>` : ""}
-              <span class="rap__sub">${s.notes.length} noteringar${fu ? ` · <span class="rap-fu">${icon("flag")}${fu} uppföljning${fu === 1 ? "" : "ar"}</span>` : ""}</span>
+              <strong>${esc(studentName(s))}</strong>${s.fromFile ? ` <span class="rap__sub">(${esc(genitive(s.fromFile))} fil)</span>` : ""}
+              <span class="rap__sub">${s.notes.length} ${s.notes.length === 1 ? "notering" : "noteringar"}${fu ? ` · <span class="rap-fu">${icon("flag")}${fu} uppföljning${fu === 1 ? "" : "ar"}</span>` : ""}</span>
               <span class="rap-student__dots">${teacherDots(s)}</span>
             </button></li>`;
           }).join("")}

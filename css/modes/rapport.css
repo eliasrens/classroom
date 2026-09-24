@@ -190,7 +190,7 @@
 .rap-dialog__tip { font-size: var(--text-s); }
 .rap-dialog__hint { font-size: var(--text-s); color: var(--color-ink-soft); }
 .rap-dialog__actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-2); }
-.rap-dialog button[disabled] { opacity: 0.55; cursor: not-allowed; }
+.rap-dialog button[disabled] { opacity: 0.4; filter: saturate(0.2); cursor: not-allowed; }
 
 /* ============================================================
    RAPPORTDOKUMENTET (.rp-*) — samma markup på skärm och papper
@@ -222,6 +222,8 @@
 
 .rp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--space-3); }
 .rp-box { break-inside: avoid; }
+.rp-box--wide { grid-column: 1 / -1; }
+.rp-box--wide .rp-bars li { grid-template-columns: minmax(12rem, 45%) 1fr 2.2em; }
 .rp-list { margin: 0; padding-left: var(--space-4); font-size: var(--text-s); display: flex; flex-direction: column; gap: 2px; }
 .rp-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: var(--text-s); }
 .rp-bars li { display: grid; grid-template-columns: minmax(6rem, 42%) 1fr 2.2em; gap: var(--space-2); align-items: center; }

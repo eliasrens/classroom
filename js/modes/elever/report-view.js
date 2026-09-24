@@ -15,7 +15,7 @@ import { icon } from "../../lib/icons.js";
 import { escapeHtml, fmtDate, fmtTime } from "./shared.js";
 import { weekLabel, weekStartFromKey } from "../../lib/week.js";
 import {
-  analyzeNotes, classSummary, interventionLine, kindName, lessonName, periodLabel,
+  analyzeNotes, classSummary, interventionLine, kindName, lessonName, periodLabel, genitive,
 } from "./report-data.js";
 
 const esc = escapeHtml;
@@ -34,11 +34,11 @@ export function studentName(s) {
   return `${s.name}${s.tag ? ` ${s.tag}` : ""}`;
 }
 
-function bars(title, rows, sub = "") {
+function bars(title, rows, sub = "", { wide = false } = {}) {
   if (!rows.length || rows.every((r) => r.count === 0)) return "";
   const max = Math.max(1, ...rows.map((r) => r.count));
   return `
-    <section class="rp-box">
+    <section class="rp-box${wide ? " rp-box--wide" : ""}">
       <h4>${esc(title)}</h4>
       ${sub ? `<p class="rp-sub">${esc(sub)}</p>` : ""}
       <ul class="rp-bars">
@@ -99,7 +99,7 @@ export function renderStudentReport(student, merged, { className = "", now } = {
         <p class="rp-meta">${esc(className)} · ${esc(periodLabel(merged.period, now))}
           ${teachersHere.length ? ` · ${teachersHere.map(teacherTag).join(" ")}` : ""}</p>
         ${student.aliases.length > 1 ? `<p class="rp-sub">Sammanslagen från: ${student.aliases.map(esc).join(" · ")}</p>` : ""}
-        ${student.fromFile ? `<p class="rp-sub">Ingen av dina elever — visas som i ${esc(student.fromFile)}s fil.</p>` : ""}
+        ${student.fromFile ? `<p class="rp-sub">Ingen av dina elever — visas som i ${esc(genitive(student.fromFile))} fil.</p>` : ""}
       </header>
 
       <section class="rp-follow">
@@ -126,7 +126,7 @@ export function renderStudentReport(student, merged, { className = "", now } = {
         ${bars("Veckodag", a.byWeekday)}
         ${bars("Tid på dagen", a.byHour)}
         ${bars("När i lektionen", a.byMoment)}
-        ${bars("Per lektion", a.byLesson)}
+        ${bars("Per lektion", a.byLesson, "", { wide: true })}
       </div>
 
       <section class="rp-box rp-box--wide">
@@ -177,7 +177,9 @@ export function renderClassSummary(merged, { className = "", now } = {}) {
 export function renderSources(merged, { now } = {}) {
   if (!merged.sources.length) return "";
   return `<p class="rp-sources">Källor: ${merged.sources.map((s) =>
-    `${esc(s.teacherName ?? "?")} (${esc(s.className ?? "")}, ${esc(s.period?.label || periodLabel(s.period, now))}, exporterad ${esc(fmtDate(s.exportedAt))})`).join(" · ")}</p>`;
+    s.thisComputer
+      ? `${esc(s.teacherName ?? "?")} (egna noteringar från den här datorn)`
+      : `${esc(s.teacherName ?? "?")} (${esc(s.className ?? "")}, ${esc(s.period?.label || periodLabel(s.period, now))}, exporterad ${esc(fmtDate(s.exportedAt))})`).join(" · ")}</p>`;
 }
 
 /**
