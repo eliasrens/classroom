@@ -189,7 +189,7 @@ export function createDataLayer({ onSyncState } = {}) {
       const { [id]: _gone, ...rest } = docs;
       writeCollection(path, rest);
       notify(path);
-      enqueue({ op: "delete", path, id });
+      enqueue({ op: "delete", path, id, at: Date.now() }); // at: LWW mot servern
     },
 
     /** Alla lagrade samlings-paths under ett prefix (t.ex. "classes/4a/"). */
