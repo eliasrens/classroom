@@ -75,7 +75,7 @@ export function renderStudentReport(student, merged, { className = "", now } = {
 
   const tst = a.typeSubjectTeacher.map((row) => `
     <li><strong>${esc(row.typeName)}:</strong> ${row.parts.map((p) =>
-      `${p.count} i ${esc(p.subject)}${multi ? ` (${esc(p.teacherName)})` : ""}`).join(", ")}</li>`).join("");
+      `${p.count} ${p.subject === "Utanför lektion" ? "utanför lektion" : `i ${esc(p.subject)}`}${multi ? ` (${esc(p.teacherName)})` : ""}`).join(", ")}</li>`).join("");
 
   const weeks = a.weeks.length > 1 ? `
     <section class="rp-box rp-box--wide">
