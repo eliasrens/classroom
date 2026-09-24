@@ -19,6 +19,8 @@
 
 import { createTicker } from "../lib/timer.js";
 import { icon } from "../lib/icons.js";
+import { attribution } from "../data/plans.js";
+import { currentLessonBlock, teacherLabel, escapeHtml } from "./elever/shared.js";
 
 const CONFIG_ID = "trafikljus";       // settings/trafikljus  → { value: {yellowSec, redSec} }
 const STATE_ID = "trafikljusState";   // settings/trafikljusState → { value: {timer} }
@@ -259,11 +261,16 @@ export default {
         color === "green" && (before.recordSec == null || durationSec < before.recordSec);
       savedCurrent = true;
       drawControls();
+      // Attribution: vem loggade passet + snapshot av pågående block ur den
+      // inloggade lärarens planering (null om inget block pågår just nu).
+      const lesson = await currentLessonBlock(data, classId);
       await data.put(sessionsPath(classId), {
         type: "trafikljus",
         startedAt: timer.startedAt,
         endedAt: timer.pausedAt,
         result: { color, durationSec },
+        lesson,
+        ...attribution(),
       });
       // sessions-watch ritar om statistiken (med ev. rekordmarkering).
     }
@@ -329,6 +336,7 @@ export default {
                   ${dot(s.result.color)}
                   <span class="tl-pass-time">${fmtMMSS(s.result.durationSec * 1000)}</span>
                   <span class="tl-pass-date">${fmtDate(s.startedAt)}</span>
+                  <span class="tl-pass-teacher">${escapeHtml(teacherLabel(s))}</span>
                 </li>`,
               )
               .join("");

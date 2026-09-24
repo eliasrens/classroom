@@ -6,6 +6,8 @@
  * elevskärmsfönstret (som följer via storage-eventet, se app.js).
  */
 
+import { createClass } from "../data/classes.js";
+
 export const ACTIVE_CLASS_KEY = "classroom:activeClassId";
 
 const ADD_VALUE = "__add__";
@@ -33,7 +35,8 @@ export function initClassPicker({ el, store, data }) {
   async function addClass() {
     const name = prompt("Klassens namn (t.ex. 4A):")?.trim();
     if (!name) { render(); return; }
-    const id = await data.put("classes", { name });
+    // Dubblettsäkert: samma namn återanvänder befintlig klass (data/classes.js).
+    const id = await createClass(data, name);
     selectClass(id);
   }
 

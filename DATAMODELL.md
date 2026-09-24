@@ -8,6 +8,14 @@ så modellen gäller oavsett om Firebase är anslutet eller ej.
 ```
 classes/{classId}                       — en klass (4A, 4B, …)
   name: "4A"
+                     — {classId} är för nya klasser ett DETERMINISTISKT
+                       id härlett ur namnet ("4B" → "4b", se
+                       js/data/classes.js) så att två enheter som skapar
+                       samma klass oberoende av varandra skriver samma
+                       dokument — klasser kan aldrig dubbleras. Äldre
+                       klasser med UUID-id fortsätter gälla; skapande
+                       med ett namn som redan finns återanvänder alltid
+                       den befintliga klassen.
 
 classes/{classId}/students/{studentId}  — elev i klassen
   firstName          — ENDAST förnamn. Det finns AVSIKTLIGT inget
@@ -26,6 +34,13 @@ classes/{classId}/sessions/{sessionId}  — genomförda pass/resultat
   type: "trafikljus" | …
   startedAt, endedAt
   result: { … }      — passtypens egna data (t.ex. antal varningar)
+  lesson             — SNAPSHOT av pågående block ur den inloggade
+                       lärarens lessonPlans vid sparandet (samma format
+                       som noteringarnas): { date, start, end,
+                       subjectId, title } | null om inget block pågår
+  createdBy          — lärarens uid
+  createdByName      — lärarens visningsnamn ("Elias"); gamla dokument
+                       utan fältet visas som "okänd lärare"
 
 classes/{classId}/notes/{noteId}        — noteringar om elever (Läge 4)
   studentId
@@ -43,7 +58,9 @@ classes/{classId}/notes/{noteId}        — noteringar om elever (Läge 4)
   lesson             — SNAPSHOT av pågående block ur lessonPlans vid
                        skapandet: { date, start, end, subjectId, title } | null
                        (grund för mönstervyerna: moment/veckodag/tid/ämne)
-  createdBy          — lärarens uid/e-post
+  createdBy          — lärarens uid
+  createdByName      — lärarens visningsnamn ("Elias"); gamla dokument
+                       utan fältet visas som "okänd lärare"
   createdAt          — epoch ms; tillsammans med klass-kopplingen i pathen
                        gör tidsstämpeln central auto-radering (Läge 5) möjlig
 
@@ -68,8 +85,10 @@ classes/{classId}/settings/display      — namnvisning (togglas i lärarvyn)
                        fram ur förnamnet (js/lib/names.js), lagras ej
 
 teachers/{uid}                          — lärarprofil (se docs/AUTH.md)
-  email, displayName
-  classIds: ["…"]    — klasser läraren undervisar (för behörighetsregler)
+  email, displayName — skrivs/uppdateras automatiskt vid inloggning
+                       (js/auth.js); displayName härleds ur e-postens
+                       lokala del ("elias@…" → "Elias") och används för
+                       attribution (createdByName) på pass/noteringar
 
 teachers/{uid}/classes/{classId}/lessonPlans/{planId}
                      — lektionsplanering (Läge 2). PRIVAT per lärare:

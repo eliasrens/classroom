@@ -51,8 +51,12 @@ export function createDataLayer({ onSyncState } = {}) {
 
   function setSyncState(next) {
     if (next === syncState) return;
+    const wasOffline = syncState === "offline";
     syncState = next;
     onSyncState?.(next);
+    // Tillbaka online (t.ex. första server-snapshoten efter ett avbrott):
+    // töm outboxen direkt — vänta inte på nästa skrivning eller online-event.
+    if (next === "online" && wasOffline) void flush();
   }
 
   function notify(path) {
@@ -212,7 +216,9 @@ export function createDataLayer({ onSyncState } = {}) {
       onStatus: setSyncState,
     });
     void flush();
-    window.addEventListener("online", () => void flush());
+    // Nät tillbaka: ge SDK-laddningen en ny chans (den kan ha misslyckats
+    // vid kallstart offline) och töm sedan kön.
+    window.addEventListener("online", () => { sync.reset(); void flush(); });
   }
 
   // Live-uppdatering mellan flikar/fönster (lärarfönster ↔ elevskärm)

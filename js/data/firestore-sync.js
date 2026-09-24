@@ -91,5 +91,12 @@ export function createFirestoreSync({ firebaseConfig, onRemoteDocs, onStatus }) 
     else await api.setDoc(ref, op.doc, { merge: op.op === "patch" });
   }
 
-  return { start, watch, push, get connected() { return fs != null; } };
+  /** Nollställ "SDK:n gick inte att ladda" så nästa start() försöker igen
+   *  (anropas när webbläsaren kommer online igen — kallstart offline ska
+   *  inte låsa appen i lokalt läge för resten av sessionen). */
+  function reset() {
+    if (!fs) startFailed = false;
+  }
+
+  return { start, watch, push, reset, get connected() { return fs != null; } };
 }

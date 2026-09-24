@@ -11,7 +11,7 @@ import { icon } from "../../lib/icons.js";
 import { studentLabel } from "../../lib/names.js";
 import {
   notesPath, activeStudents, escapeHtml, noteTypeById,
-  createNote, fmtTime, fmtDateTime, todayISO,
+  createNote, fmtTime, fmtDateTime, todayISO, teacherLabel,
 } from "./shared.js";
 
 export function renderCard(el, api) {
@@ -226,6 +226,7 @@ function noteHtml(n, api) {
     <li class="ekort__note ${n.positive ? "ekort__note--pos" : ""} ${n.kind === "insats" ? "ekort__note--insats" : ""}">
       <div class="ekort__note-meta">
         <time>${fmtDateTime(n.createdAt)}</time>
+        <span class="ekort__note-teacher">${escapeHtml(teacherLabel(n))}</span>
         ${chipFor(n)}
         ${label ? `<span class="chip chip--label" style="--label-color:${escapeHtml(label.color)}">${escapeHtml(label.name)}</span>` : ""}
         ${n.followUp ? `<span class="chip chip--follow">${icon("flag")}Uppföljning</span>` : ""}
