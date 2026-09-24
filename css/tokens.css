@@ -113,7 +113,8 @@ html[data-theme="teacher"][data-scheme="light"] {
 /* ============ ELEVVY — projektor ============
    Samma formspråk, men: ljus, varm och bländfri botten, få element,
    stor text, hög kontrast — läsbar från bakre delen av klassrummet. */
-html[data-theme="student"] {
+html[data-theme="student"],
+.theme-student { /* .theme-student: elevtemat på en enskild yta, t.ex. förhandsvisningen i lärarvyn */
   color-scheme: light;
   --font-base: 22px;
   --density-pad: var(--space-4);

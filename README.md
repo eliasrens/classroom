@@ -58,8 +58,10 @@ js/
   lib/icons.js          linje-ikoner (inline-SVG) — inga emoji i gränssnittet
   lib/names.js          elevnamn: endast förnamn, valfri tag, initial-läge
   lib/privacy.js        integritet: auto-radering av noteringar + radera all klassdata
-  modes/                lägena + registret (oversikt.js = startvyn, statistik.js = veckoarkivet)
+  modes/                lägena + registret (oversikt.js = startvyn, statistik.js = veckoarkivet,
+                        vecka.js = Veckans övergångar — elevvänlig veckosammanfattning för mentorstiden)
   lib/week.js           veckologik (måndag 00:00) · lib/week-rhythm.js  rent varje måndag
+  lib/week-goal.js      trafikljusets veckomål · lib/week-recap.js  veckosammanfattningen (Veckans övergångar)
   ui/login.js           login-vy + elevskärmens väntevy
   ui/class-picker.js    klassval i topbaren
   ui/help.js            genvägslista under "?" · ui/shortcuts.js  globala tangentgenvägar

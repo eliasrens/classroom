@@ -1,0 +1,346 @@
+/* ============================================================
+   VECKANS ÖVERGÅNGAR (issue #36) — elevvänlig veckosammanfattning.
+
+   Scenen (.vk-stage) är en storleks-container: ALLA mått inuti räknas i
+   --u (1 % av scenens höjd, begränsat av bredden vid smalare format än
+   16:9). Därför ser förhandsvisningen i lärarvyn och helskärmen på
+   projektorn exakt likadana ut — bara större. Ryms en sida ändå inte
+   (många pass en dag) krymper fitStage() --vk-fit stegvis: inget scrollar.
+
+   Färgerna är trafikljusets fasfärger (--tl-*-bg, css/modes/trafikljus.css).
+   Tonen är lugn: inga röda ytor, röda pass är bara en prick bland andra.
+   ============================================================ */
+
+.vk { width: 100%; }
+
+/* ---- Scenen ---- */
+
+.vk-stage {
+  --vk-fit: 1;
+  --u: calc(min(1cqh, 0.5625cqw) * var(--vk-fit));
+  container-type: size;
+  position: relative;
+  overflow: hidden;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  text-align: center;
+}
+.vk-content {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: calc(var(--u) * 2);
+  padding: calc(var(--u) * 4) calc(var(--u) * 6) calc(var(--u) * 3);
+}
+
+.vk-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(var(--u) * 3);
+  border-bottom: 1px solid var(--color-line);
+  padding-bottom: calc(var(--u) * 1.5);
+  text-align: left;
+}
+.vk-title { margin: 0; font-size: calc(var(--u) * 5.6); font-weight: 700; letter-spacing: -0.01em; line-height: 1.1; }
+.vk-week { margin: 0; font-size: calc(var(--u) * 3.2); color: var(--color-ink-soft); white-space: nowrap; }
+
+.vk-body {
+  min-height: 0;
+  overflow: hidden; /* fitStage mäter scrollHeight — här scrollar ingenting */
+  display: flex;
+}
+.vk-page {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--u) * 2.5);
+}
+.vk-page p { margin: 0; }
+
+.vk-lead { font-size: calc(var(--u) * 5); font-weight: 600; line-height: 1.2; }
+.vk-sub { font-size: calc(var(--u) * 3.6); color: var(--color-ink-soft); }
+.vk-kicker { font-size: calc(var(--u) * 4.4); font-weight: 600; color: var(--color-ink-soft); text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* Prickar i fasfärg */
+.vk-dot {
+  display: inline-block;
+  flex: none;
+  width: calc(var(--u) * 2.8);
+  height: calc(var(--u) * 2.8);
+  border-radius: var(--radius-round);
+  background: var(--tl-green-bg);
+}
+.vk-dot[data-color="yellow"] { background: var(--tl-yellow-bg); }
+.vk-dot[data-color="red"]    { background: var(--tl-red-bg); }
+.vk-dot--big { width: calc(var(--u) * 7); height: calc(var(--u) * 7); }
+
+/* Sidprickar längst ner: var i genomgången klassen är */
+.vk-progress {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  gap: calc(var(--u) * 4);
+  font-size: calc(var(--u) * 2.3);
+  color: var(--color-ink-soft);
+}
+.vk-progress li { display: inline-flex; align-items: center; gap: calc(var(--u) * 1); opacity: 0.6; }
+.vk-progress li.is-on { opacity: 1; color: var(--color-ink); font-weight: 600; }
+.vk-progress__dot {
+  width: calc(var(--u) * 1.4);
+  height: calc(var(--u) * 1.4);
+  border-radius: var(--radius-round);
+  border: 2px solid currentColor;
+}
+.vk-progress li.is-on .vk-progress__dot { background: var(--color-accent); border-color: var(--color-accent); }
+
+/* ---- Sida 1: Översikt ---- */
+
+.vk-total { display: flex; align-items: baseline; gap: calc(var(--u) * 2.5); line-height: 1; }
+.vk-total__n { font-size: calc(var(--u) * 20); font-weight: 700; font-variant-numeric: tabular-nums; }
+.vk-total__l { font-size: calc(var(--u) * 6.5); font-weight: 600; }
+
+.vk-tiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: calc(var(--u) * 5);
+}
+.vk-tile {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+  padding: calc(var(--u) * 2) calc(var(--u) * 4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-l);
+  background: var(--color-surface);
+}
+.vk-tile__n { font-size: calc(var(--u) * 11); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.vk-tile__l { font-size: calc(var(--u) * 4); color: var(--color-ink-soft); }
+.vk-cheer { font-size: calc(var(--u) * 4.6); font-weight: 600; color: var(--color-accent-text); }
+
+/* ---- Sida 2: Dag för dag ---- */
+
+.vk-page--days { justify-content: center; }
+.vk-days {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.vk-day {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 3);
+  padding: calc(var(--u) * 1.4) 0;
+  border-bottom: 1px solid var(--color-line);
+  text-align: left;
+}
+.vk-day:last-child { border-bottom: 0; }
+.vk-day__name { flex: none; width: calc(var(--u) * 22); font-size: calc(var(--u) * 4.4); font-weight: 700; }
+.vk-day.is-empty .vk-day__name { color: var(--color-ink-soft); font-weight: 600; }
+.vk-day__passes { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 1.4) calc(var(--u) * 2); min-width: 0; }
+.vk-day__none { font-size: calc(var(--u) * 3.2); color: var(--color-ink-soft); }
+.vk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.2);
+  padding: calc(var(--u) * 0.8) calc(var(--u) * 2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-l);
+  background: var(--color-surface);
+  white-space: nowrap;
+}
+.vk-chip__time { font-size: calc(var(--u) * 4.2); font-weight: 700; font-variant-numeric: tabular-nums; }
+.vk-chip__lesson { font-size: calc(var(--u) * 2.8); color: var(--color-ink-soft); }
+
+/* ---- Sida 3: Snabbaste ---- */
+
+.vk-star { line-height: 0; color: #a88221; }
+.vk-star svg { width: calc(var(--u) * 15); height: calc(var(--u) * 15); fill: var(--tl-yellow-bg); }
+.vk-fast-time {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 3);
+  font-size: calc(var(--u) * 22);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.vk-fast-when { font-size: calc(var(--u) * 4.4); color: var(--color-ink-soft); }
+
+/* ---- Sida 4: Målet + trend ---- */
+
+.vk-page--goal { gap: calc(var(--u) * 3); }
+.vk-goal { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 2); }
+.vk-goal-line { font-size: calc(var(--u) * 4.8); font-weight: 600; font-variant-numeric: tabular-nums; }
+.vk-goal-line svg { color: var(--color-accent-text); }
+.vk-goal-from { font-size: 0.7em; font-weight: 400; color: var(--color-ink-soft); }
+.vk-goal-value { font-size: calc(var(--u) * 6); font-variant-numeric: tabular-nums; }
+.vk-goal-value strong { font-size: 1.5em; }
+.vk-goal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+  padding: calc(var(--u) * 1.6) calc(var(--u) * 5);
+  border-radius: var(--radius-l);
+  background: var(--tl-green-bg);
+  color: var(--tl-green-ink);
+  font-size: calc(var(--u) * 7.5);
+  font-weight: 700;
+}
+.vk-goal-badge svg { width: 1em; height: 1em; }
+.vk-goal-near { font-size: calc(var(--u) * 5.4); font-weight: 700; color: var(--color-accent-text); }
+
+.vk-trend { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 1); }
+.vk-trend__title { font-size: calc(var(--u) * 2.8); color: var(--color-ink-soft); }
+.vk-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: calc(var(--u) * 3);
+  height: calc(var(--u) * 20);
+}
+.vk-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--u) * 0.6);
+  height: 100%;
+  width: calc(var(--u) * 11);
+}
+.vk-bar__v { font-size: calc(var(--u) * 2.6); font-variant-numeric: tabular-nums; color: var(--color-ink-soft); }
+.vk-bar__track { flex: 1; width: 70%; display: flex; align-items: flex-end; }
+.vk-bar__fill {
+  width: 100%;
+  border-radius: var(--radius-s) var(--radius-s) 0 0;
+  background: var(--color-line);
+}
+.vk-bar__l { font-size: calc(var(--u) * 2.6); color: var(--color-ink-soft); }
+.vk-bar.is-current .vk-bar__fill { background: var(--color-accent); }
+.vk-bar.is-current .vk-bar__v,
+.vk-bar.is-current .vk-bar__l { color: var(--color-ink); font-weight: 700; }
+
+/* ---- Rörelse: mjukt sidbyte, klarat mål poppar, konfetti en gång ---- */
+
+.vk-content.is-entering .vk-body { animation: vk-in 380ms ease-out; }
+@keyframes vk-in { from { opacity: 0; transform: translateY(calc(var(--u) * 1.5)); } }
+
+.vk-stage[data-page="malet"] .vk-content.is-entering .vk-goal-badge { animation: vk-pop 600ms 250ms cubic-bezier(.2, 1.4, .4, 1) both; }
+@keyframes vk-pop { from { opacity: 0; transform: scale(0.6); } }
+
+.vk-confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.vk-confetti span {
+  position: absolute;
+  top: -4%;
+  width: calc(var(--u) * 1.1);
+  height: calc(var(--u) * 1.9);
+  border-radius: 2px;
+  animation-name: vk-fall;
+  animation-timing-function: cubic-bezier(.25, .6, .5, 1);
+  animation-fill-mode: forwards;
+}
+@keyframes vk-fall {
+  to { transform: translate(var(--d), 108cqh) rotate(var(--r)); opacity: 0.85; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vk-content.is-entering .vk-body,
+  .vk-stage .vk-content.is-entering .vk-goal-badge { animation: none; }
+  .vk-confetti { display: none; }
+}
+
+/* ---- Elevvy: scenen fyller skärmen ---- */
+
+.vk--student .vk-stage {
+  width: 100%;
+  height: calc(100dvh - 2 * var(--density-pad));
+}
+
+/* ---- Lärarvy: verktygsrad, förhandsvisning i 16:9, sidknappar ---- */
+
+.vk--teacher {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.vk-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+.vk-weeknav { display: flex; align-items: center; gap: var(--space-1); }
+.vk-weeklabel { min-width: 15rem; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+.vk-weeknav .btn:disabled { opacity: 0.4; cursor: default; }
+.vk-kinds { display: flex; align-items: center; gap: var(--space-1); }
+.vk-seg,
+.vk-pagebtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: calc(var(--space-1) + 2px) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  color: var(--color-ink-soft);
+  cursor: pointer;
+}
+.vk-seg:hover:not(:disabled),
+.vk-pagebtn:hover { color: var(--color-ink); background: var(--color-surface-alt); }
+.vk-seg[aria-pressed="true"],
+.vk-pagebtn[aria-current="step"] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-weight: 600;
+}
+.vk-seg:disabled { opacity: 0.4; cursor: default; }
+.vk-kind-note { font-size: var(--text-s); color: var(--color-ink-soft); margin-left: var(--space-1); }
+
+.vk-preview {
+  /* 16:9 som projektorn; aldrig högre än att sidknapparna syns under */
+  width: min(100%, calc((100dvh - var(--topbar-height) - 13rem) * 16 / 9));
+  min-width: min(100%, 480px);
+  aspect-ratio: 16 / 9;
+  margin: 0 auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-l);
+  overflow: hidden;
+}
+.vk-preview .vk-stage { width: 100%; height: 100%; }
+
+.vk-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+.vk-pager .btn:disabled { opacity: 0.4; cursor: default; }
+.vk-pagebtn__n {
+  font-size: var(--text-s);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+.vk-hint { margin: 0; text-align: center; font-size: var(--text-s); color: var(--color-ink-soft); }
+.vk-hint kbd {
+  font: inherit;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+}

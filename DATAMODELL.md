@@ -133,6 +133,16 @@ classes/{classId}/settings/trafikljusState — Läge 3:s live-tillstånd
                      — speglas till elevskärmen (även via sync-bussen);
                        kind styr gränserna och etiketten "Datorer"
 
+classes/{classId}/settings/vecka        — Veckans övergångar (issue #36): vad elevskärmen visar
+  value: { week: "2026-W39" | null,   — null = innevarande vecka (serverNow)
+           kind: "overgang" | "datorer",
+           page: 0–3 }                — Översikt, Dag för dag, Snabbaste, Målet
+                     — skrivs av lärarvyn vid bläddring (speglas även via
+                       sync-bussen `vecka:view`). Innehållet räknas fram ur
+                       sessions (js/lib/week-recap.js) — inga lärarnamn
+                       eller noteringar når elevskärmen.
+                       Test: node docs/test-week-recap.mjs
+
 classes/{classId}/settings/display      — namnvisning (togglas i lärarvyn)
   value: { nameDisplay: "first" | "initials" }
                      — "initials" = reservläget: initialer räknas

@@ -29,6 +29,21 @@ export function isPreviewWindow() {
   catch { return false; }
 }
 
+/** sessionStorage-nyckeln för enskärmsläget ("Helskärm här", js/ui/student-panel.js). */
+export const SINGLESCREEN_RETURN_KEY = "classroom:singlescreenReturn";
+
+/**
+ * Är detta fönster LÄRARENS eget fönster i enskärmsläge (elevvy i helskärm
+ * via "Helskärm här")? Då sitter läraren vid tangentbordet trots elevvyn,
+ * så ett läge får ta emot bläddertangenter där (t.ex. js/modes/vecka.js).
+ * Aldrig i förhandsvisningen eller ett separat elevfönster.
+ */
+export function isSingleScreenWindow() {
+  if (isPreviewWindow()) return false;
+  try { return sessionStorage.getItem(SINGLESCREEN_RETURN_KEY) != null; }
+  catch { return false; }
+}
+
 export function createSyncBus() {
   const busId = Math.random().toString(36).slice(2);
   const handlers = new Map(); // type → Set<cb>
