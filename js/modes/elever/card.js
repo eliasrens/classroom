@@ -11,7 +11,7 @@ import { icon } from "../../lib/icons.js";
 import { studentLabel } from "../../lib/names.js";
 import {
   notesPath, activeStudents, escapeHtml, noteTypeById,
-  createNote, fmtTime, fmtDateTime, todayISO, teacherLabel,
+  createNote, deleteNote, fmtTime, fmtDateTime, todayISO, teacherLabel,
 } from "./shared.js";
 import { startOfWeek } from "../../lib/week.js";
 import { serverNow } from "../../lib/clock.js";
@@ -156,7 +156,8 @@ export function renderCard(el, api) {
 
     const del = e.target.closest("[data-delnote]");
     if (del && confirm("Radera noteringen? Det går inte att ångra.")) {
-      void api.data.remove(path, del.dataset.delnote).then(() => api.refresh());
+      // Tar även bort noteringens anonyma streck i molnet (issue #32).
+      void deleteNote(api.data, api.cid, del.dataset.delnote).then(() => api.refresh());
     }
   });
   main.querySelector("[data-editnoteform]")?.addEventListener("submit", (e) => {

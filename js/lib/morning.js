@@ -9,11 +9,25 @@
  * Ingenting här rör DOM — bara ren datamodell och härledningar.
  */
 
-import { weekKey, weekStartFromKey, startOfWeek } from "./week.js";
+import { weekStartFromKey, startOfWeek } from "./week.js";
 import { serverNow } from "./clock.js";
 
 export const MORNING_KEY = "morningScreen";
 export const settingsPath = (classId) => `classes/${classId}/settings`;
+
+// Bra jobbat-listan är ELEVDATA och lagras BARA lokalt (issue #32):
+// classes/{cid}/praise, doc "board" = { praise, weekOf }. Pathen routas
+// av datalagret till js/data/local-only.js och når aldrig Firestore.
+// I minnet håller lägena kvar den sammanslagna formen (normalize nedan,
+// med praise/weekOf) — load/save/watch nedan delar upp och slår ihop.
+export const PRAISE_DOC = "board";
+export const praisePath = (classId) => `classes/${classId}/praise`;
+
+/** Dela upp ett normaliserat värde i delat (moln) och lokalt (praise). */
+export function splitMorning(settings) {
+  const { praise, weekOf, ...shared } = normalize(settings);
+  return { shared, praise, weekOf };
+}
 
 export const WEEKDAYS = ["Måndag", "Tisdag", "Onsdag", "Torsdag", "Fredag"];
 
@@ -148,15 +162,51 @@ export function currentPraise(settings, now = serverNow()) {
 
 // ---- Läsning/skrivning mot datalagret ----
 
+/** Slå ihop det delade molnvärdet med den lokala Bra jobbat-listan. */
+function mergeMorning(cloudValue, board) {
+  return normalize({
+    ...(cloudValue && typeof cloudValue === "object" ? cloudValue : {}),
+    praise: board?.praise ?? [],
+    weekOf: board?.weekOf ?? null,
+  });
+}
+
 export async function loadMorning(data, classId) {
   if (!classId) return normalize(null);
-  const doc = await data.get(settingsPath(classId), MORNING_KEY);
-  return normalize(doc?.value);
+  const [doc, board] = await Promise.all([
+    data.get(settingsPath(classId), MORNING_KEY),
+    data.get(praisePath(classId), PRAISE_DOC),
+  ]);
+  return mergeMorning(doc?.value, board);
 }
 
 export async function saveMorning(data, classId, settings) {
   if (!classId) return; // ingen klass vald — ändringar blir efemära
-  await data.put(settingsPath(classId), { id: MORNING_KEY, value: settings });
+  const { shared, praise, weekOf } = splitMorning(settings);
+  await Promise.all([
+    data.put(settingsPath(classId), { id: MORNING_KEY, value: shared }),
+    data.put(praisePath(classId), { id: PRAISE_DOC, praise, weekOf }),
+  ]);
+}
+
+/**
+ * Lyssna på morgonskärmens SAMMANSLAGNA tillstånd: det delade dokumentet
+ * (moln) + den lokala Bra jobbat-listan. cb(normaliserat värde) vid varje
+ * ändring från någon av källorna. Returnerar unsubscribe.
+ */
+export function watchMorning(data, classId, cb) {
+  let cloud = null;
+  let board = null;
+  const emit = () => cb(mergeMorning(cloud, board));
+  const offSettings = data.watch(settingsPath(classId), (docs) => {
+    cloud = docs.find((d) => d.id === MORNING_KEY)?.value ?? null;
+    emit();
+  });
+  const offBoard = data.watch(praisePath(classId), (docs) => {
+    board = docs.find((d) => d.id === PRAISE_DOC) ?? null;
+    emit();
+  });
+  return () => { offSettings(); offBoard(); };
 }
 
 /**
@@ -169,10 +219,11 @@ export async function saveMorning(data, classId, settings) {
 export async function saveBackground(data, classId, url) {
   if (!classId) return;
   await data.once(settingsPath(classId), MORNING_KEY, (doc) => {
-    const value = normalize(doc?.value);
-    if (doc && value.background.current === url) return null;
-    value.background.current = url;
-    value.weekOf ??= weekKey();
-    return [{ path: settingsPath(classId), doc: { ...(doc ?? {}), id: MORNING_KEY, value } }];
+    // Delade dokumentet får ALDRIG innehålla praise/weekOf (issue #32) —
+    // strippa även om ett äldre moln-dokument råkar ha fälten kvar.
+    const { shared } = splitMorning(doc?.value);
+    if (doc && shared.background.current === url) return null;
+    shared.background.current = url;
+    return [{ path: settingsPath(classId), doc: { ...(doc ?? {}), id: MORNING_KEY, value: shared } }];
   }, { allowLocal: true });
 }

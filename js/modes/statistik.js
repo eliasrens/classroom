@@ -1,20 +1,22 @@
 /**
- * STATISTIK — veckoarkivet (issue #29). ENDAST LÄRARVY.
+ * STATISTIK — veckoarkivet (issue #29, GDPR-delat i issue #32).
+ * ENDAST LÄRARVY.
  *
  * Veckorytmen gör de andra vyerna rena varje måndag (de filtrerar på
  * innevarande vecka). Här finns alla veckor: välj "Denna vecka" eller en
  * tidigare vecka och se
  *   - trafikljuspass per typ (övergång / datorer) med lärare och lektion,
- *     veckoresultat (snitt, bästa, total), om veckomålet nåddes och en
- *     trendrad över de senaste veckorna (issue #35, js/lib/week-goal.js),
- *   - noteringar och elevstatistik per elev (alfabetiskt — aldrig rangordnat),
- *   - veckans Bra jobbat (ögonblicksbilden i praiseArchive, se week-rhythm.js).
- * Filter per lärare: Alla, Mina eller en viss lärare. Allt är delat mellan
- * lärarna — samma data (Firestore) och därmed samma arkiv för alla.
- *
- * Prestanda: samlingarna speglas redan lokalt av datalagret (en lyssnare
- * per samling och session); veckan filtreras på klienten. Ingenting här
- * läser om hela samlingen från servern.
+ *     veckoresultat, veckomål och trend (issue #35, js/lib/week-goal.js),
+ *   - KLASSENS noteringsstatistik per lektion, dag och lärare — ur de
+ *     ANONYMA molnstrecken (classes/{cid}/noteStats): antal per typ,
+ *     positiva, anteckningar, insatser. Inga elevnamn, inga texter —
+ *     det är allt som finns i molnet (issue #32). Delas mellan lärarna:
+ *     Elias ser hur det gick på Catalins lektion.
+ *   - noteringar PER ELEV — enbart den här datorns LOKALA noteringar
+ *     (tydligt märkta "Endast den här datorn"),
+ *   - veckans Bra jobbat (lokal lista + lokalt arkiv, se week-rhythm.js).
+ * Filter per lärare: Alla, Mina eller en viss lärare. CSV-export och
+ * utskrift av klasstatistiken innehåller aldrig elevdata.
  *
  * INTEGRITETSSPÄRR: står inte i STUDENT_MODE_IDS, så routern monterar det
  * aldrig på elevskärmen — och skulle det ändå ske renderas en neutral
@@ -31,9 +33,9 @@ import {
 } from "../lib/trafikljus-stats.js";
 import { teacherOptions, teacherFilterFn, validTeacherFilter } from "../lib/teacher-filter.js";
 import { GOAL_METRICS, normalizeGoalSettings, weekGoalStatus, goalTrend, fmtSec } from "../lib/week-goal.js";
-import { MORNING_KEY, normalize as normalizeMorning, currentPraise } from "../lib/morning.js";
+import { PRAISE_DOC, praisePath, normalize as normalizeMorning, currentPraise } from "../lib/morning.js";
 import { praiseArchivePath } from "../lib/week-rhythm.js";
-import { escapeHtml, noteTypeById, teacherLabel } from "./elever/shared.js";
+import { escapeHtml, noteTypeById, teacherLabel, noteStatsPath, NOTE_TYPES } from "./elever/shared.js";
 
 const PASS_PAGE = 10; // pass per typ innan "Visa alla"
 
@@ -70,14 +72,16 @@ export default {
 
     const { data } = ctx;
     const cid = ctx.activeClass.id;
+    const className = ctx.activeClass.name ?? cid;
     let sessions = [];
-    let notes = [];
+    let noteStats = [];  // ANONYMA molnstreck — klassens delade statistik
+    let notes = [];      // LOKALA noteringar (bara den här datorn)
     let students = [];
     let archive = [];
     let settingsDocs = [];
     let subjects = mergedSubjects([]);
     let initials = false;
-    let morning = normalizeMorning(null);
+    let morning = normalizeMorning(null); // praise/weekOf ur den LOKALA listan
     let goalCfg = normalizeGoalSettings(null);
 
     el.innerHTML = `<div class="stat"></div>`;
@@ -98,7 +102,7 @@ export default {
       const counts = new Map([[cur, 0], [selected, 0]]);
       const bump = (ws, n = 1) => { if (ws != null && ws <= cur) counts.set(ws, (counts.get(ws) ?? 0) + n); };
       for (const s of trafikljus()) bump(startOfWeek(sessionTime(s)));
-      for (const n of notes) if (n.createdAt) bump(startOfWeek(n.createdAt));
+      for (const s of noteStats) if (s.createdAt) bump(startOfWeek(s.createdAt));
       for (const a of archive) bump(weekStartFromKey(a.weekOf ?? a.id), 0);
       return [...counts].sort((a, b) => b[0] - a[0]);
     }
@@ -121,22 +125,30 @@ export default {
 
     // ---- Rendering ----
 
+    /** Klassens anonyma streck i vald vecka (ev. lärarfiltrerade). */
+    const statsInWeek = (ws, filter) => noteStats
+      .filter((n) => inWeek(n.createdAt ?? 0, ws) && (!filter || filter(n)))
+      .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+
     function render() {
       const cur = currentWeek();
       const ws = selectedWeek();
       const weeks = weekIndex(ws);
       const oldest = weeks[weeks.length - 1][0];
-      const others = teacherOptions([...trafikljus(), ...notes]);
+      const others = teacherOptions([...trafikljus(), ...noteStats]);
       ui.teacher = validTeacherFilter(ui.teacher, others);
       const filter = teacherFilterFn(ui.teacher);
 
+      // KLASSENS delade statistik: anonyma streck ur molnet (issue #32).
+      const weekStats = statsInWeek(ws, filter);
+      // Den här datorns LOKALA noteringar — enda källan till per-elev.
       const weekNotes = notes
         .filter((n) => inWeek(n.createdAt ?? 0, ws) && (!filter || filter(n)))
         .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
       const stats = Object.fromEntries(KIND_KEYS.map((k) => [k, computeStats(sessions, k, { weekStart: ws, filter })]));
       const praise = praiseFor(ws).map(praiseName).filter(Boolean);
 
-      const typ = weekNotes.filter((n) => n.kind === "typ");
+      const typ = weekStats.filter((n) => (n.kind ?? "typ") === "typ");
       const neg = typ.filter((n) => !n.positive).length;
       const passTotal = KIND_KEYS.reduce((sum, k) => sum + stats[k].weekTotal, 0);
 
@@ -166,14 +178,18 @@ export default {
               ${teacherOpt("mine", "Mina")}
               ${others.map((o) => teacherOpt(o.value, o.name)).join("")}
             </select>
+            <button type="button" class="btn" data-csv data-focus="csv"
+              title="Klasstatistik för veckan som CSV — utan elevdata">${icon("download")} CSV</button>
+            <button type="button" class="btn" data-print data-focus="print"
+              title="Skriv ut klasstatistiken — utan elevdata">${icon("printer")} Skriv ut</button>
           </div>
         </header>
 
-        <ul class="stat-tiles" aria-label="Veckan i siffror">
+        <ul class="stat-tiles" aria-label="Veckan i siffror (klassens delade statistik)">
           ${tile(neg, "noteringar")}
           ${tile(typ.length - neg, "positiva")}
-          ${tile(weekNotes.filter((n) => n.kind === "text").length, "anteckningar")}
-          ${tile(weekNotes.filter((n) => n.kind === "insats").length, "insatser")}
+          ${tile(weekStats.filter((n) => n.kind === "text").length, "anteckningar")}
+          ${tile(weekStats.filter((n) => n.kind === "insats").length, "insatser")}
           ${tile(passTotal, "trafikljuspass")}
           ${tile(praise.length, "Bra jobbat")}
         </ul>
@@ -183,20 +199,157 @@ export default {
           <div class="stat-kinds">${KIND_KEYS.map((k) => kindCard(k, stats[k], ws, cur)).join("")}</div>
         </section>
 
-        <section class="stat-section" aria-label="Noteringar per elev">
-          <h2 class="stat-h2">${icon("users")} Noteringar per elev</h2>
+        <section class="stat-section" aria-label="Per lektion">
+          <h2 class="stat-h2">${icon("calendar")} Per lektion</h2>
+          ${lessonSection(weekStats, ws, filter)}
+        </section>
+
+        <section class="stat-section stat-section--local" aria-label="Noteringar per elev">
+          <h2 class="stat-h2">${icon("users")} Noteringar per elev
+            <span class="chip stat-localonly" title="Elevdata lagras aldrig i molnet">Endast den här datorn</span></h2>
           ${studentTable(weekNotes)}
         </section>
 
-        <section class="stat-section" aria-label="Bra jobbat">
-          <h2 class="stat-h2">${icon("star")} Bra jobbat</h2>
+        <section class="stat-section stat-section--local" aria-label="Bra jobbat">
+          <h2 class="stat-h2">${icon("star")} Bra jobbat
+            <span class="chip stat-localonly" title="Elevdata lagras aldrig i molnet">Endast den här datorn</span></h2>
           <div class="card stat-card">
             ${praise.length === 0
               ? `<p class="stat-empty">Ingen på Bra jobbat-listan ${ws === cur ? "ännu den här veckan" : "den veckan"}.</p>`
               : `<ul class="stat-praise">${praise.map((n) => `<li>${escapeHtml(n)}</li>`).join("")}</ul>`}
-            <p class="stat-note">Listan är klassens gemensamma och påverkas inte av lärarfiltret.</p>
+            <p class="stat-note">Listan sparas bara på den här datorn och påverkas inte av lärarfiltret.</p>
           </div>
         </section>`;
+    }
+
+    // ---- Per lektion: klassens anonyma statistik (issue #32) ----
+
+    const dayISO = (ts) => {
+      const d = new Date(ts);
+      const p = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    };
+    const fmtDay = (iso) => {
+      const d = new Date(`${iso}T12:00:00`);
+      const s = d.toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "short" });
+      return s.charAt(0).toLocaleUpperCase("sv") + s.slice(1);
+    };
+
+    /** Gruppera streck + trafikljuspass per (dag, lektions-snapshot, lärare). */
+    function lessonGroups(weekStats, ws, filter) {
+      const groups = new Map();
+      const groupFor = (lesson, doc, ts) => {
+        const date = lesson?.date ?? dayISO(ts);
+        const key = [date, lesson?.start ?? "", lesson?.end ?? "", lesson?.subjectId ?? "",
+          lesson?.title ?? "", doc.createdBy ?? ""].join("|");
+        if (!groups.has(key)) {
+          groups.set(key, { date, lesson: lesson ?? null, teacher: teacherLabel(doc), stats: [], passes: [], firstTs: ts });
+        }
+        const g = groups.get(key);
+        g.firstTs = Math.min(g.firstTs, ts);
+        return g;
+      };
+      for (const s of weekStats) groupFor(s.lesson, s, s.createdAt ?? 0).stats.push(s);
+      for (const p of trafikljus()) {
+        const ts = sessionTime(p);
+        if (!inWeek(ts, ws) || (filter && !filter(p))) continue;
+        groupFor(p.lesson, p, ts).passes.push(p);
+      }
+      return [...groups.values()].sort((a, b) =>
+        a.date.localeCompare(b.date) ||
+        (a.lesson?.start ?? "").localeCompare(b.lesson?.start ?? "") ||
+        a.firstTs - b.firstTs);
+    }
+
+    /** "20 prat · 3 ur stol · 5 positiva · 2 anteckningar · 1 insats" */
+    function countsLabel(stats) {
+      const parts = [];
+      for (const t of NOTE_TYPES) {
+        if (t.positive) continue;
+        const n = stats.filter((s) => (s.kind ?? "typ") === "typ" && !s.positive && (s.typeId ?? "annat") === t.id).length;
+        if (n) parts.push(`${n} ${t.name.toLocaleLowerCase("sv")}`);
+      }
+      const pos = stats.filter((s) => s.positive).length;
+      if (pos) parts.push(`${pos} positiva`);
+      const text = stats.filter((s) => s.kind === "text").length;
+      if (text) parts.push(`${text} ${text === 1 ? "anteckning" : "anteckningar"}`);
+      const insats = stats.filter((s) => s.kind === "insats").length;
+      if (insats) parts.push(`${insats} ${insats === 1 ? "insats" : "insatser"}`);
+      return parts.join(" · ");
+    }
+
+    function lessonSection(weekStats, ws, filter) {
+      const groups = lessonGroups(weekStats, ws, filter);
+      if (groups.length === 0) {
+        return `<div class="card stat-card"><p class="stat-empty">Ingen klasstatistik den här veckan${ui.teacher !== "all" ? " för det här urvalet" : ""}.</p></div>`;
+      }
+      const dot = (c) => `<span class="tl-dot" data-phase="${c}"></span>`;
+      const byDay = new Map();
+      for (const g of groups) {
+        if (!byDay.has(g.date)) byDay.set(g.date, []);
+        byDay.get(g.date).push(g);
+      }
+      return `<div class="card stat-card">
+        ${[...byDay].map(([date, list]) => `
+          <h3 class="stat-day">${escapeHtml(fmtDay(date))}</h3>
+          <ul class="stat-lessons">
+            ${list.map((g) => {
+              const name = g.lesson
+                ? `${lessonLabel(g.lesson, subjects) || "Lektion"}${g.lesson.start ? ` ${g.lesson.start}${g.lesson.end ? `–${g.lesson.end}` : ""}` : ""}`
+                : "Utanför lektion";
+              const counts = countsLabel(g.stats);
+              const passes = g.passes
+                .sort((a, b) => sessionTime(a) - sessionTime(b))
+                .map((p) => `${dot(p.result.color)} ${fmtMMSS(p.result.durationSec * 1000)}`)
+                .join(" · ");
+              return `<li class="stat-lesson">
+                <span class="stat-lesson__head"><strong>${escapeHtml(name)}</strong>
+                  <span class="stat-lesson__teacher">(${escapeHtml(g.teacher)})</span></span>
+                <span class="stat-lesson__counts">${counts ? escapeHtml(counts) : `<span class="stat-zero">inga noteringar</span>`}${passes ? `${counts ? " · " : ""}trafikljus ${passes}` : ""}</span>
+              </li>`;
+            }).join("")}
+          </ul>`).join("")}
+        <p class="stat-note">Klassens delade statistik — anonyma räkningar utan elevnamn och utan texter.</p>
+      </div>`;
+    }
+
+    // ---- CSV-export & utskrift av KLASSTATISTIKEN (aldrig elevdata) ----
+
+    function exportCsv() {
+      const ws = selectedWeek();
+      const filter = teacherFilterFn(ui.teacher);
+      const groups = lessonGroups(statsInWeek(ws, filter), ws, filter);
+      const negTypes = NOTE_TYPES.filter((t) => !t.positive);
+      const header = ["vecka", "datum", "start", "slut", "lektion", "larare",
+        ...negTypes.map((t) => t.name.toLocaleLowerCase("sv")),
+        "positiva", "anteckningar", "insatser",
+        "trafikljuspass", "grona", "gula", "roda", "basta_sek"];
+      const rows = [header];
+      for (const g of groups) {
+        const count = (fn) => g.stats.filter(fn).length;
+        const green = g.passes.filter((p) => p.result.color === "green");
+        rows.push([
+          weekKey(ws), g.date, g.lesson?.start ?? "", g.lesson?.end ?? "",
+          g.lesson ? (lessonLabel(g.lesson, subjects) || "") : "utanfor lektion", g.teacher,
+          ...negTypes.map((t) => count((s) => (s.kind ?? "typ") === "typ" && !s.positive && (s.typeId ?? "annat") === t.id)),
+          count((s) => s.positive), count((s) => s.kind === "text"), count((s) => s.kind === "insats"),
+          g.passes.length, green.length,
+          g.passes.filter((p) => p.result.color === "yellow").length,
+          g.passes.filter((p) => p.result.color === "red").length,
+          green.length ? Math.min(...green.map((p) => p.result.durationSec)) : "",
+        ]);
+      }
+      const cell = (v) => {
+        const s = String(v ?? "");
+        return /[";\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+      };
+      const csv = rows.map((r) => r.map(cell).join(";")).join("\r\n");
+      const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `klasstatistik-${className}-${weekKey(ws)}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
     }
 
     const tile = (n, label) =>
@@ -331,6 +484,8 @@ export default {
             </tbody>
           </table>
           ${without > 0 ? `<p class="stat-note">${without} ${without === 1 ? "elev" : "elever"} utan noteringar den här veckan.</p>` : ""}
+          <p class="stat-note">Elevnoteringar sparas bara på den här datorn — andra lärares noteringar syns
+            som anonyma räkningar under Per lektion. Det som ska sparas långsiktigt dokumenteras i skolans system.</p>
         </div>`;
     }
 
@@ -398,7 +553,12 @@ export default {
         const k = more.dataset.allPasses;
         if (ui.allPasses.has(k)) ui.allPasses.delete(k); else ui.allPasses.add(k);
         scheduleRender();
+        return;
       }
+      if (e.target.closest("[data-csv]")) { exportCsv(); return; }
+      // Utskriften gäller KLASSTATISTIKEN: sektionerna med elevdata
+      // (per elev, Bra jobbat) döljs vid print via .stat-section--local.
+      if (e.target.closest("[data-print]")) window.print();
     });
     root.addEventListener("change", (e) => {
       if (e.target.matches("[data-week]")) {
@@ -415,15 +575,22 @@ export default {
 
     // ---- Datakällor (live, delade mellan lärarna) ----
 
+    // Delat (moln): pass + anonyma streck. Lokalt (bara den här datorn):
+    // noteringar, elever, Bra jobbat-listan och dess arkiv.
     offs.push(data.watch(`classes/${cid}/sessions`, (docs) => { sessions = docs; scheduleRender(); }));
+    offs.push(data.watch(noteStatsPath(cid), (docs) => { noteStats = docs; scheduleRender(); }));
     offs.push(data.watch(`classes/${cid}/notes`, (docs) => { notes = docs; scheduleRender(); }));
     offs.push(data.watch(`classes/${cid}/students`, (docs) => { students = docs; scheduleRender(); }));
     offs.push(data.watch(praiseArchivePath(cid), (docs) => { archive = docs; scheduleRender(); }));
+    offs.push(data.watch(praisePath(cid), (docs) => {
+      const board = docs.find((d) => d.id === PRAISE_DOC);
+      morning = normalizeMorning({ praise: board?.praise, weekOf: board?.weekOf });
+      scheduleRender();
+    }));
     offs.push(data.watch(`classes/${cid}/settings`, (docs) => {
       settingsDocs = docs;
       subjects = mergedSubjects(settingsDocs);
       initials = docs.find((d) => d.id === "display")?.value?.nameDisplay === "initials";
-      morning = normalizeMorning(docs.find((d) => d.id === MORNING_KEY)?.value);
       goalCfg = normalizeGoalSettings(docs.find((d) => d.id === "trafikljus")?.value);
       scheduleRender();
     }));

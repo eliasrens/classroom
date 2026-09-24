@@ -38,9 +38,25 @@
  */
 
 import { firebaseConfig, isFirebaseConfigured } from "../firebase-config.js";
-import { readCollection, writeCollection, pathFromStorageKey, collectionPathsUnder } from "./local.js";
+import { readCollection as readSynced, writeCollection as writeSynced, pathFromStorageKey, collectionPathsUnder } from "./local.js";
+import {
+  isLocalOnlyPath, readLocalCollection, writeLocalCollection,
+  localPathFromStorageKey, localCollectionPathsUnder,
+} from "./local-only.js";
+import { migrateStudentDataToLocal } from "./migrate-local.js";
 import { createFirestoreSync } from "./firestore-sync.js";
 import { serverNow, remoteWins } from "../lib/clock.js";
+
+// ---- ENDAST LOKALT (issue #32) ----
+// Elevdata (students, notes, praise, praiseArchive, privacy under en
+// klass) lagras BARA lokalt (js/data/local-only.js) och går ALDRIG via
+// outboxen eller Firestore. Datalagret routar per path: samma API för
+// lägena, men skrivningar till lokala paths köas inte och molnadaptern
+// ser dem aldrig.
+const readCollection = (path) =>
+  isLocalOnlyPath(path) ? readLocalCollection(path) : readSynced(path);
+const writeCollection = (path, docs) =>
+  isLocalOnlyPath(path) ? writeLocalCollection(path, docs) : writeSynced(path, docs);
 
 const OUTBOX_PREFIX = "classroom:outbox:";      // en nyckel per op
 const OUTBOX_KEY = "classroom:outbox";          // gammal array-kö (före #30), töms bara
@@ -53,6 +69,13 @@ const RETRY_MAX_MS = 30000;
 
 // createSync: bara för tester (docs/test-outbox.mjs) — byt molnadaptern mot en attrapp.
 export function createDataLayer({ onSyncState, createSync = createFirestoreSync } = {}) {
+  // Elevdata → lokal lagring, INNAN någon Firestore-lyssnare kopplas
+  // (annars kunde en auktoritativ snapshot tömma cachen som migreringen
+  // ska kopiera ifrån). Se js/data/migrate-local.js.
+  try { migrateStudentDataToLocal(); } catch (err) {
+    console.warn("[data] migrering till lokal elevdata misslyckades:", err);
+  }
+
   const watchers = new Map(); // path → Set<cb>
   let syncState = "local";
   let sync = null;
@@ -140,6 +163,7 @@ export function createDataLayer({ onSyncState, createSync = createFirestoreSync 
   }
 
   function enqueue(op) {
+    if (isLocalOnlyPath(op.path)) return; // elevdata — lämnar ALDRIG datorn
     if (!isFirebaseConfigured()) return; // rent lokalt läge — ingen kö behövs
     const opId = newId();
     const key = `${OUTBOX_PREFIX}${String(Date.now()).padStart(15, "0")}:${String(opSeq++).padStart(8, "0")}:${opId}`;
@@ -263,6 +287,7 @@ export function createDataLayer({ onSyncState, createSync = createFirestoreSync 
   }
 
   function mergeRemote(path, remoteDocs, { authoritative = false } = {}) {
+    if (isLocalOnlyPath(path)) return; // fjärrdata får aldrig röra lokal elevdata
     const local = readCollection(path);
     const merged = { ...local };
     let changed = false;
@@ -347,9 +372,10 @@ export function createDataLayer({ onSyncState, createSync = createFirestoreSync 
       enqueue({ op: "delete", path, id, at: serverNow() }); // at: LWW mot servern
     },
 
-    /** Alla lagrade samlings-paths under ett prefix (t.ex. "classes/4a/"). */
+    /** Alla lagrade samlings-paths under ett prefix (t.ex. "classes/4a/") —
+     *  både synkade och endast lokala samlingar. */
     async collections(prefix) {
-      return collectionPathsUnder(prefix);
+      return [...new Set([...collectionPathsUnder(prefix), ...localCollectionPathsUnder(prefix)])];
     },
 
     /**
@@ -379,7 +405,7 @@ export function createDataLayer({ onSyncState, createSync = createFirestoreSync 
         return true;
       };
 
-      if (!isFirebaseConfigured()) return runLocal();
+      if (isLocalOnlyPath(path) || !isFirebaseConfigured()) return runLocal();
       if (sync && (await sync.start())) {
         try {
           const written = await sync.transact(path, id, (doc) => {
@@ -398,7 +424,7 @@ export function createDataLayer({ onSyncState, createSync = createFirestoreSync 
     watch(path, cb) {
       if (!watchers.has(path)) watchers.set(path, new Set());
       watchers.get(path).add(cb);
-      sync?.watch(path);
+      if (!isLocalOnlyPath(path)) sync?.watch(path);
       cb(Object.values(readCollection(path)));
       return () => watchers.get(path)?.delete(cb);
     },
@@ -419,9 +445,10 @@ export function createDataLayer({ onSyncState, createSync = createFirestoreSync 
     window.addEventListener("online", () => { sync.reset(); void flush(); });
   }
 
-  // Live-uppdatering mellan flikar/fönster (lärarfönster ↔ elevskärm)
+  // Live-uppdatering mellan flikar/fönster (lärarfönster ↔ elevskärm) —
+  // gäller både synkade samlingar och den endast lokala elevdatan.
   window.addEventListener("storage", (e) => {
-    const path = pathFromStorageKey(e.key);
+    const path = pathFromStorageKey(e.key) ?? localPathFromStorageKey(e.key);
     if (path && watchers.has(path)) notify(path);
   });
 

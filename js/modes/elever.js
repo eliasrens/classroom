@@ -18,7 +18,7 @@ import { studentLabel } from "../lib/names.js";
 import {
   studentsPath, notesPath, settingsPath,
   loadModeSettings, DEFAULT_SETTINGS,
-  createNote, noteTypeById, escapeHtml, activeStudents,
+  createNote, deleteNote, noteTypeById, escapeHtml, activeStudents,
 } from "./elever/shared.js";
 import { renderRegister } from "./elever/register.js";
 import { renderRoster } from "./elever/roster.js";
@@ -111,7 +111,7 @@ export default {
         while (api.undoStack.length > 0) {
           const id = api.undoStack.pop();
           if (api.notes.some((n) => n.id === id)) {
-            await data.remove(notesPath(cid), id);
+            await deleteNote(data, cid, id); // tar även bort molnstrecket
             api.toast("Senaste noteringen ångrad.");
             return;
           }

@@ -18,9 +18,10 @@ import { serverNow } from "../../lib/clock.js";
 
 // ---- Paths ----
 
-export const studentsPath = (cid) => `classes/${cid}/students`;
-export const notesPath = (cid) => `classes/${cid}/notes`;
-export const settingsPath = (cid) => `classes/${cid}/settings`;
+export const studentsPath = (cid) => `classes/${cid}/students`;   // ENDAST LOKALT (issue #32)
+export const notesPath = (cid) => `classes/${cid}/notes`;         // ENDAST LOKALT (issue #32)
+export const settingsPath = (cid) => `classes/${cid}/settings`;   // delat (moln)
+export const noteStatsPath = (cid) => `classes/${cid}/noteStats`; // delat (moln) — anonyma streck
 
 // ---- Noteringstyper (kind: "typ") ----
 // Fast, saklig uppsättning. "Positivt" har egen tangentväg (Shift+tangent)
@@ -118,6 +119,15 @@ export async function currentLessonBlock(data, cid) {
  * visningsnamn) och snapshot av pågående lektion. Läraren fyller
  * aldrig i tid eller lektion själv.
  *
+ * INTEGRITET (issue #32): själva noteringen (med studentId, text,
+ * followUp, helped, labelId) lagras BARA lokalt på den här datorn.
+ * Samtidigt skrivs ett ANONYMT "streck" till molnet
+ * (classes/{cid}/noteStats) med enbart typ, kind, positiv-flaggan,
+ * lärare och lektions-snapshot — ALDRIG något elevspecifikt. Strecket
+ * får det deterministiska id:t "note-{noteId}" så att kopplingen
+ * notering → streck finns implicit (och bara) lokalt, och så att en
+ * borttagen notering kan ta bort sitt streck.
+ *
  * kind: "typ" (kategoriserad snabbnotering) | "text" (fritext) | "insats"
  */
 export async function createNote(data, cid, fields) {
@@ -135,7 +145,28 @@ export async function createNote(data, cid, fields) {
     ...fields,
   };
   const id = await data.put(notesPath(cid), doc);
+  await data.put(noteStatsPath(cid), noteStatFor(id, doc));
   return id;
+}
+
+/** Det anonyma molnstrecket för en notering. Innehåller ALDRIG
+ *  studentId, text, labelId, followUp eller helped. */
+export function noteStatFor(noteId, note) {
+  return {
+    id: `note-${noteId}`,
+    kind: note.kind ?? "typ",
+    typeId: note.typeId ?? null,
+    positive: Boolean(note.positive),
+    lesson: note.lesson ?? null,
+    createdBy: note.createdBy ?? null,
+    createdByName: note.createdByName ?? null,
+  };
+}
+
+/** Ta bort en notering OCH dess anonyma streck i molnet. */
+export async function deleteNote(data, cid, noteId) {
+  await data.remove(notesPath(cid), noteId);
+  await data.remove(noteStatsPath(cid), `note-${noteId}`);
 }
 
 /** Lärarnamn för visning ur ett pass/en notering — gamla dokument utan

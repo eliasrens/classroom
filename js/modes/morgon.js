@@ -15,7 +15,7 @@ import { studentLabel } from "../lib/names.js";
 import { createPraiseBoard } from "../ui/praise-board.js";
 import {
   WEEKDAYS, UNSPLASH_IDS, unsplashUrl,
-  normalize, loadMorning, saveMorning, saveBackground, settingsPath, MORNING_KEY,
+  normalize, loadMorning, saveMorning, saveBackground, watchMorning,
   studentTextFor, orderedTasks, greetingText, currentPraise, praiseIsStale,
 } from "../lib/morning.js";
 import { rolloverPraise } from "../lib/week-rhythm.js";
@@ -379,12 +379,10 @@ export default {
     const stops = [];
     this._stops = stops;
 
-    // Inställningarna (hälsning, uppgifter, namntavla, bakgrund)
+    // Inställningarna (hälsning, uppgifter, namntavla, bakgrund) + den
+    // LOKALA Bra jobbat-listan (issue #32) — sammanslagna av watchMorning.
     stops.push(classId
-      ? data.watch(settingsPath(classId), (docs) => {
-          const doc = docs.find((d) => d.id === MORNING_KEY);
-          applyExternal(doc?.value);
-        })
+      ? watchMorning(data, classId, (value) => applyExternal(value))
       : () => {});
 
     // Namnvisning (initialer) + elevlista (för namntavlan)
