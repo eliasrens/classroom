@@ -14,6 +14,7 @@ import {
   createNote, fmtTime, fmtDateTime, todayISO, teacherLabel,
 } from "./shared.js";
 import { startOfWeek } from "../../lib/week.js";
+import { serverNow } from "../../lib/clock.js";
 
 export function renderCard(el, api) {
   const students = activeStudents(api.students);
@@ -177,7 +178,7 @@ function cardHtml(student, api) {
   const older = all.filter((n) => (n.createdAt ?? 0) < weekStart);
   const notes = api._cardShowOlder ? all : all.filter((n) => (n.createdAt ?? 0) >= weekStart);
   const editing = api._cardEditingNote ?? null;
-  const from = api._cardFrom ?? todayISO(new Date(Date.now() - 28 * 864e5));
+  const from = api._cardFrom ?? todayISO(new Date(serverNow() - 28 * 864e5));
   const to = api._cardTo ?? todayISO();
 
   return `

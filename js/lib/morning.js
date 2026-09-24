@@ -10,6 +10,7 @@
  */
 
 import { weekKey, weekStartFromKey, startOfWeek } from "./week.js";
+import { serverNow } from "./clock.js";
 
 export const MORNING_KEY = "morningScreen";
 export const settingsPath = (classId) => `classes/${classId}/settings`;
@@ -18,7 +19,7 @@ export const WEEKDAYS = ["Måndag", "Tisdag", "Onsdag", "Torsdag", "Fredag"];
 
 /** Dagens veckodag (Mån–Fre); helg → Måndag. */
 export function todayWeekday() {
-  const d = new Date().getDay(); // 0 sön … 6 lör
+  const d = new Date(serverNow()).getDay(); // 0 sön … 6 lör
   return WEEKDAYS[Math.min(Math.max(d - 1, 0), 4)];
 }
 
@@ -125,16 +126,23 @@ export function greetingText(settings, activeClass) {
 /**
  * Hör listan till en TIDIGARE vecka (ännu ej tömd)? Då visas den inte —
  * vyn är ren från måndag 00:00 även innan tömningen hunnit sparas (t.ex.
- * offline). Saknad weekOf (äldre data) räknas som innevarande vecka; en
- * weekOf i framtiden (fel klocka på någon enhet) rörs inte.
+ * offline). Saknad weekOf (äldre data) räknas som innevarande vecka, och
+ * likaså en weekOf i framtiden (fel klocka på någon enhet, issue #31):
+ * den är ogiltig och rättas av veckorytmen (js/lib/week-rhythm.js).
  */
-export function praiseIsStale(settings, now = Date.now()) {
+export function praiseIsStale(settings, now = serverNow()) {
   const start = weekStartFromKey(settings?.weekOf);
   return start != null && start < startOfWeek(now);
 }
 
+/** Ligger listans weekOf i en FRAMTIDA vecka (skriven med fel klocka)? */
+export function praiseWeekInFuture(settings, now = serverNow()) {
+  const start = weekStartFromKey(settings?.weekOf);
+  return start != null && start > startOfWeek(now);
+}
+
 /** Bra jobbat-listan som ska VISAS nu (tom om den hör till förra veckan). */
-export function currentPraise(settings, now = Date.now()) {
+export function currentPraise(settings, now = serverNow()) {
   return praiseIsStale(settings, now) ? [] : (settings?.praise ?? []);
 }
 

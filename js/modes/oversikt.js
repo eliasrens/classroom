@@ -27,17 +27,18 @@ import { createClass } from "../data/classes.js";
 import { startOfWeek, inWeek, weekLabel, weekRangeLabel } from "../lib/week.js";
 import { KIND_KEYS, KINDS, computeStats } from "../lib/trafikljus-stats.js";
 import { MORNING_KEY, normalize as normalizeMorning, currentPraise } from "../lib/morning.js";
+import { serverNow } from "../lib/clock.js";
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-const todayISO = (d = new Date()) => {
+const todayISO = (d = new Date(serverNow())) => {
   const p = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 };
 
 /** Lugn hälsning efter tid på dygnet (saklig, ingen emoji). */
-function greeting(d = new Date()) {
+function greeting(d = new Date(serverNow())) {
   const h = d.getHours();
   if (h < 10) return "God morgon";
   if (h < 13) return "God förmiddag";
@@ -45,7 +46,7 @@ function greeting(d = new Date()) {
   return "God kväll";
 }
 
-const fmtLongDate = (d = new Date()) =>
+const fmtLongDate = (d = new Date(serverNow())) =>
   d.toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long" });
 
 /** Ämnesfärg (inbyggda + lärarens egna) för en planeringsprick. */

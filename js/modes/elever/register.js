@@ -14,8 +14,9 @@ import {
   createNote, currentLessonBlock, fmtTime,
 } from "./shared.js";
 import { startOfWeek } from "../../lib/week.js";
+import { serverNow } from "../../lib/clock.js";
 
-const startOfToday = () => new Date(new Date(Date.now()).setHours(0, 0, 0, 0)).getTime();
+const startOfToday = () => new Date(new Date(serverNow()).setHours(0, 0, 0, 0)).getTime();
 
 export function renderRegister(el, api) {
   const students = activeStudents(api.students);
@@ -106,7 +107,7 @@ export function renderRegister(el, api) {
   });
 
   el.querySelector("[data-reset]")?.addEventListener("click", () => {
-    void api.saveSettings({ sessionStart: Date.now() }).then(() => api.refresh());
+    void api.saveSettings({ sessionStart: serverNow() }).then(() => api.refresh());
   });
 
   el.querySelector(".reg__session")?.addEventListener("click", (e) => {

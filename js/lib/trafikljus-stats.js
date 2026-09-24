@@ -10,6 +10,7 @@
 
 import { SUBJECTS } from "./color.js";
 import { startOfWeek, inWeek } from "./week.js";
+import { serverNow } from "./clock.js";
 
 /** Passtyper. Gamla pass/config utan typ räknas som "overgang". */
 export const KINDS = {
@@ -33,7 +34,7 @@ export const sessionTime = (s) => s?.startedAt ?? s?.createdAt ?? 0;
  * Veckan är den som innehåller `now` — eller `weekStart` om den anges
  * (arkivet). `filter` (valfri) begränsar vidare, t.ex. till en lärare.
  */
-export function computeStats(sessions, kind = DEFAULT_KIND, { now = Date.now(), weekStart = startOfWeek(now), filter = null } = {}) {
+export function computeStats(sessions, kind = DEFAULT_KIND, { now = serverNow(), weekStart = startOfWeek(now), filter = null } = {}) {
   const week = sessions
     .filter((s) => s.type === "trafikljus" && s.result && sessionKind(s) === kindOf(kind) &&
       inWeek(sessionTime(s), weekStart) && (!filter || filter(s)))
@@ -64,7 +65,7 @@ export function fmtMMSS(ms) {
 }
 
 /** "tis 10:15" inom innevarande vecka, annars "tis 15 sep 10:15". */
-export function fmtWhen(ts, now = Date.now()) {
+export function fmtWhen(ts, now = serverNow()) {
   const d = new Date(ts);
   const day = d.toLocaleDateString("sv-SE", { weekday: "short" }).replace(/\.$/, "");
   const time = d.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });

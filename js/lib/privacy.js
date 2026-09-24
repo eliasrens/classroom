@@ -24,6 +24,7 @@
  */
 
 import { plansPath as plansPathFor } from "../data/plans.js";
+import { serverNow } from "./clock.js";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -65,7 +66,7 @@ export async function savePrivacy(data, cid, { noteRetentionWeeks }) {
  * antalet borttagna. weeks = null/0 → gör ingenting (spara tills vidare).
  * Idempotent och ofarlig att anropa ofta.
  */
-export async function purgeOldNotes(data, cid, weeks, now = Date.now()) {
+export async function purgeOldNotes(data, cid, weeks, now = serverNow()) {
   if (!cid || !Number.isFinite(weeks) || weeks <= 0) return 0;
   const cutoff = now - weeks * WEEK_MS;
   let removed = 0;
@@ -85,7 +86,7 @@ export async function purgeOldNotes(data, cid, weeks, now = Date.now()) {
 }
 
 /** Bekvämt: läs inställningen och kör raderingen i ett svep. */
-export async function runRetention(data, cid, now = Date.now()) {
+export async function runRetention(data, cid, now = serverNow()) {
   const { noteRetentionWeeks } = await loadPrivacy(data, cid);
   return purgeOldNotes(data, cid, noteRetentionWeeks, now);
 }

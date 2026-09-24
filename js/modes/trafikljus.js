@@ -29,6 +29,7 @@ import {
   computeStats, fmtMMSS, fmtWhen, lessonLabel, mergedSubjects,
 } from "../lib/trafikljus-stats.js";
 import { attribution } from "../data/plans.js";
+import { serverNow } from "../lib/clock.js";
 import { teacherOptions as sharedTeacherOptions, teacherFilterFn, validTeacherFilter } from "../lib/teacher-filter.js";
 import { currentLessonBlock, teacherLabel, escapeHtml } from "./elever/shared.js";
 
@@ -51,7 +52,7 @@ const PHASES = {
 // ---- Rena hjälpare (tidsstämpelbaserat, syncbart) ------------------------
 
 /** Millisekunder uppräknade sedan start (0 om null, fryser vid pausedAt). */
-function elapsedMs(t, now = Date.now()) {
+function elapsedMs(t, now = serverNow()) {
   if (!t) return 0;
   return Math.max(0, (t.pausedAt ?? now) - t.startedAt);
 }
@@ -146,7 +147,7 @@ export default {
     // -- Ritning (både vyer) -----------------------------------------------
 
     function drawTimer() {
-      const now = Date.now();
+      const now = serverNow();
       const sec = Math.floor(elapsedMs(timer, now) / 1000);
       const phase = phaseFor(sec, limits());
       clockEl.textContent = fmtMMSS(elapsedMs(timer, now));
@@ -256,7 +257,7 @@ export default {
 
     function start() {
       if (timer && timer.pausedAt == null) return; // redan igång
-      timer = { startedAt: Date.now(), pausedAt: null };
+      timer = { startedAt: serverNow(), pausedAt: null };
       savedCurrent = false;
       celebrateRecord = false;
       drawTimer();
@@ -266,7 +267,7 @@ export default {
 
     function stop() {
       if (!timer || timer.pausedAt != null) return;
-      timer = { ...timer, pausedAt: Date.now() };
+      timer = { ...timer, pausedAt: serverNow() };
       drawTimer();
       void pushState();
     }

@@ -24,6 +24,8 @@ export function initClassPicker({ el, store, data }) {
     select.innerHTML = "";
     if (classes.length === 0) {
       select.append(new Option("Ingen klass", ""));
+    } else if (!classId) {
+      select.append(new Option("Välj klass…", ""));
     }
     for (const c of [...classes].sort((a, b) => a.name.localeCompare(b.name, "sv"))) {
       select.append(new Option(c.name, c.id, false, c.id === classId));
@@ -53,8 +55,10 @@ export function initClassPicker({ el, store, data }) {
   data.watch("classes", (docs) => {
     classes = docs;
     const { classId } = store.get();
-    // Städa upp om vald klass försvunnit (t.ex. borttagen på annan enhet)
-    if (classId && !classes.some((c) => c.id === classId)) selectClass(classes[0]?.id ?? null);
+    // Vald klass försvunnen (t.ex. borttagen på annan enhet): gå till
+    // "Välj klass…" — ALDRIG tyst över till en annan riktig klass, där
+    // vyerna (veckorytm, autosparning) annars skulle börja skriva (#31).
+    if (classId && !classes.some((c) => c.id === classId)) selectClass(null);
     render();
   });
 

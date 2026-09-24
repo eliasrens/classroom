@@ -114,6 +114,18 @@ html[data-theme="student"] .teacher-only { display: none !important; }
 .sync-status[data-state="online"]::before  { background: var(--color-ok); }
 .sync-status[data-state="offline"]::before { background: var(--color-danger); }
 
+/* Datorns klocka avviker från servern (issue #31) — bara i topbaren,
+   som aldrig visas på elevskärmen. */
+.clock-warning {
+  font-size: var(--text-s);
+  color: var(--color-warn);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-round);
+  padding: 2px var(--space-2);
+  white-space: nowrap;
+}
+.clock-warning[hidden] { display: none; }
+
 /* ---- Vy-ytan ---- */
 
 .view {

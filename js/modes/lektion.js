@@ -35,6 +35,7 @@ import { plansPath as plansPathFor, currentUid } from "../data/plans.js";
 import { createPraiseBoard } from "../ui/praise-board.js";
 import { normalize as normalizeMorning, MORNING_KEY } from "../lib/morning.js";
 import { studentLabel } from "../lib/names.js";
+import { serverNow } from "../lib/clock.js";
 
 /* De nio av-/påslagbara delarna, i den ordning kryssrutorna visas.
    `slot` säger var i tavlan de bor; `list` = flerradsfält. */
@@ -61,7 +62,7 @@ const HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 const pad2 = (n) => String(n).padStart(2, "0");
 const isoLocal = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-const todayISO = () => isoLocal(new Date());
+const todayISO = () => isoLocal(new Date(serverNow()));
 function parseISO(s) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s ?? ""));
   return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;

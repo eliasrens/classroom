@@ -38,6 +38,7 @@
  */
 
 import { firebaseConfig, isFirebaseConfigured } from "./firebase-config.js";
+import { serverNow, clockCalibrated, onClockChange } from "./lib/clock.js";
 
 const SDK_BASE = "https://www.gstatic.com/firebasejs/10.12.2";
 
@@ -163,11 +164,15 @@ export function createAuth() {
         ]);
         const app = appMod.getApps().length ? appMod.getApp() : appMod.initializeApp(firebaseConfig);
         const db = fsApi.getFirestore(app);
-        await fsApi.setDoc(
-          fsApi.doc(db, "teachers", user.uid),
-          { email: user.email ?? null, displayName: name || null, updatedAt: Date.now() },
-          { merge: true },
-        );
+        // updatedAt med servertid: vänta (högst 20 s) på att datalagret mätt
+        // klockan — annars skrivs profilen utan updatedAt (issue #31).
+        const calibrated = clockCalibrated() || await new Promise((resolve) => {
+          const off = onClockChange(() => { off(); clearTimeout(t); resolve(true); });
+          const t = setTimeout(() => { off(); resolve(false); }, 20_000);
+        });
+        const profile = { email: user.email ?? null, displayName: name || null };
+        if (calibrated) profile.updatedAt = serverNow();
+        await fsApi.setDoc(fsApi.doc(db, "teachers", user.uid), profile, { merge: true });
       } catch (err) {
         console.warn("[auth] kunde inte spara lärarprofilen (försöker vid nästa inloggning):", err);
       }
