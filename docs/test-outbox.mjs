@@ -15,6 +15,11 @@
  * Fyra scenarier, fem varv vardera: med Web Locks, med localStorage-lease
  * (ingen Web Locks), med slumpade externa transaktionskonflikter
  * (retry-vägen) och med en outbox i det gamla array-formatet (före #30).
+ * Plus ett deterministiskt backoff-test (konflikter mellan lyckade pushar
+ * får inte dubbla väntan).
+ *
+ *   node docs/test-outbox.mjs backoff        — bara backoff-testet
+ *   node docs/test-outbox.mjs conflicts 1    — ett scenario, ett varv
  */
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -125,7 +130,8 @@ async function scenario(label, { locks, externalConflictRate = 0, legacy = false
   const logged = { warn: 0, error: 0 };
   console.warn = () => { logged.warn++; };
   console.error = () => { logged.error++; };
-  console.info = () => {};
+  const backoffs = [];
+  console.info = (msg) => { const m = /om (\d+) ms/.exec(String(msg)); if (m) backoffs.push(Number(m[1])); };
 
   const layers = [teacher, student];
   for (let i = 0; i < 20; i++) {
@@ -177,7 +183,59 @@ async function scenario(label, { locks, externalConflictRate = 0, legacy = false
   if (!externalConflictRate && logged.warn) problems.push(`${logged.warn} console.warn`);
 
   const ok = problems.length === 0;
-  console.log(`${ok ? "OK  " : "FAIL"} ${label} — ${cloud.stats.pushes} pushar, ${cloud.stats.external} externa konflikter`);
+  console.log(`${ok ? "OK  " : "FAIL"} ${label} — ${cloud.stats.pushes} pushar, ${cloud.stats.external} externa konflikter`
+    + (backoffs.length ? `, backoff max ${Math.max(...backoffs)} ms (summa ${backoffs.reduce((a, b) => a + b, 0)} ms)` : ""));
+  for (const p of problems) console.log("     ·", p);
+  return ok;
+}
+
+// ---- Deterministiskt: backoff vid konflikter ----
+//
+// Regression (flakigheten i "externa konflikter"): backoffen får bara växa
+// vid konflikter I RAD. Enstaka konflikter mellan lyckade pushar ska ge
+// RETRY_BASE_MS varje gång — tidigare dubblades väntan ändå (300 → 600 →
+// … → 30 000 ms) eftersom räknaren bara nollställdes när HELA kön tömts.
+// Molnet är skriptat (ingen slump): op 1, 3, 5 och 7 får en konflikt var,
+// op 8 får tre i rad.
+
+async function backoffScenario() {
+  setNavigator({ locks: fakeLocks() });
+  const conflictsLeft = new Map([["d1", 1], ["d3", 1], ["d5", 1], ["d7", 1], ["d8", 3]]);
+  const pushed = [];
+  const createSync = ({ onStatus }) => ({
+    async start() { onStatus?.("online"); return true; },
+    watch() {}, reset() {},
+    async push(op) {
+      const left = conflictsLeft.get(op.id) ?? 0;
+      if (left > 0) {
+        conflictsLeft.set(op.id, left - 1);
+        throw Object.assign(new Error("extern konflikt"), { code: "aborted" });
+      }
+      pushed.push(op.id);
+    },
+  });
+  const origInfo = console.info, origWarn = console.warn, origErr = console.error;
+  const backoffs = [], logged = { warn: 0, error: 0 };
+  console.info = (msg) => { const m = /om (\d+) ms/.exec(String(msg)); if (m) backoffs.push(Number(m[1])); };
+  console.warn = () => { logged.warn++; };
+  console.error = () => { logged.error++; };
+
+  const data = createDataLayer({ createSync });
+  // Köa allt synkront (utan await mellan) så att en och samma flush tömmer kön.
+  for (let i = 0; i <= 8; i++) void data.put("classes/4A/settings", { id: `d${i}`, n: i });
+
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline && outboxLeft()) await sleep(20);
+  console.info = origInfo; console.warn = origWarn; console.error = origErr;
+
+  const expected = [300, 300, 300, 300, 300, 600, 1200];
+  const problems = [];
+  if (outboxLeft()) problems.push(`outboxen har ${outboxLeft()} ops kvar`);
+  if (JSON.stringify(backoffs) !== JSON.stringify(expected)) problems.push(`backoff ${JSON.stringify(backoffs)}, väntat ${JSON.stringify(expected)}`);
+  if (new Set(pushed).size !== 9) problems.push(`pushade ${JSON.stringify(pushed)}`);
+  if (logged.error || logged.warn) problems.push(`${logged.error} console.error, ${logged.warn} console.warn`);
+  const ok = problems.length === 0;
+  console.log(`${ok ? "OK  " : "FAIL"} backoff (deterministisk) — ${JSON.stringify(backoffs)}`);
   for (const p of problems) console.log("     ·", p);
   return ok;
 }
@@ -191,6 +249,7 @@ const SCENARIOS = {
   legacy: ["gammal array-outbox", { locks: true, legacy: true }],
 };
 const only = process.argv[2];
+if (only === "backoff") process.exit((await backoffScenario()) ? 0 : 1);
 if (only) {
   const [label, opts] = SCENARIOS[only];
   process.exit((await scenario(`${label} #${process.argv[3]}`, opts)) ? 0 : 1);
@@ -198,7 +257,7 @@ if (only) {
 
 const { spawnSync } = await import("node:child_process");
 const { fileURLToPath } = await import("node:url");
-let allOk = true;
+let allOk = spawnSync(process.execPath, [fileURLToPath(import.meta.url), "backoff"], { stdio: "inherit" }).status === 0;
 for (let run = 1; run <= 5; run++) {
   for (const name of Object.keys(SCENARIOS)) {
     const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), name, String(run)], { stdio: "inherit" });

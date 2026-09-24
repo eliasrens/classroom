@@ -206,7 +206,8 @@ outboxen som `js/data/datalayer.js` tömmer mot Firestore. Semantik:
   Tidsstämplar och klocka nedan).
 - **Fel**: transaktionskonflikt (`failed-precondition`/`aborted`) ger
   retry med backoff (0,3 s → 30 s), op:en ligger kvar och synkstatusen
-  påverkas inte (loggas med `console.info`). Övriga fel = synkstatus
+  påverkas inte (loggas med `console.info`). Backoffen dubblas bara vid
+  konflikter i rad; varje lyckad push nollställer den. Övriga fel = synkstatus
   `offline`; kön försöker igen vid nästa skrivning, `online`-event eller
   när en server-snapshot kommer tillbaka.
 - Test: `node docs/test-outbox.mjs` (två fönster, 20 snabba skrivningar,
