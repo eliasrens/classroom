@@ -339,7 +339,10 @@ export default {
     }
 
     // ================= WATCHERS =================
+    // Registreras direkt (inte först i slutet av mount): kraschar eller
+    // hänger resten av mount städar unmount ändå bort det som hann starta.
     const stops = [];
+    this._stops = stops;
 
     // Inställningarna (hälsning, uppgifter, namntavla, bakgrund)
     stops.push(classId
@@ -381,8 +384,6 @@ export default {
     renderDisplay();
     showBackground(settings.background.current);
     if (isTeacher) { syncPanel(); }
-
-    this._stops = stops;
   },
 
   async unmount() {

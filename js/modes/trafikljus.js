@@ -139,6 +139,9 @@ export default {
     let celebrateRecord = false; // visa "Nytt rekord!" tills nästa start/återställ
 
     const unsubs = [];
+    // Städfunktionen sätts direkt: kraschar mount halvvägs stoppar
+    // unmount ändå ticker, watchers och tangentlyssnare som hann starta.
+    this._cleanup = () => { for (const u of unsubs.splice(0)) { try { u(); } catch { /* ok */ } } };
 
     // -- Markup -------------------------------------------------------------
 
@@ -188,7 +191,6 @@ export default {
       );
 
       unsubs.push(createTicker(drawTimer));
-      this._cleanup = () => { for (const u of unsubs) u(); };
       return;
     }
 
@@ -370,8 +372,6 @@ export default {
 
     // Allt (knappar, watchers) är nu på plats — starta ritsignalen.
     unsubs.push(createTicker(drawTimer));
-
-    this._cleanup = () => { for (const u of unsubs) u(); };
   },
 
   async unmount() {
