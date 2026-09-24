@@ -12,6 +12,7 @@
 
 import { icon } from "../lib/icons.js";
 import { studentLabel } from "../lib/names.js";
+import { createPraiseBoard } from "../ui/praise-board.js";
 import {
   WEEKDAYS, UNSPLASH_IDS, unsplashUrl,
   normalize, loadMorning, saveMorning, settingsPath, MORNING_KEY,
@@ -42,6 +43,28 @@ export default {
     const $ = (sel) => el.querySelector(sel);
     const stage = $(".morgon");
     const bgImg = $(".morgon__bgimg");
+
+    // "Bra jobbat"-tavlan: återanvändbar komponent som växer i kolumner.
+    // Centerytans högermarginal följer tavlans faktiska bredd (--nt-space).
+    const board = createPraiseBoard({
+      className: "morgon__nametavla praise-board--glass",
+      clearable: isTeacher,
+      onClear: () => clearNt(),
+      maxWidth: () => {
+        const panel = isTeacher && stage.querySelector('.morgon__panel[data-open="true"]');
+        const free = stage.clientWidth - (panel ? panel.offsetWidth : 0);
+        return Math.max(free * 0.36, 240);
+      },
+      onLayout: (w) => {
+        if (!w) { stage.style.removeProperty("--nt-space"); return; }
+        const right = parseFloat(getComputedStyle(board.el).right) || 0;
+        stage.style.setProperty("--nt-space", `${Math.ceil(w + right * 2)}px`);
+      },
+    });
+    board.el.hidden = true;
+    stage.append(board.el);
+    this._board = board;
+    let clearNt = () => {};
 
     // Skyddsnät: om vyn redan bytts ut (routern har rensat <main> medan
     // ett watch-callback ligger i kö) är .morgon inte längre i DOM:en —
@@ -91,14 +114,10 @@ export default {
 
     function renderNametavla() {
       if (!mounted()) return;
-      const nt = $(".morgon__nametavla");
-      nt.hidden = !settings.showNametavla;
       const names = settings.praise.map(praiseName).filter(Boolean);
-      $(".morgon__nt-names").innerHTML = names.length
-        ? names.map((n) => `<li>${escapeHtml(n)}</li>`).join("")
-        : `<li class="morgon__nt-empty">Kryssa i elever i panelen →</li>`;
       // Elevvyn ska aldrig visa "tom"-hjälptexten som en riktig rad.
-      if (!isTeacher && !names.length) nt.hidden = true;
+      board.el.hidden = !settings.showNametavla || (!isTeacher && !names.length);
+      board.setNames(names, { emptyText: isTeacher ? "Kryssa i elever i panelen →" : "" });
     }
 
     function renderDisplay() {
@@ -147,6 +166,7 @@ export default {
       applyOpen();
       toggle.addEventListener("click", () => {
         open = !open; applyOpen();
+        board.fit(); // tavlans maxbredd beror på panelen
         try { localStorage.setItem(PANEL_KEY, open ? "1" : "0"); } catch { /* ok */ }
       });
 
@@ -249,10 +269,9 @@ export default {
       };
       $(".morgon__ntfree-btn").addEventListener("click", addFree);
       ntFree.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addFree(); } });
-      const clearNt = () => { const next = clone(); next.praise = []; commit(next); };
+      clearNt = () => { const next = clone(); next.praise = []; commit(next); };
       $(".morgon__ntclear").addEventListener("click", clearNt);
-      // Töm-knapp på själva namntavlan (teacher-only, döljs i elevvyn)
-      $(".morgon__nt-clear").addEventListener("click", clearNt);
+      // Töm-knappen på själva namntavlan (teacher-only) går via onClear ovan.
 
       // ---- Bakgrund ----
       $(".morgon__bg-random").addEventListener("click", () => {
@@ -389,6 +408,8 @@ export default {
     for (const stop of this._stops ?? []) { try { stop(); } catch { /* ok */ } }
     this._stops = null;
     this._renderNtStudents = null;
+    this._board?.destroy();
+    this._board = null;
   },
 };
 
@@ -418,14 +439,6 @@ function renderShell(isTeacher) {
           <p class="morgon__tasks-empty" hidden>Kryssa i dagens uppgifter i panelen.</p>
         </div>
       </div>
-
-      <aside class="morgon__nametavla" hidden aria-label="Bra jobbat">
-        <header class="morgon__nt-head">
-          <h2 class="morgon__nt-title">⭐ Bra jobbat!</h2>
-          <button class="morgon__nt-clear teacher-only btn btn--ghost btn--icon" title="Töm namntavlan" aria-label="Töm namntavlan">${icon("trash")}</button>
-        </header>
-        <ul class="morgon__nt-names"></ul>
-      </aside>
     </div>`;
 }
 
