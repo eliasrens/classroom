@@ -1,5 +1,5 @@
 /**
- * LÄGESREGISTRET — de fem lägena i menyordning.
+ * LÄGESREGISTRET — lägena i menyordning (Statistik = veckoarkivet, issue #29).
  *
  * Varje läge är en modul i js/modes/ som default-exporterar ett
  * objekt enligt docs/MODULKONTRAKT.md. Registret är den enda plats
@@ -11,14 +11,15 @@ import lektion from "./lektion.js";
 import trafikljus from "./trafikljus.js";
 import elever from "./elever.js";
 import oversikt from "./oversikt.js";
+import statistik from "./statistik.js";
 
-export const MODES = [morgon, lektion, trafikljus, elever, oversikt];
+export const MODES = [morgon, lektion, trafikljus, elever, oversikt, statistik];
 
 export const DEFAULT_MODE_ID = MODES[0].id;
 
 /**
- * SPÄRR: de enda lägen som får renderas på elevskärmen. Elevlista och
- * Översikt (noteringar, lärarpaneler) får ALDRIG nå elevvyn — routern
+ * SPÄRR: de enda lägen som får renderas på elevskärmen. Elevlista,
+ * Översikt och Statistik (noteringar, lärarpaneler) får ALDRIG nå elevvyn — routern
  * vägrar montera dem där och elevskärmen följer aldrig med dit.
  */
 export const STUDENT_MODE_IDS = ["morgon", "lektion", "trafikljus"];

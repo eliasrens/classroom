@@ -2,7 +2,8 @@
  * LÄGE 5 — ÖVERSIKT / START. ENDAST LÄRARVY.
  *
  * Den lugna startvyn efter inloggning: välj klass, välj läge, se dagens
- * sparade lektionsplaneringar — en rofylld ingång till hela appen. Här
+ * sparade lektionsplaneringar — en rofylld ingång till hela appen, med
+ * veckans siffror (rena varje måndag, tidigare veckor i Statistik). Här
  * bor även de tvärgående integritetsinställningarna (Läge 5): namn­visning
  * (förnamn/initialer), auto-radering av noteringar och "radera all data
  * för klassen".
@@ -23,6 +24,9 @@ import {
 } from "../lib/privacy.js";
 import { plansPath as plansPathFor } from "../data/plans.js";
 import { createClass } from "../data/classes.js";
+import { startOfWeek, inWeek, weekLabel, weekRangeLabel } from "../lib/week.js";
+import { KIND_KEYS, KINDS, computeStats } from "../lib/trafikljus-stats.js";
+import { MORNING_KEY, normalize as normalizeMorning, currentPraise } from "../lib/morning.js";
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -76,6 +80,8 @@ export default {
     let settingsDocs = [];
     let initials = false;
     let retentionWeeks = null;
+    let notes = [];
+    let sessions = [];
     const activeId = () => store.get().classId ?? null;
 
     el.innerHTML = `<div class="oversikt"></div>`;
@@ -139,6 +145,33 @@ export default {
       alert(`Klart — ${n} poster raderade för "${cls.name}".`);
     }
 
+    // ---- Veckans siffror (veckorytm: bara innevarande vecka) ----
+    function weekSection(cls) {
+      if (!cls) return "";
+      const ws = startOfWeek();
+      const weekNotes = notes.filter((n) => inWeek(n.createdAt ?? 0, ws));
+      const typ = weekNotes.filter((n) => n.kind === "typ");
+      const neg = typ.filter((n) => !n.positive).length;
+      const praise = currentPraise(normalizeMorning(settingsDocs.find((d) => d.id === MORNING_KEY)?.value));
+      const tile = (n, label) =>
+        `<li class="stat-tile"><span class="stat-tile__n">${n}</span><span class="stat-tile__l">${esc(label)}</span></li>`;
+      return `
+        <section class="ov-section ov-week" aria-label="Den här veckan">
+          <h2 class="ov-section__title">${icon("chart")} Den här veckan · ${esc(weekLabel(ws))} · ${esc(weekRangeLabel(ws))}</h2>
+          <ul class="stat-tiles">
+            ${tile(neg, "noteringar")}
+            ${tile(typ.length - neg, "positiva")}
+            ${KIND_KEYS.map((k) => {
+              const { weekTotal, counts } = computeStats(sessions, k, { weekStart: ws });
+              return tile(weekTotal, `pass ${KINDS[k].label.toLowerCase()} (${counts.green} gröna)`);
+            }).join("")}
+            ${tile(praise.length, "Bra jobbat")}
+          </ul>
+          <p class="ov-week__foot">Siffrorna börjar om varje måndag.
+            <button class="ov-link" data-mode="statistik">Tidigare veckor finns i Statistik.</button></p>
+        </section>`;
+    }
+
     // ---- Rendering ----
     function render() {
       const cid = activeId();
@@ -177,6 +210,8 @@ export default {
               </button>`).join("")}
           </div>
         </section>
+
+        ${weekSection(cls)}
 
         <section class="ov-section" aria-label="Dagens planeringar">
           <h2 class="ov-section__title">${icon("calendar")} Dagens lektionsplaneringar</h2>
@@ -246,6 +281,8 @@ export default {
     if (cid) {
       // Planeringar är privata per lärare — visa bara den inloggades egna.
       this._offs.push(data.watch(plansPathFor(cid), (docs) => { plans = docs; render(); }));
+      this._offs.push(data.watch(`classes/${cid}/notes`, (docs) => { notes = docs; render(); }));
+      this._offs.push(data.watch(`classes/${cid}/sessions`, (docs) => { sessions = docs; render(); }));
       this._offs.push(data.watch(`classes/${cid}/settings`, (docs) => {
         settingsDocs = docs;
         initials = docs.find((d) => d.id === "display")?.value?.nameDisplay === "initials";

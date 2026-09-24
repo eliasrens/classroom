@@ -18,6 +18,7 @@ import { initStudentPanel } from "./ui/student-panel.js";
 import { createSyncBus, isPreviewWindow, announceStudentScreen, watchStudentScreen } from "./sync.js";
 import { icon } from "./lib/icons.js";
 import { runRetention } from "./lib/privacy.js";
+import { startWeekRhythm } from "./lib/week-rhythm.js";
 import { getProjectorScreen, screenOpenFeatures } from "./lib/screens.js";
 import { initHelp } from "./ui/help.js";
 import { initShortcuts } from "./ui/shortcuts.js";
@@ -148,6 +149,12 @@ function startApp() {
     lastPurgedClass = classId;
     void runRetention(data, classId);
   });
+
+  // VECKORYTM: rent varje måndag. Statistikvyerna filtrerar själva på
+  // innevarande vecka; här arkiveras + töms förra veckans Bra jobbat —
+  // exakt en gång per vecka, även om flera lärare öppnar samtidigt
+  // (se js/lib/week-rhythm.js). Bara lärarvyn skriver.
+  startWeekRhythm({ store, data });
 
   // Lärarfönstret publicerar KLASSVALET — vid varje klassbyte och på
   // begäran. Klassen följer alltid med automatiskt (samma aktiva klass

@@ -76,6 +76,21 @@ classes/{classId}/settings/{key}        — inställningar per klass
                                            t.ex. "schedule", "morningScreen")
   value: { … }
 
+classes/{classId}/settings/morningScreen — Läge 1:s tillstånd (js/lib/morning.js)
+  value: { greeting, tasks, showNametavla, background,
+           praise: [ { id, kind: "student", studentId } | { id, kind: "free", text } ],
+           weekOf: "2026-W39" }
+                     — praise = Bra jobbat-listan. weekOf = ISO-veckan listan
+                       hör till. Första gången appen öppnas en NY vecka
+                       arkiveras listan och töms (se Veckorytm nedan). Saknad
+                       weekOf (äldre data) = innevarande vecka.
+
+classes/{classId}/praiseArchive/{weekOf} — ögonblicksbild av förra veckans Bra jobbat
+  weekOf: "2026-W38" — = dokument-id (deterministiskt: en per vecka)
+  weekStart          — epoch ms, måndag 00:00 lokal tid
+  praise: [ … ]      — listan som den såg ut när veckan tog slut
+  archivedAt, createdBy, createdByName — vilken lärares enhet som gjorde tömningen
+
 classes/{classId}/settings/elevlista    — Läge 4:s inställningar
   value: {
     defaultTypeId    — standardtyp för ett-trycks-notering ("prat" …)
@@ -179,6 +194,29 @@ outboxen som `js/data/datalayer.js` tömmer mot Firestore. Semantik:
   planerar sina egna lektioner; ingen annan lärare kommer åt dem.
   Pathen bär ägarskapet, så en klientlyssnare på det egna subträdet
   behöver ingen `where`-filtrering (se `js/data/plans.js`).
+
+## Veckorytm — rent varje måndag (issue #29)
+
+- En vecka börjar **måndag 00:00 lokal tid** (`js/lib/week.js`).
+- Elevstatistik (noteringar, mönster, tallies i Elevlista och Översikt) och
+  trafikljustider (tallies, rekord, veckans pass per typ) **filtreras** på
+  innevarande vecka. Ingenting raderas: `notes` och `sessions` behåller all
+  historik, och tidigare veckor visas i arkivet under **Statistik**
+  (`js/modes/statistik.js`, ett lärarläge som aldrig är elev-visningsbart).
+- **Bra jobbat** (`settings/morningScreen → praise`) är ett tillstånd, inte en
+  logg. Första öppningen en ny vecka skriver `praiseArchive/{weekOf}` och
+  tömmer listan (`weekOf` = den nya veckan) i EN Firestore-transaktion mot
+  serverns version (`data.once`, `js/lib/week-rhythm.js`). Öppnar flera lärare
+  samtidigt gör bara den första tömningen, så den sker exakt en gång per vecka.
+  Vyerna visar aldrig förra veckans lista, inte heller innan tömningen hunnit
+  sparas (t.ex. offline).
+- **Lektionsplaneringar rörs aldrig** av veckorytmen.
+- **Känd risk — enhetsklockor** (last-write-wins på klientklockor är ett
+  medvetet val): en enhet vars klocka går FÖRE rullar veckan tidigt för alla
+  (arkiverar + tömmer Bra jobbat innan måndag). Dessutom får dess skrivningar
+  ett `updatedAt` i framtiden, som vinner LWW mot alla andra tills realtiden
+  hunnit ikapp. En `weekOf` i framtiden rörs inte (ingen tömning). En klocka
+  som går EFTER påverkar inte veckoskiftet.
 
 ## Motivering
 

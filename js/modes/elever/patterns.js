@@ -16,8 +16,13 @@ import {
   activeStudents, escapeHtml, noteTypeById, NOTE_TYPES,
   MOMENT_BUCKETS, momentOf, weekdayOf, hourOf, WEEKDAYS, fmtDateTime,
 } from "./shared.js";
+import { startOfWeek } from "../../lib/week.js";
 
+// Veckorytm: "Denna vecka" är standard — mönstren börjar om varje måndag.
+// Längre perioder väljs aktivt (och gäller bara tills läget lämnas);
+// enskilda tidigare veckor finns i arkivet under Statistik.
 const RANGES = [
+  { id: "vecka", name: "Denna vecka", week: true },
   { id: "2v", name: "2 veckor", days: 14 },
   { id: "4v", name: "4 veckor", days: 28 },
   { id: "allt", name: "Hela historiken", days: null },
@@ -26,9 +31,9 @@ const RANGES = [
 export function renderPatterns(el, api) {
   const students = activeStudents(api.students);
   const scope = api._patScope ?? "class"; // "class" | studentId
-  const rangeId = api._patRange ?? "4v";
-  const range = RANGES.find((r) => r.id === rangeId) ?? RANGES[1];
-  const cutoff = range.days ? Date.now() - range.days * 864e5 : 0;
+  const rangeId = api._patRange ?? "vecka";
+  const range = RANGES.find((r) => r.id === rangeId) ?? RANGES[0];
+  const cutoff = range.week ? startOfWeek() : range.days ? Date.now() - range.days * 864e5 : 0;
 
   const student = scope === "class" ? null : api.studentById(scope);
   const inScope = api.notes.filter((n) =>
@@ -56,6 +61,7 @@ export function renderPatterns(el, api) {
           </select>
         </label>
         <span class="pat__sum">${negNotes.length} noteringar, ${posCount} positiva${student ? "" : " — mönster per moment, inte per elev"}</span>
+        <a class="pat__archive" href="#/statistik">Tidigare veckor i Statistik</a>
       </div>
 
       ${negNotes.length === 0 && posCount === 0 ? `
