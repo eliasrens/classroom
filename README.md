@@ -62,6 +62,7 @@ js/
   ui/login.js           login-vy + elevskärmens väntevy
   ui/class-picker.js    klassval i topbaren
   ui/help.js            genvägslista under "?" · ui/shortcuts.js  globala tangentgenvägar
+  ui/praise-board.js    "Bra jobbat"-tavlan (växer i kolumner, scrollar aldrig) — morgonskärm, lektion
 firestore.rules         Firestore-säkerhetsregler: inloggning krävs för all läs/skriv
 firebase.json           pekar firebase-CLI:t på firestore.rules (för deploy av regler)
 docs/

@@ -1,0 +1,65 @@
+/* ============================================================
+   "BRA JOBBAT"-TAVLAN — återanvändbar komponent (js/ui/praise-board.js)
+   Rutan scrollar aldrig: namnen flödar i kolumner och rutan blir
+   bredare; JS krymper texten mot --praise-font-min vid behov.
+   Positionering (var rutan sitter, hur hög den är) sköter anroparen.
+   ============================================================ */
+
+.praise-board {
+  --praise-font-max: clamp(1.3rem, 2.6vw, 2rem);
+  --praise-font-min: 1rem;
+  --praise-gap-x: 1em;
+
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden; /* aldrig scroll — JS ser till att allt ryms */
+}
+.praise-board[hidden] { display: none; }
+
+.praise-board__head { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+.praise-board__title {
+  margin: 0;
+  flex: 1;
+  white-space: nowrap;
+  font-size: clamp(1.3rem, 2.4vw, 1.9rem);
+}
+
+.praise-board__names {
+  flex: 1 1 0;
+  min-height: 0;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  overflow: visible;
+  display: grid;
+  gap: 0.25em var(--praise-gap-x);
+  align-content: start;
+  justify-content: start;
+  font-size: var(--praise-font-max);
+  font-weight: 600;
+}
+.praise-board__names li { line-height: 1.2; white-space: nowrap; }
+/* Kolumnflöde: fyll en kolumn uppifrån, lägg sedan till nästa bredvid. */
+.praise-board__names[data-flow="columns"] {
+  grid-auto-flow: column;
+  grid-template-rows: repeat(var(--praise-rows, 1), max-content);
+  grid-auto-columns: max-content;
+}
+.praise-board__empty { font-weight: 400; opacity: 0.75; font-size: var(--text-m); white-space: normal !important; }
+
+/* Glas-look för rutan ovanpå en bild (morgonskärmen). */
+.praise-board--glass {
+  padding: clamp(var(--space-3), 2vw, var(--space-4));
+  border-radius: var(--radius-l);
+  background: rgb(18 20 26 / 52%);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  border: 1px solid rgb(255 255 255 / 14%);
+  box-shadow: 0 10px 40px rgb(0 0 0 / 28%);
+  color: #fff;
+}
+.praise-board--glass .praise-board__title { color: #fff; text-shadow: 0 2px 10px rgb(0 0 0 / 55%); }
+.praise-board--glass .praise-board__names li { text-shadow: 0 1px 8px rgb(0 0 0 / 55%); }
+.praise-board--glass .praise-board__clear { color: #fff; }
+.praise-board--glass .praise-board__clear:hover { background: rgb(255 255 255 / 14%); }
