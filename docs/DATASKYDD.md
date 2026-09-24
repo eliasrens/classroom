@@ -41,6 +41,11 @@ Noteringar raderas automatiskt efter en valbar tid — **standard
 Integritet & data). Elevnoteringar sparas bara på den här datorn;
 det som ska sparas långsiktigt dokumenteras i skolans ordinarie system.
 
+En dator som före uppgraderingen hade "Spara tills vidare" (eller
+ingen inställning) börjar **inte** gallra av sig själv: gallringen är
+pausad tills läraren aktivt bekräftar en lagringstid i Översikten.
+Inga gamla noteringar raderas alltså tyst av bytet.
+
 ## Om webbläsarens data rensas
 
 Rensas webbläsarens lokala lagring (eller om datorn byts) försvinner

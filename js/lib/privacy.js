@@ -52,16 +52,29 @@ export const RETENTION_OPTIONS = [
 const privacyPath = (cid) => `classes/${cid}/privacy`;
 const notesPath = (cid) => `classes/${cid}/notes`;
 
-/** Läs datorns gallringsinställning. → { noteRetentionWeeks: number } */
+/**
+ * Läs datorns gallringsinställning.
+ * → { noteRetentionWeeks: number, awaitingChoice: boolean }
+ *
+ * awaitingChoice: SKYDD efter uppgraderingen till lokal elevdata
+ * (issue #32). Hade datorn förut "Spara tills vidare" (eller ingen
+ * inställning alls — det gamla standardvalet) sätter migreringen
+ * flaggan, och gallringen körs INTE förrän läraren aktivt bekräftat
+ * en lagringstid i Översikten. Utan skyddet hade de lokala
+ * noteringarna äldre än 12 veckor raderats tyst vid första öppningen
+ * — och lokala noteringar finns ingen annanstans.
+ */
 export async function loadPrivacy(data, cid) {
   const doc = await data.get(privacyPath(cid), PRIVACY_SETTING_ID);
   const weeks = doc?.value?.noteRetentionWeeks;
   return {
     noteRetentionWeeks: Number.isFinite(weeks) && weeks > 0 ? weeks : DEFAULT_RETENTION_WEEKS,
+    awaitingChoice: Boolean(doc?.value?.awaitingChoice),
   };
 }
 
-/** Spara datorns gallringsinställning. */
+/** Spara datorns gallringsinställning. Ett aktivt val häver alltid
+ *  uppgraderingsskyddet (awaitingChoice skrivs inte tillbaka). */
 export async function savePrivacy(data, cid, { noteRetentionWeeks }) {
   const weeks = Number.isFinite(noteRetentionWeeks) && noteRetentionWeeks > 0
     ? Math.round(noteRetentionWeeks) : DEFAULT_RETENTION_WEEKS;
@@ -96,9 +109,11 @@ export async function purgeOldNotes(data, cid, weeks, now = serverNow()) {
   return removed;
 }
 
-/** Bekvämt: läs inställningen och kör gallringen i ett svep. */
+/** Bekvämt: läs inställningen och kör gallringen i ett svep.
+ *  Körs INTE medan uppgraderingsskyddet väntar på lärarens val. */
 export async function runRetention(data, cid, now = serverNow()) {
-  const { noteRetentionWeeks } = await loadPrivacy(data, cid);
+  const { noteRetentionWeeks, awaitingChoice } = await loadPrivacy(data, cid);
+  if (awaitingChoice) return 0;
   return purgeOldNotes(data, cid, noteRetentionWeeks, now);
 }
 

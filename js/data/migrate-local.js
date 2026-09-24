@@ -96,14 +96,20 @@ function migrateClass(cid) {
   }
 
   // Gallringsinställningen blir lokal (dokumentet i molnet lämnas orört).
+  // SKYDD: hade datorn "Spara tills vidare" (null) eller ingen inställning
+  // alls — det gamla standardvalet — får den INTE tyst börja gallra med
+  // nya standardvärdet 12 veckor: lokala noteringar finns bara här och
+  // hade raderats oåterkalleligt vid första öppningen. awaitingChoice
+  // pausar gallringen (js/lib/privacy.js) tills läraren aktivt bekräftar
+  // en lagringstid i Översikten.
   const weeks = settings.privacy?.value?.noteRetentionWeeks;
-  if (Number.isFinite(weeks) && weeks > 0) {
-    const privacyPath = `classes/${cid}/privacy`;
-    const local = readLocalCollection(privacyPath);
-    if (!local.privacy) {
-      local.privacy = { id: "privacy", value: { noteRetentionWeeks: weeks }, updatedAt: Date.now() };
-      writeLocalCollection(privacyPath, local);
-    }
+  const privacyPath = `classes/${cid}/privacy`;
+  const local = readLocalCollection(privacyPath);
+  if (!local.privacy) {
+    local.privacy = Number.isFinite(weeks) && weeks > 0
+      ? { id: "privacy", value: { noteRetentionWeeks: weeks }, updatedAt: Date.now() }
+      : { id: "privacy", value: { noteRetentionWeeks: 12, awaitingChoice: true }, updatedAt: Date.now() };
+    writeLocalCollection(privacyPath, local);
   }
 
   if (changed) writeCollection(`classes/${cid}/settings`, settings);

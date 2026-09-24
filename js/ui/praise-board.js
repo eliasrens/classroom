@@ -6,8 +6,9 @@
  * blir rutan då bredare än `maxWidth()` krymper texten stegvis ner mot
  * en läsbar minsta storlek. Alla namn syns alltid.
  *
- * Används av morgonskärmen och är tänkt för lektionsplaneringen — samma
- * data (classes/{id}/settings/morningScreen → praise), delad per klass.
+ * Används av morgonskärmen och lektionsplaneringen — samma data: den
+ * LOKALA Bra jobbat-listan (classes/{id}/praise → "board", issue #32),
+ * per dator och klass — aldrig i molnet.
  * Komponenten rör ingen data: anroparen matar in färdiga visningsnamn.
  *
  * Storlekar styrs från CSS (css/ui/praise-board.css) via custom properties

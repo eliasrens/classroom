@@ -20,7 +20,7 @@ import { SUBJECTS } from "../lib/color.js";
 import { ACTIVE_CLASS_KEY } from "../ui/class-picker.js";
 import { loadNameDisplay, saveNameDisplay } from "./elever/shared.js";
 import {
-  savePrivacy, RETENTION_OPTIONS, DEFAULT_RETENTION_WEEKS, deleteAllClassData,
+  savePrivacy, runRetention, RETENTION_OPTIONS, DEFAULT_RETENTION_WEEKS, deleteAllClassData,
 } from "../lib/privacy.js";
 import { plansPath as plansPathFor } from "../data/plans.js";
 import { createClass } from "../data/classes.js";
@@ -84,6 +84,7 @@ export default {
     let settingsDocs = [];
     let initials = false;
     let retentionWeeks = DEFAULT_RETENTION_WEEKS;
+    let retentionAwaiting = false; // uppgraderingsskydd: gallring pausad tills läraren valt
     let noteStats = [];      // klassens anonyma streck (moln, issue #32)
     let praiseBoard = null;  // lokala Bra jobbat-listan
     let sessions = [];
@@ -124,10 +125,13 @@ export default {
     }
 
     // ---- Integritet: lokal gallring av noteringar (per dator) ----
-    function setRetention(value) {
+    // Ett aktivt val häver uppgraderingsskyddet; kör gallringen direkt
+    // så att "starta gallringen" i bekräftelsen stämmer.
+    async function setRetention(value) {
       const cid = activeId();
       if (!cid) return;
-      void savePrivacy(data, cid, { noteRetentionWeeks: Number(value) });
+      await savePrivacy(data, cid, { noteRetentionWeeks: Number(value) });
+      await runRetention(data, cid);
     }
 
     // ---- Integritet: flytta elevdata från molnet (engångs, issue #32) ----
@@ -285,6 +289,14 @@ export default {
           </label>
           <p class="ov-field__hint">Lokal gallring på den här datorn (standard 12 veckor — en termin).
             Rensningen körs automatiskt när klassen öppnas. Klassens anonyma statistik i molnet påverkas inte.</p>
+          ${retentionAwaiting ? `
+          <div class="ov-retention-pause">
+            <p><strong>Gallringen är pausad.</strong> Den här datorn hade tidigare
+              "Spara tills vidare", så inga noteringar raderas förrän du bekräftar
+              en lagringstid ovan. Äldre noteringar än den valda tiden raderas då
+              från den här datorn.</p>
+            <button class="btn" data-confirm-retention>Bekräfta ${retentionWeeks} veckor och starta gallringen</button>
+          </div>` : ""}
 
           <div class="ov-danger">
             <button class="btn" data-migrate>${icon("upload")} Flytta elevdata från molnet</button>
@@ -309,7 +321,9 @@ export default {
       rootEl.querySelector("[data-initials]")?.addEventListener("change", (e) =>
         toggleInitials(e.target.checked));
       rootEl.querySelector("[data-retention]")?.addEventListener("change", (e) =>
-        setRetention(e.target.value));
+        void setRetention(e.target.value));
+      rootEl.querySelector("[data-confirm-retention]")?.addEventListener("click", () =>
+        void setRetention(retentionWeeks));
       rootEl.querySelector("[data-migrate]")?.addEventListener("click", () => void migrateCloud());
       rootEl.querySelector("[data-del]")?.addEventListener("click", () => void deleteClass());
     }
@@ -334,8 +348,10 @@ export default {
       }));
       // Gallringsinställningen är LOKAL per dator (issue #32).
       this._offs.push(data.watch(`classes/${cid}/privacy`, (docs) => {
-        const weeks = docs.find((d) => d.id === "privacy")?.value?.noteRetentionWeeks;
+        const value = docs.find((d) => d.id === "privacy")?.value;
+        const weeks = value?.noteRetentionWeeks;
         retentionWeeks = Number.isFinite(weeks) && weeks > 0 ? weeks : DEFAULT_RETENTION_WEEKS;
+        retentionAwaiting = Boolean(value?.awaitingChoice);
         render();
       }));
     }

@@ -52,6 +52,18 @@ export async function moveStudentDataFromCloud({ onProgress = () => {}, classIds
   };
   const add = async (fn) => { fn(batch); pending++; await commitIfFull(); };
 
+  // När firestore.rules väl nekar elevsamlingarna (efter rensningen)
+  // svarar läsningen permission-denied — då finns inget kvar att flytta.
+  // Knappen ska då säga "klart", inte fel.
+  const docsOf = async (...path) => {
+    try {
+      return (await fs.getDocs(fs.collection(db, ...path))).docs;
+    } catch (err) {
+      if (err?.code === "permission-denied") return [];
+      throw err;
+    }
+  };
+
   const classesSnap = await fs.getDocs(fs.collection(db, "classes"));
   const report = [];
 
@@ -63,8 +75,8 @@ export async function moveStudentDataFromCloud({ onProgress = () => {}, classIds
     const now = serverNow();
 
     // a) notes → anonyma noteStats-streck (idempotent via note-{id}).
-    const notesSnap = await fs.getDocs(fs.collection(db, "classes", cid, "notes"));
-    for (const d of notesSnap.docs) {
+    const notes = await docsOf("classes", cid, "notes");
+    for (const d of notes) {
       const note = d.data();
       const stat = {
         ...noteStatFor(d.id, note),
@@ -77,8 +89,8 @@ export async function moveStudentDataFromCloud({ onProgress = () => {}, classIds
     // b) radera elevdata ur molnet.
     let deleted = 0;
     for (const coll of ["notes", "students", "praiseArchive"]) {
-      const snap = await fs.getDocs(fs.collection(db, "classes", cid, coll));
-      for (const d of snap.docs) {
+      const docs = coll === "notes" ? notes : await docsOf("classes", cid, coll);
+      for (const d of docs) {
         await add((b) => b.delete(d.ref));
         deleted++;
       }
@@ -93,7 +105,7 @@ export async function moveStudentDataFromCloud({ onProgress = () => {}, classIds
       await add((b) => b.set(morningRef, { ...morning, value, updatedAt: now }));
     }
 
-    report.push({ cid, name, notes: notesSnap.size, deleted });
+    report.push({ cid, name, notes: notes.length, deleted });
   }
 
   await commitIfFull(true);

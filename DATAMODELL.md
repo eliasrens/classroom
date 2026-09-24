@@ -104,8 +104,13 @@ classes/{classId}/praise/board          — Bra jobbat-listan — ENDAST LOKALT
                        listan innehåller elevdata och delas inte längre.
 
 classes/{classId}/privacy/privacy       — lokal gallring — ENDAST LOKALT
-  value: { noteRetentionWeeks }         — standard 12 (en termin), min 1.
-                       Gäller de lokala noteringarna på den här datorn.
+  value: { noteRetentionWeeks,          — standard 12 (en termin), min 1.
+           awaitingChoice }             — uppgraderingsskydd: sätts av
+                       migreringen när datorn hade "Spara tills vidare"
+                       (eller ingen inställning). Gallringen körs INTE
+                       förrän läraren bekräftat en lagringstid i
+                       Översikten (annars hade lokala noteringar äldre
+                       än 12 veckor raderats tyst vid första öppningen).
 
 classes/{classId}/settings/{key}        — inställningar per klass
                                           (dokument-id = inställningens namn,
