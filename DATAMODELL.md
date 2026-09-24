@@ -133,14 +133,20 @@ teachers/{uid}/classes/{classId}/lessonPlans/{planId}
 ## Outbox (synkkön)
 
 Alla skrivningar går först till localStorage och läggs samtidigt i
-outboxen (`classroom:outbox`, en JSON-array av ops) som `js/data/datalayer.js`
-tömmer mot Firestore. Semantik:
+outboxen som `js/data/datalayer.js` tömmer mot Firestore. Semantik:
 
+- **Lagring**: en localStorage-nyckel PER op,
+  `classroom:outbox:<tid>:<löpnr>:<opId>` (kön = nycklarna sorterade).
+  Enqueue är ett `setItem`, borttagning ett `removeItem` — aldrig
+  läs-ändra-skriv på en delad array, eftersom localStorage inte är atomärt
+  mellan fönster i olika processer (två fönster kunde annars skriva över
+  varandras nyss köade ops). En gammal array-kö under `classroom:outbox`
+  (före #30) töms först och tas sedan bort.
 - **En op** = `{ opId, op: "set"|"patch"|"delete", path, id, doc | at }`.
   `opId` är unikt och sätts vid enqueue. Äldre ops utan `opId`
   identifieras på `op|path|id|updatedAt` (resp. `at` för delete).
-- **Borttagning per identitet**: efter lyckad push tas just den op:en bort
-  (`filter(opId !== …)`), aldrig "första i kön" — så en op som köats under
+- **Borttagning per identitet**: efter lyckad push tas just den op:ens
+  nyckel bort (gamla array-ops: `filter` på identitet), aldrig "första i kön" — så en op som köats under
   tiden (här eller i ett annat fönster) kan inte raderas av misstag.
 - **En flush i taget per fönster**: spärren (ett promise) sätts synkront
   innan första `await`. Ett flush-anrop under pågående flush tappas inte —
@@ -158,7 +164,8 @@ tömmer mot Firestore. Semantik:
   `offline`; kön försöker igen vid nästa skrivning, `online`-event eller
   när en server-snapshot kommer tillbaka.
 - Test: `node docs/test-outbox.mjs` (två fönster, 20 snabba skrivningar,
-  flush från flera håll, med och utan Web Locks samt med konflikter).
+  flush från flera håll, med och utan Web Locks, med konflikter samt
+  med en gammal array-outbox).
 
 ## Delat kontra privat
 

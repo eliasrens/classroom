@@ -12,9 +12,9 @@
  *   - outboxen blir tom
  *   - molnets slutläge == lokalt slutläge (ingen op tappad)
  *   - inga samtidiga pushar (= inga failed-precondition) mellan/inom fönster
- * Tre scenarier, fem varv vardera: med Web Locks, med localStorage-lease
- * (ingen Web Locks) och med slumpade externa transaktionskonflikter
- * (retry-vägen).
+ * Fyra scenarier, fem varv vardera: med Web Locks, med localStorage-lease
+ * (ingen Web Locks), med slumpade externa transaktionskonflikter
+ * (retry-vägen) och med en outbox i det gamla array-formatet (före #30).
  */
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -28,7 +28,13 @@ globalThis.localStorage = {
   setItem: (k, v) => { store.set(k, String(v)); },
   removeItem: (k) => { store.delete(k); },
   clear: () => store.clear(),
+  get length() { return store.size; },
+  key: (i) => [...store.keys()][i] ?? null,
 };
+/** Allt som ligger kvar i outboxen: egna op-nycklar + ev. gammal array-kö. */
+const outboxLeft = () =>
+  [...store.keys()].filter((k) => k.startsWith("classroom:outbox:")).length
+  + JSON.parse(localStorage.getItem("classroom:outbox") ?? "[]").length;
 globalThis.window = new EventTarget();
 
 /** Minimal Web Locks: exklusivt, FIFO, per namn. */
@@ -99,8 +105,16 @@ function createCloud({ externalConflictRate = 0 } = {}) {
 
 // ---- Scenario ----
 
-async function scenario(label, { locks, externalConflictRate = 0 }) {
+async function scenario(label, { locks, externalConflictRate = 0, legacy = false }) {
   setNavigator(locks ? { locks: fakeLocks() } : {});
+  const PATHS = ["classes/4A/settings", "classes/4A/students", "teachers/u1/classes/4A/lessonPlans"];
+  if (legacy) {
+    // Outbox i det gamla formatet (en array, ops utan opId) från före #30.
+    const t = Date.now() - 1000;
+    const docs = [0, 1, 2].map((k) => ({ id: `legacy${k}`, n: -1, createdAt: t, updatedAt: t + k }));
+    localStorage.setItem("classroom:data:" + PATHS[1], JSON.stringify(Object.fromEntries(docs.map((d) => [d.id, d]))));
+    localStorage.setItem("classroom:outbox", JSON.stringify(docs.map((doc) => ({ op: "set", path: PATHS[1], id: doc.id, doc }))));
+  }
   const cloud = createCloud({ externalConflictRate });
   const adapters = [];
   const factory = (opts) => { const a = cloud.factory(opts); adapters.push(a); return a; };
@@ -113,7 +127,6 @@ async function scenario(label, { locks, externalConflictRate = 0 }) {
   console.error = () => { logged.error++; };
   console.info = () => {};
 
-  const PATHS = ["classes/4A/settings", "classes/4A/students", "teachers/u1/classes/4A/lessonPlans"];
   const layers = [teacher, student];
   for (let i = 0; i < 20; i++) {
     const data = layers[i % 2];
@@ -134,15 +147,19 @@ async function scenario(label, { locks, externalConflictRate = 0 }) {
 
   // Vänta in att kön töms (retry-timers vid konflikter inräknade).
   const deadline = Date.now() + 20000;
-  while (Date.now() < deadline && JSON.parse(localStorage.getItem("classroom:outbox") ?? "[]").length) {
+  while (Date.now() < deadline && outboxLeft()) {
     await sleep(20);
   }
   await sleep(50);
   console.warn = origWarn; console.error = origErr; console.info = origInfo;
 
-  const outbox = JSON.parse(localStorage.getItem("classroom:outbox") ?? "[]");
   const problems = [];
-  if (outbox.length) problems.push(`outboxen har ${outbox.length} ops kvar`);
+  if (outboxLeft()) problems.push(`outboxen har ${outboxLeft()} ops kvar`);
+  if (legacy) {
+    for (const k of [0, 1, 2]) {
+      if (!cloud.docs.has(`${PATHS[1]}/legacy${k}`)) problems.push(`gammal op legacy${k} pushades aldrig`);
+    }
+  }
   for (const path of PATHS) {
     const local = readCollection(path);
     const cloudIds = [...cloud.docs.keys()].filter((k) => k.startsWith(path + "/") && !k.slice(path.length + 1).includes("/"));
@@ -171,6 +188,7 @@ const SCENARIOS = {
   locks: ["Web Locks", { locks: true }],
   lease: ["localStorage-lease", { locks: false }],
   conflicts: ["externa konflikter", { locks: true, externalConflictRate: 0.25 }],
+  legacy: ["gammal array-outbox", { locks: true, legacy: true }],
 };
 const only = process.argv[2];
 if (only) {
