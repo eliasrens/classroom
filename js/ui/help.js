@@ -38,7 +38,7 @@ export const SHORTCUT_GROUPS = [
   {
     title: "Elevlista — Registrera",
     items: [
-      { keys: ["Elevens tangent"], text: "Snabbnotering på eleven" },
+      { keys: ["Elevens tangent"], text: "Snabbnotering på eleven (1–5 och E byter inte läge här — klicka i menyn)" },
       { keys: ["Shift", "+", "tangent"], text: "Positiv notering i stället" },
       { keys: ["Ctrl", "+", "Z"], text: "Ångra senaste noteringen" },
     ],

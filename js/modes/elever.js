@@ -62,6 +62,12 @@ export default {
 
     const { data } = ctx;
     const cid = ctx.activeClass.id;
+    // Lever denna montering? En omritning som ligger i kö (microtask) när
+    // läget lämnas får inte köra efter unmount — Elever-flikens
+    // tangentfångst (roster.js) registrerar en global capture-lyssnare
+    // som då aldrig togs bort och svalde tangenttryck (även 1–5) överallt.
+    let alive = true;
+    cleanup.push(() => { alive = false; });
 
     // ---- Delat tillstånd för alla flikar ----
     const api = {
@@ -123,6 +129,10 @@ export default {
       },
 
       setTab(id) {
+        // Lämnar vi Elever-fliken mitt i "tryck en tangent…": släpp fångsten.
+        api._rosterCaptureOff?.();
+        api._rosterCaptureOff = null;
+        api._rosterCapturing = null;
         api.tab = id;
         try { sessionStorage.setItem("classroom:elever:tab", id); } catch { /* ok */ }
         renderTabs();
@@ -160,6 +170,7 @@ export default {
       renderQueued = true;
       queueMicrotask(() => {
         renderQueued = false;
+        if (!alive) return;
         // Rör inte flikar där läraren just skriver: rendera bara om
         // fokus inte står i ett fält i flikkroppen.
         const tab = TABS.find((t) => t.id === api.tab) ?? TABS[0];
