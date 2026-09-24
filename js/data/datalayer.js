@@ -154,12 +154,18 @@ export function createDataLayer({ onSyncState, createSync = createFirestoreSync 
   let flushing = null;     // pågående flush (Promise) — spärren, sätts synkront
   let flushAgain = false;  // flush begärd medan en redan körde → kör igen efteråt
   let retryTimer = null;
+  let retryAt = 0;         // när retryTimer går (epoch ms)
   let conflictStreak = 0;
 
   const isConflict = (err) => err?.code === "failed-precondition" || err?.code === "aborted";
 
+  /** Schemalägg ett nytt flush-försök om `ms`. En redan schemalagd retry
+   *  som går tidigare behålls; en som går senare ersätts. */
   function scheduleRetry(ms) {
-    if (retryTimer) return;
+    const at = Date.now() + ms;
+    if (retryTimer && retryAt <= at) return;
+    clearTimeout(retryTimer);
+    retryAt = at;
     retryTimer = setTimeout(() => { retryTimer = null; void flush(); }, ms);
   }
 
@@ -194,8 +200,11 @@ export function createDataLayer({ onSyncState, createSync = createFirestoreSync 
         await sync.push(e.op); // kastar vid fel → op ligger kvar
         removeFromOutbox(e);
         renewLease?.();
+        // Framsteg: backoffen växer bara vid konflikter I RAD. Annars kunde
+        // enstaka konflikter mellan lyckade pushar dubbla väntan ända upp
+        // till 30 s trots att kön faktiskt rörde sig.
+        conflictStreak = 0;
       }
-      conflictStreak = 0;
       setSyncState("online");
       return "done";
     } catch (err) {
