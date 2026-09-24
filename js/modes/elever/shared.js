@@ -13,7 +13,7 @@
  *   classes/{cid}/settings/display   — value: { nameDisplay }
  */
 
-import { plansPath as plansPathFor, currentUid } from "../../data/plans.js";
+import { plansPath as plansPathFor, attribution } from "../../data/plans.js";
 
 // ---- Paths ----
 
@@ -94,7 +94,10 @@ export async function currentLessonBlock(data, cid) {
     const nowMin = now.getHours() * 60 + now.getMinutes();
     for (const plan of plans) {
       if (plan.date !== date) continue;
-      for (const b of plan.blocks ?? []) {
+      // En planering i Läge 2 ÄR ett block: start/end/subjectId/name ligger
+      // direkt på planeringen. (Äldre form med plan.blocks stöds också.)
+      const blocks = plan.blocks ?? [{ start: plan.start, end: plan.end, subjectId: plan.subjectId, title: plan.name }];
+      for (const b of blocks) {
         const s = minutesOf(b.start);
         const e = minutesOf(b.end);
         if (s != null && e != null && s <= nowMin && nowMin < e) {
@@ -108,12 +111,11 @@ export async function currentLessonBlock(data, cid) {
 
 // ---- Skapa notering ----
 
-const createdBy = () => currentUid();
-
 /**
  * Skapar en notering med automatiskt datum/tid (createdAt sätts av
- * datalagret), lärar-id och snapshot av pågående lektion. Läraren
- * fyller aldrig i tid eller lektion själv.
+ * datalagret), lärar-attribution (createdBy = uid, createdByName =
+ * visningsnamn) och snapshot av pågående lektion. Läraren fyller
+ * aldrig i tid eller lektion själv.
  *
  * kind: "typ" (kategoriserad snabbnotering) | "text" (fritext) | "insats"
  */
@@ -128,11 +130,17 @@ export async function createNote(data, cid, fields) {
     followUp: false,
     helped: null, // endast kind "insats": "ja" | "delvis" | "nej"
     lesson,
-    createdBy: createdBy(),
+    ...attribution(),
     ...fields,
   };
   const id = await data.put(notesPath(cid), doc);
   return id;
+}
+
+/** Lärarnamn för visning ur ett pass/en notering — gamla dokument utan
+ *  attribution visas som "okänd lärare". */
+export function teacherLabel(doc) {
+  return doc?.createdByName || "okänd lärare";
 }
 
 // ---- Mönsterhjälpare ----

@@ -22,6 +22,7 @@ import {
   loadPrivacy, savePrivacy, RETENTION_OPTIONS, deleteAllClassData,
 } from "../lib/privacy.js";
 import { plansPath as plansPathFor } from "../data/plans.js";
+import { createClass } from "../data/classes.js";
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -90,7 +91,8 @@ export default {
     async function addClass() {
       const name = prompt("Klassens namn (t.ex. 4A):")?.trim();
       if (!name) return;
-      const id = await data.put("classes", { name });
+      // Dubblettsäkert: samma namn återanvänder befintlig klass (data/classes.js).
+      const id = await createClass(data, name);
       chooseClass(id);
     }
 

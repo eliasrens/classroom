@@ -218,6 +218,7 @@
   min-width: 4ch;
 }
 .tl-pass-date { color: var(--color-ink-soft); font-size: var(--text-s); margin-left: auto; }
+.tl-pass-teacher { color: var(--color-ink-soft); font-size: var(--text-s); }
 .tl-pass.is-record .tl-pass-time { color: var(--color-accent-text); }
 
 @media (max-width: 640px) {
