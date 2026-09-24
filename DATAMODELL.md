@@ -122,7 +122,12 @@ teachers/{uid}/classes/{classId}/lessonPlans/{planId}
   date: "2026-09-14" — ISO-datum; en planering per dag och klass är normalfallet
   name, subjectId, start, end
   fields: { … }      — planeringens innehåll (vad/hur/varför/…)
-  show: { … }        — vilka fält som visas på tavlan
+  show: { … }        — vilka fält som visas på tavlan; show.praise = visa
+                       "Bra jobbat"-rutan i högerkolumnen (namnen läses ur
+                       den DELADE classes/{id}/settings/morningScreen → praise)
+                     — planeringar skapas och raderas aldrig automatiskt
+                       (ingen testdata/auto-seed, ingen veckostädning);
+                       bara läraren själv skapar, kopierar och tar bort
 ```
 
 ## Delat kontra privat
