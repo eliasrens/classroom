@@ -130,6 +130,36 @@ teachers/{uid}/classes/{classId}/lessonPlans/{planId}
                        bara läraren själv skapar, kopierar och tar bort
 ```
 
+## Outbox (synkkön)
+
+Alla skrivningar går först till localStorage och läggs samtidigt i
+outboxen (`classroom:outbox`, en JSON-array av ops) som `js/data/datalayer.js`
+tömmer mot Firestore. Semantik:
+
+- **En op** = `{ opId, op: "set"|"patch"|"delete", path, id, doc | at }`.
+  `opId` är unikt och sätts vid enqueue. Äldre ops utan `opId`
+  identifieras på `op|path|id|updatedAt` (resp. `at` för delete).
+- **Borttagning per identitet**: efter lyckad push tas just den op:en bort
+  (`filter(opId !== …)`), aldrig "första i kön" — så en op som köats under
+  tiden (här eller i ett annat fönster) kan inte raderas av misstag.
+- **En flush i taget per fönster**: spärren (ett promise) sätts synkront
+  innan första `await`. Ett flush-anrop under pågående flush tappas inte —
+  kön körs igen när den pågående är klar. Kön läses om före varje op.
+- **En flush i taget mellan fönster** (lärarfönster och elevskärm delar
+  samma localStorage-outbox): Web Locks (`navigator.locks`, låset
+  `classroom-outbox`), med ett localStorage-lease
+  (`classroom:outbox-lease`, 15 s utgångstid) som reserv.
+- **Idempotent push**: varje op skrivs i en last-write-wins-transaktion
+  (`firestore-sync.js`) som hoppar över op:en om servern har nyare
+  `updatedAt`. Råkar samma op pushas två gånger är det ofarligt.
+- **Fel**: transaktionskonflikt (`failed-precondition`/`aborted`) ger
+  retry med backoff (0,3 s → 30 s), op:en ligger kvar och synkstatusen
+  påverkas inte (loggas med `console.info`). Övriga fel = synkstatus
+  `offline`; kön försöker igen vid nästa skrivning, `online`-event eller
+  när en server-snapshot kommer tillbaka.
+- Test: `node docs/test-outbox.mjs` (två fönster, 20 snabba skrivningar,
+  flush från flera håll, med och utan Web Locks samt med konflikter).
+
 ## Delat kontra privat
 
 - **DELAT mellan alla inloggade lärare** (läs+skriv, realtid via
