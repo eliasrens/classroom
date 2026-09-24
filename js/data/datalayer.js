@@ -3,6 +3,10 @@
  *
  * Abstraktion ovanpå Firestore som alla lägen använder. Principen:
  *
+ *   0. ELEVDATA ÄR ENDAST LOKAL (issue #32): students, notes, praise,
+ *      praiseArchive och privacy under en klass routas till en egen
+ *      lokal lagring (local-only.js) och går ALDRIG via outboxen
+ *      eller Firestore — se "ENDAST LOKALT" nedan.
  *   1. ALLA läsningar och skrivningar går mot lokal lagring
  *      (localStorage, se local.js). Appen är alltid snabb och
  *      fungerar fullt ut utan nät och utan Firebase.

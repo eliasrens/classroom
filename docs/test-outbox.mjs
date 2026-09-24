@@ -107,7 +107,9 @@ function createCloud({ externalConflictRate = 0 } = {}) {
 
 async function scenario(label, { locks, externalConflictRate = 0, legacy = false }) {
   setNavigator(locks ? { locks: fakeLocks() } : {});
-  const PATHS = ["classes/4A/settings", "classes/4A/students", "teachers/u1/classes/4A/lessonPlans"];
+  // OBS: students/notes är ENDAST LOKALA sedan issue #32 (köas aldrig) —
+  // testet använder bara synkade samlingar.
+  const PATHS = ["classes/4A/settings", "classes/4A/sessions", "teachers/u1/classes/4A/lessonPlans"];
   if (legacy) {
     // Outbox i det gamla formatet (en array, ops utan opId) från före #30.
     const t = Date.now() - 1000;

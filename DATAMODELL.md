@@ -3,6 +3,16 @@
 Samma pathsyntax används av det lokala datalagret (`js/data/datalayer.js`),
 så modellen gäller oavsett om Firebase är anslutet eller ej.
 
+**ELEVDATA ÄR ENDAST LOKAL (issue #32).** Ingenting om enskilda elever
+lämnar lärardatorn: samlingarna `students`, `notes`, `praise`,
+`praiseArchive` och `privacy` under en klass routas av datalagret till
+en egen lokal lagring (`js/data/local-only.js`, prefix
+`classroom:local:`) som aldrig går via outboxen eller Firestore.
+Molnet innehåller bara klasstatistik: `sessions` (trafikljuspass) och
+`noteStats` (anonyma noteringsräkningar), plus klassinställningar och
+lärarnas privata planeringar. `firestore.rules` nekar elevsamlingarna
+helt och fältvaliderar `noteStats`. Se `docs/DATASKYDD.md`.
+
 ## Struktur
 
 ```
@@ -17,7 +27,7 @@ classes/{classId}                       — en klass (4A, 4B, …)
                        med ett namn som redan finns återanvänder alltid
                        den befintliga klassen.
 
-classes/{classId}/students/{studentId}  — elev i klassen
+classes/{classId}/students/{studentId}  — elev i klassen — ENDAST LOKALT
   firstName          — ENDAST förnamn. Det finns AVSIKTLIGT inget
                        efternamns-/fullnamnsfält (integritet: appen
                        visas på projektor).
@@ -49,7 +59,7 @@ classes/{classId}/sessions/{sessionId}  — genomförda pass/resultat
   createdByName      — lärarens visningsnamn ("Elias"); gamla dokument
                        utan fältet visas som "okänd lärare"
 
-classes/{classId}/notes/{noteId}        — noteringar om elever (Läge 4)
+classes/{classId}/notes/{noteId}        — noteringar om elever (Läge 4) — ENDAST LOKALT
   studentId
   kind: "typ" | "text" | "insats"
                      — typ = kategoriserad snabbnotering (ett tryck),
@@ -71,21 +81,47 @@ classes/{classId}/notes/{noteId}        — noteringar om elever (Läge 4)
   createdAt          — epoch ms; tillsammans med klass-kopplingen i pathen
                        gör tidsstämpeln central auto-radering (Läge 5) möjlig
 
+classes/{classId}/noteStats/{eventId}   — ANONYMT "streck" per notering (issue #32)
+  id: "note-{noteId}" — deterministiskt (noteId = den LOKALA noteringens
+                       id) så att omräkning/migrering är idempotent och
+                       en borttagen lokal notering kan ta bort sitt streck.
+                       Kopplingen notering → streck finns bara lokalt.
+  kind               — "typ" | "text" | "insats"
+  typeId             — för kind "typ": prat | stol | fokus | sen | annat | positiv
+  positive: bool
+  lesson             — SNAPSHOT { date, start, end, subjectId, title } | null
+  createdBy, createdByName, createdAt, updatedAt
+                     — ALDRIG studentId, text, followUp, helped eller
+                       labelId — firestore.rules fältvaliderar (hasOnly).
+                       Append-only i praktiken (inga räknare som krockar);
+                       radering sker när noteringen tas bort lokalt eller
+                       klassen raderas.
+
+classes/{classId}/praise/board          — Bra jobbat-listan — ENDAST LOKALT
+  praise: [ { id, kind: "student", studentId } | { id, kind: "free", text } ]
+  weekOf: "2026-W39" — veckan listan hör till (veckorytmen nedan).
+                       Flyttad hit från settings/morningScreen (issue #32):
+                       listan innehåller elevdata och delas inte längre.
+
+classes/{classId}/privacy/privacy       — lokal gallring — ENDAST LOKALT
+  value: { noteRetentionWeeks }         — standard 12 (en termin), min 1.
+                       Gäller de lokala noteringarna på den här datorn.
+
 classes/{classId}/settings/{key}        — inställningar per klass
                                           (dokument-id = inställningens namn,
                                            t.ex. "schedule", "morningScreen")
   value: { … }
 
 classes/{classId}/settings/morningScreen — Läge 1:s tillstånd (js/lib/morning.js)
-  value: { greeting, tasks, showNametavla, background,
-           praise: [ { id, kind: "student", studentId } | { id, kind: "free", text } ],
-           weekOf: "2026-W39" }
-                     — praise = Bra jobbat-listan. weekOf = ISO-veckan listan
-                       hör till. Första gången appen öppnas en NY vecka
-                       arkiveras listan och töms (se Veckorytm nedan). Saknad
-                       weekOf (äldre data) = innevarande vecka.
+  value: { greeting, tasks, showNametavla, background }
+                     — Bra jobbat (praise/weekOf) är FLYTTAD till den
+                       lokala classes/{id}/praise/board (issue #32);
+                       firestore.rules nekar en morningScreen som
+                       innehåller praise/weekOf. I minnet slår
+                       js/lib/morning.js ihop båda källorna
+                       (watchMorning/loadMorning/saveMorning).
 
-classes/{classId}/praiseArchive/{weekOf} — ögonblicksbild av förra veckans Bra jobbat
+classes/{classId}/praiseArchive/{weekOf} — ögonblicksbild av förra veckans Bra jobbat — ENDAST LOKALT
   weekOf: "2026-W38" — = dokument-id (deterministiskt: en per vecka)
   weekStart          — epoch ms, måndag 00:00 lokal tid
   praise: [ … ]      — listan som den såg ut när veckan tog slut
@@ -213,13 +249,18 @@ outboxen som `js/data/datalayer.js` tömmer mot Firestore. Semantik:
   flush från flera håll, med och utan Web Locks, med konflikter samt
   med en gammal array-outbox).
 
-## Delat kontra privat
+## Delat kontra privat kontra endast lokalt (issue #32)
 
 - **DELAT mellan alla inloggade lärare** (läs+skriv, realtid via
-  onSnapshot): klasser, elever, noteringar, pass/resultat och
-  klassinställningar (allt under `classes/{classId}`). En lärare ser
-  alla andras noteringar på eleverna, sparade pass och delade
-  inställningar.
+  onSnapshot): klasser, pass/resultat, ANONYMA noteringsräkningar
+  (`noteStats`) och klassinställningar. En lärare ser alla andras pass
+  och räkningar per lektion — men aldrig något om enskilda elever.
+- **ENDAST LOKALT per lärardator** (aldrig via outboxen/Firestore, se
+  `js/data/local-only.js`): elevlistan, noteringarna, Bra jobbat med
+  arkiv och gallringsinställningen. Elevskärmen i samma webbläsare
+  läser samma lokala lagring (livespegling via storage-eventet).
+  Varje notering skapar samtidigt ett anonymt `noteStats`-streck i
+  molnet (`js/modes/elever/shared.js` → `createNote`).
 - **PRIVAT per lärare**: lektionsplaneringar
   (`teachers/{uid}/classes/{classId}/lessonPlans`). Varje lärare
   planerar sina egna lektioner; ingen annan lärare kommer åt dem.
@@ -234,13 +275,12 @@ outboxen som `js/data/datalayer.js` tömmer mot Firestore. Semantik:
   innevarande vecka. Ingenting raderas: `notes` och `sessions` behåller all
   historik, och tidigare veckor visas i arkivet under **Statistik**
   (`js/modes/statistik.js`, ett lärarläge som aldrig är elev-visningsbart).
-- **Bra jobbat** (`settings/morningScreen → praise`) är ett tillstånd, inte en
-  logg. Första öppningen en ny vecka skriver `praiseArchive/{weekOf}` och
-  tömmer listan (`weekOf` = den nya veckan) i EN Firestore-transaktion mot
-  serverns version (`data.once`, `js/lib/week-rhythm.js`). Öppnar flera lärare
-  samtidigt gör bara den första tömningen, så den sker exakt en gång per vecka.
-  Vyerna visar aldrig förra veckans lista, inte heller innan tömningen hunnit
-  sparas (t.ex. offline).
+- **Bra jobbat** (LOKALA `praise/board`, issue #32) är ett tillstånd, inte en
+  logg. Första öppningen en ny vecka skriver det LOKALA `praiseArchive/{weekOf}`
+  och tömmer listan (`weekOf` = den nya veckan) — helt lokalt per dator
+  (`js/lib/week-rhythm.js`); det deterministiska arkiv-id:t gör att två
+  fönster på samma dator konvergerar. Vyerna visar aldrig förra veckans
+  lista, inte heller innan tömningen hunnit sparas.
 - **Lektionsplaneringar rörs aldrig** av veckorytmen.
 - **Enhetsklockor** (issue #31): veckan räknas på servertid (`serverNow()`,
   se Tidsstämplar och klocka nedan), och med Firebase körs veckorytmen först

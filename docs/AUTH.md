@@ -41,16 +41,18 @@ event). Utloggning i ett fönster loggar ut alla fönster.
 
 De skarpa reglerna ligger i **[`firestore.rules`](../firestore.rules)** (rotmappen)
 — deploya med `firebase deploy --only firestore:rules`. De kräver
-inloggning (`request.auth != null`) för ALL läsning och skrivning, så
-elevdata är stängd för oautentiserad åtkomst även om klientkoden ligger
-publikt. Åtkomstmodellen (se DATAMODELL.md) i korthet:
+inloggning (`request.auth != null`) för ALL läsning och skrivning — och
+sedan issue #32 finns det dessutom **ingen elevdata alls i molnet**:
+elevlistor, noteringar och Bra jobbat lagras enbart lokalt på varje
+lärardator (`js/data/local-only.js`), och reglerna nekar
+`classes/{id}/students/**` och `classes/{id}/notes/**` helt.
+Åtkomstmodellen (se DATAMODELL.md) i korthet:
 
 ```
-// DELAT: alla inloggade lärare läser/skriver klasser, elever,
-// noteringar, pass och klassinställningar (realtid via onSnapshot).
-match /classes/{classId}/{document=**} {
-  allow read, write: if request.auth != null;
-}
+// DELAT: alla inloggade lärare läser/skriver klasser, pass,
+// klassinställningar och ANONYMA noteringsräkningar (noteStats —
+// fältvalidering: studentId/text kan aldrig skrivas dit).
+// ELEVDATA (students, notes, praiseArchive): nekas helt.
 
 // PRIVAT: lärarprofil + lärarens egna lektionsplaneringar. Bara ägaren.
 match /teachers/{uid}/{document=**} {
@@ -58,9 +60,10 @@ match /teachers/{uid}/{document=**} {
 }
 ```
 
-Delad klassdata gör att ett helt arbetslag ser varandras noteringar,
-pass och inställningar på samma elever. Lektionsplaneringar är däremot
-privata per lärare och ligger under `teachers/{uid}/…` — pathen bär
+Den delade klasstatistiken gör att ett arbetslag ser varandras pass och
+anonyma noteringsräkningar per lektion — men aldrig något om enskilda
+elever. Lektionsplaneringar är privata per lärare och ligger under
+`teachers/{uid}/…` — pathen bär
 ägarskapet, så reglerna behöver ingen extra `get()`-läsning. Vid första
 inloggning kan lärarprofilen `teachers/{uid}` (DATAMODELL.md) skapas med
 `email` och `displayName`. Steg-för-steg-idrifttagning:

@@ -420,3 +420,10 @@ kbd {
 .quick-note__labels input { flex: 1; min-width: 9em; font-size: var(--text-s); }
 .quick-note__reminder { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); }
 .quick-note__actions { display: flex; justify-content: flex-end; }
+
+/* Lokal lagring-notis (issue #32) */
+.roster__local-note {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+}

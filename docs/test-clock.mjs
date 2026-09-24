@@ -223,33 +223,37 @@ const scenarios = {
     const L = realNow() - 1000;
     writeCollection(PATH, { morningScreen: { id: "morningScreen", value: { note: "framtid" }, createdAt: F, updatedAt: F } });
     fake.seed(KEY, { id: "morningScreen", value: { note: "läkt" }, createdAt: F, updatedAt: L });
-    writeCollection("classes/test/students", { s1: { id: "s1", name: "Lokal", updatedAt: realNow() } });
-    fake.seed("classes/test/students/s1", { id: "s1", name: "Fjärr-framtid", updatedAt: F });
+    // OBS: students/notes är numera ENDAST LOKALA (issue #32) och synkas
+    // aldrig — testet använder sessions (delad samling) i stället.
+    writeCollection("classes/test/sessions", { s1: { id: "s1", name: "Lokal", updatedAt: realNow() } });
+    fake.seed("classes/test/sessions/s1", { id: "s1", name: "Fjärr-framtid", updatedAt: F });
     const { data } = device(fake);
     data.watch(PATH, () => {});
     await settle();
     check(readCollection(PATH).morningScreen.value.note === "läkt", "enhet med framtida lokal kopia tar emot den läkta versionen (ingen divergens)");
     // Egen opushad ändring mot framtida fjärrversion: står kvar och vinner.
-    await data.patch("classes/test/students", "s1", { name: "Egen ändring" });
-    data.watch("classes/test/students", () => {});
+    await data.patch("classes/test/sessions", "s1", { name: "Egen ändring" });
+    data.watch("classes/test/sessions", () => {});
     await settle();
-    check(readCollection("classes/test/students").s1.name === "Egen ändring", "egen opushad ändring står kvar mot framtida fjärrversion");
-    check(fake.docs.get("classes/test/students/s1").name === "Egen ändring" && near(fake.docs.get("classes/test/students/s1").updatedAt),
+    check(readCollection("classes/test/sessions").s1.name === "Egen ändring", "egen opushad ändring står kvar mot framtida fjärrversion");
+    check(fake.docs.get("classes/test/sessions/s1").name === "Egen ändring" && near(fake.docs.get("classes/test/sessions/s1").updatedAt),
       "… och når servern med korrekt tid");
   },
 
-  // Veckorytmen: weekOf i framtiden = ogiltig.
+  // Veckorytmen: weekOf i framtiden = ogiltig. (Sedan issue #32 ligger
+  // Bra jobbat i det LOKALA "board"-dokumentet — plan tar det direkt.)
   weekRhythm() {
     const now = realNow();
     const future = weekKey(addWeeks(startOfWeek(now), 1));
-    const doc = { id: "morningScreen", value: { weekOf: future, praise: [{ id: "p", kind: "free", text: "Bra!" }] } };
-    const writes = planPraiseRollover(doc, "test", now);
-    check(writes?.length === 1 && writes[0].doc.value.weekOf === weekKey(now) && writes[0].doc.value.praise.length === 1,
+    const board = { id: "board", weekOf: future, praise: [{ id: "p", kind: "free", text: "Bra!" }] };
+    const writes = planPraiseRollover(board, "test", now);
+    check(writes?.length === 1 && writes[0].doc.weekOf === weekKey(now) && writes[0].doc.praise.length === 1,
       "weekOf i framtiden → innevarande vecka, listan behålls (inget arkiv)");
     const last = weekKey(addWeeks(startOfWeek(now), -1));
-    const w2 = planPraiseRollover({ ...doc, value: { ...doc.value, weekOf: last } }, "test", now);
-    check(w2?.length === 2 && w2[1].doc.value.praise.length === 0, "förra veckans lista arkiveras + töms som förut");
-    check(planPraiseRollover({ ...doc, value: { ...doc.value, weekOf: weekKey(now) } }, "test", now) === null, "innevarande vecka → inget");
+    const w2 = planPraiseRollover({ ...board, weekOf: last }, "test", now);
+    check(w2?.length === 2 && w2[1].doc.praise.length === 0 && w2[0].path === "classes/test/praiseArchive",
+      "förra veckans lista arkiveras + töms som förut");
+    check(planPraiseRollover({ ...board, weekOf: weekKey(now) }, "test", now) === null, "innevarande vecka → inget");
   },
 };
 
