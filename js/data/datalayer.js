@@ -38,13 +38,20 @@ import { firebaseConfig, isFirebaseConfigured } from "../firebase-config.js";
 import { readCollection, writeCollection, pathFromStorageKey, collectionPathsUnder } from "./local.js";
 import { createFirestoreSync } from "./firestore-sync.js";
 
-const OUTBOX_KEY = "classroom:outbox";
+const OUTBOX_PREFIX = "classroom:outbox:";      // en nyckel per op
+const OUTBOX_KEY = "classroom:outbox";          // gammal array-kö (före #30), töms bara
+const OUTBOX_LOCK = "classroom-outbox";          // Web Locks-namn
+const LEASE_KEY = "classroom:outbox-lease";      // reserv utan Web Locks
+const LEASE_TTL_MS = 15000;
+const LEASE_RETRY_MS = 2000;
+const RETRY_BASE_MS = 300;
+const RETRY_MAX_MS = 30000;
 
-export function createDataLayer({ onSyncState } = {}) {
+// createSync: bara för tester (docs/test-outbox.mjs) — byt molnadaptern mot en attrapp.
+export function createDataLayer({ onSyncState, createSync = createFirestoreSync } = {}) {
   const watchers = new Map(); // path → Set<cb>
   let syncState = "local";
   let sync = null;
-  let flushing = false;
 
   const newId = () =>
     (crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -67,37 +74,175 @@ export function createDataLayer({ onSyncState } = {}) {
   }
 
   // ---- Outbox ----
+  //
+  // Semantik (se även DATAMODELL.md → Outbox):
+  //  - Varje op lagras under en EGEN localStorage-nyckel
+  //    (`classroom:outbox:<tid>:<löpnr>:<opId>`) — enqueue är ett setItem
+  //    och borttagning ett removeItem. Aldrig läs-ändra-skriv på en delad
+  //    array: localStorage är inte atomärt mellan flikar i olika processer,
+  //    så två fönster som skrev om samma array kunde skriva över varandras
+  //    nyss köade ops (tyst dataförlust).
+  //  - En op tas bort ur kön PER IDENTITET efter lyckad push — aldrig
+  //    positionellt (slice(1) kunde radera en annan, opushad op).
+  //  - Bara EN flush kör åt gången per fönster (promise-spärr som sätts
+  //    synkront), och mellan fönster (lärare ↔ elevskärm delar samma
+  //    outbox) via Web Locks, med ett localStorage-lease som reserv. Ett
+  //    flush-anrop under pågående flush tappas inte: kön körs igen efteråt.
+  //  - Pushar två fönster ändå samma op är det ofarligt: pushen är en
+  //    LWW-transaktion (firestore-sync.js) och därmed idempotent.
+  //  - Transaktionskonflikt (failed-precondition/aborted) = försök igen
+  //    strax; op:en ligger kvar och synkstatusen påverkas inte.
 
-  const readOutbox = () => {
-    try { return JSON.parse(localStorage.getItem(OUTBOX_KEY)) ?? []; } catch { return []; }
-  };
-  const writeOutbox = (ops) => localStorage.setItem(OUTBOX_KEY, JSON.stringify(ops));
+  let opSeq = 0;
+
+  /** Köade ops i ordning: [{ key, op }]. Äldre outboxar (en array under
+   *  OUTBOX_KEY, före #30) töms först; nya ops ligger under egna nycklar. */
+  function readOutboxEntries() {
+    let legacy = [];
+    try {
+      const ops = JSON.parse(localStorage.getItem(OUTBOX_KEY));
+      if (Array.isArray(ops)) legacy = ops.map((op) => ({ key: null, op }));
+    } catch { /* trasig gammal kö — ignorera */ }
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k?.startsWith(OUTBOX_PREFIX)) keys.push(k);
+    }
+    keys.sort();
+    const entries = [];
+    for (const key of keys) {
+      try {
+        const op = JSON.parse(localStorage.getItem(key));
+        if (op) entries.push({ key, op });
+      } catch { localStorage.removeItem(key); } // trasig op — kan aldrig pushas
+    }
+    return [...legacy, ...entries];
+  }
+  const readOutbox = () => readOutboxEntries().map((e) => e.op);
+
+  /** Identitet för en op i den gamla array-kön (ops utan opId jämförs på
+   *  innehåll — två sådana med samma nyckel är samma skrivning). */
+  const opKey = (o) => o.opId
+    ?? `${o.op}|${o.path}|${o.id}|${o.op === "delete" ? o.at : o.doc?.updatedAt}`;
+
+  function removeFromOutbox({ key, op }) {
+    if (key) { localStorage.removeItem(key); return; }
+    const id = opKey(op);
+    let legacy = [];
+    try { legacy = JSON.parse(localStorage.getItem(OUTBOX_KEY)) ?? []; } catch { /* tom */ }
+    const rest = Array.isArray(legacy) ? legacy.filter((o) => opKey(o) !== id) : [];
+    if (rest.length) localStorage.setItem(OUTBOX_KEY, JSON.stringify(rest));
+    else localStorage.removeItem(OUTBOX_KEY);
+  }
 
   function enqueue(op) {
     if (!isFirebaseConfigured()) return; // rent lokalt läge — ingen kö behövs
-    writeOutbox([...readOutbox(), op]);
+    const opId = newId();
+    const key = `${OUTBOX_PREFIX}${String(Date.now()).padStart(15, "0")}:${String(opSeq++).padStart(8, "0")}:${opId}`;
+    try {
+      localStorage.setItem(key, JSON.stringify({ ...op, opId }));
+    } catch (err) {
+      console.warn("[data] kunde inte köa ändringen för synk (full lagring?):", err);
+    }
     void flush();
   }
 
-  /** Försök tömma outboxen mot Firestore. Ofarlig att anropa när som helst. */
-  async function flush() {
-    if (flushing || !sync) return;
-    if (!(await sync.start())) return;
-    flushing = true;
-    try {
-      let queue = readOutbox();
-      while (queue.length > 0) {
-        await sync.push(queue[0]); // kastar vid fel → op ligger kvar
-        queue = readOutbox().slice(1);
-        writeOutbox(queue);
+  let flushing = null;     // pågående flush (Promise) — spärren, sätts synkront
+  let flushAgain = false;  // flush begärd medan en redan körde → kör igen efteråt
+  let retryTimer = null;
+  let conflictStreak = 0;
+
+  const isConflict = (err) => err?.code === "failed-precondition" || err?.code === "aborted";
+
+  function scheduleRetry(ms) {
+    if (retryTimer) return;
+    retryTimer = setTimeout(() => { retryTimer = null; void flush(); }, ms);
+  }
+
+  /** Försök tömma outboxen mot Firestore. Ofarlig att anropa när som helst,
+   *  hur ofta som helst och från flera håll samtidigt. */
+  function flush() {
+    if (!sync) return Promise.resolve();
+    if (flushing) { flushAgain = true; return flushing; }
+    flushing = (async () => {
+      try {
+        do {
+          flushAgain = false;
+          if (!(await sync.start())) return;
+          const result = await withOutboxLock(drainOutbox);
+          if (result === "lease-busy") { scheduleRetry(LEASE_RETRY_MS); return; }
+          if (result !== "done") return; // fel → retry schemalagd / väntar på online
+        } while (flushAgain);
+      } catch (err) {
+        console.warn("[data] flush avbröts oväntat — ops ligger kvar i kön:", err);
+      } finally {
+        flushing = null;
       }
+    })();
+    return flushing;
+  }
+
+  /** Töm kön — körs under outbox-låset. Läser om outboxen före varje op så
+   *  att ops som köas under tiden (här eller i ett annat fönster) kommer med. */
+  async function drainOutbox(renewLease) {
+    try {
+      for (let e = readOutboxEntries()[0]; e; e = readOutboxEntries()[0]) {
+        await sync.push(e.op); // kastar vid fel → op ligger kvar
+        removeFromOutbox(e);
+        renewLease?.();
+      }
+      conflictStreak = 0;
       setSyncState("online");
+      return "done";
     } catch (err) {
+      if (isConflict(err)) {
+        // Samtidig skrivning till samma dokument (annan lärare/flik) —
+        // inget fel, bara försök igen strax. LWW i pushen avgör vem som vinner.
+        const ms = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** conflictStreak++);
+        console.info(`[data] transaktionskonflikt (${err.code}) — försöker igen om ${ms} ms`);
+        scheduleRetry(ms);
+        return "conflict";
+      }
       console.warn("[data] synk pausad, försöker igen senare:", err);
       setSyncState("offline");
-    } finally {
-      flushing = false;
+      return "error";
     }
+  }
+
+  // ---- Outbox-lås mellan fönster ----
+
+  const lockOwner = newId();
+
+  /** Kör fn med exklusivt outbox-lås över alla fönster i samma origin.
+   *  Web Locks där det finns (väntar in det andra fönstrets flush);
+   *  annars ett localStorage-lease med utgångstid (ett fönster som
+   *  stängs mitt i en flush låser därmed inte kön för gott). */
+  async function withOutboxLock(fn) {
+    if (navigator.locks?.request) {
+      try {
+        return await navigator.locks.request(OUTBOX_LOCK, () => fn());
+      } catch (err) {
+        // Kan kasta i vissa sandlådor (t.ex. opak origin) — falla tillbaka.
+        if (err?.name !== "SecurityError" && err?.name !== "InvalidStateError") throw err;
+      }
+    }
+    if (!acquireLease()) return "lease-busy";
+    try { return await fn(acquireLease); } finally { releaseLease(); }
+  }
+
+  function readLease() {
+    try { return JSON.parse(localStorage.getItem(LEASE_KEY)); } catch { return null; }
+  }
+  function acquireLease() {
+    const lease = readLease();
+    if (lease && lease.owner !== lockOwner && lease.until > Date.now()) return false;
+    try {
+      localStorage.setItem(LEASE_KEY, JSON.stringify({ owner: lockOwner, until: Date.now() + LEASE_TTL_MS }));
+    } catch { /* full lagring — kör ändå, pushen är idempotent */ }
+    return true;
+  }
+  function releaseLease() {
+    try { if (readLease()?.owner === lockOwner) localStorage.removeItem(LEASE_KEY); } catch { /* ignorera */ }
   }
 
   // ---- Merge av fjärrdata (last-write-wins per dokument) ----
@@ -210,7 +355,7 @@ export function createDataLayer({ onSyncState } = {}) {
 
   if (isFirebaseConfigured()) {
     setSyncState("offline"); // konfigurerat men ännu ej uppkopplat
-    sync = createFirestoreSync({
+    sync = createSync({
       firebaseConfig,
       onRemoteDocs: mergeRemote,
       onStatus: setSyncState,
