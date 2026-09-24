@@ -32,8 +32,15 @@ classes/{classId}/students/{studentId}  — elev i klassen
 classes/{classId}/sessions/{sessionId}  — genomförda pass/resultat
                                           (trafikljuspass, aktiviteter; Läge 3/5)
   type: "trafikljus" | …
+  kind               — endast type "trafikljus": "overgang" | "datorer".
+                       Gamla pass UTAN kind räknas som "overgang".
+                       Statistik och rekord räknas alltid separat per
+                       kind (datorer jämförs aldrig med övergångar).
   startedAt, endedAt
-  result: { … }      — passtypens egna data (t.ex. antal varningar)
+  result: { … }      — passtypens egna data (t.ex. antal varningar).
+                       Trafikljus: { color: "green"|"yellow"|"red",
+                       durationSec, limits: { yellowSec, redSec } }
+                       (limits = gränserna som gällde, saknas på äldre pass)
   lesson             — SNAPSHOT av pågående block ur den inloggade
                        lärarens lessonPlans vid sparandet (samma format
                        som noteringarnas): { date, start, end,
@@ -78,6 +85,23 @@ classes/{classId}/settings/elevlista    — Läge 4:s inställningar
     sessionStart     — epoch ms; minneslistan visar noteringar efter
                        denna. "Nollställ inför nästa lektion" = nu.
   }
+
+classes/{classId}/settings/trafikljus   — Läge 3:s gränser, per passtyp
+  value: {
+    overgang: { yellowSec, redSec }   — standard 60 / 120
+    datorer:  { yellowSec, redSec }   — standard 180 / 300 (grönt <3:00,
+                                        gult 3:00–5:00, rött från 5:00)
+  }
+                     — bakåtkompatibelt: en äldre config utan typ
+                       ({ yellowSec, redSec } på toppnivån) läses som
+                       "overgang" och skrivs om till typad form vid
+                       nästa ändring. Saknad typ får standardvärden.
+
+classes/{classId}/settings/trafikljusState — Läge 3:s live-tillstånd
+  value: { timer: { startedAt, pausedAt|null } | null,
+           kind: "overgang" | "datorer" }
+                     — speglas till elevskärmen (även via sync-bussen);
+                       kind styr gränserna och etiketten "Datorer"
 
 classes/{classId}/settings/display      — namnvisning (togglas i lärarvyn)
   value: { nameDisplay: "first" | "initials" }
