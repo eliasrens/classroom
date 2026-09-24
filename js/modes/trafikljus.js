@@ -24,7 +24,12 @@
 import { createTicker } from "../lib/timer.js";
 import { icon } from "../lib/icons.js";
 import { SUBJECTS } from "../lib/color.js";
-import { attribution, currentUid } from "../data/plans.js";
+import {
+  KINDS, KIND_KEYS, DEFAULT_KIND, kindOf,
+  computeStats, fmtMMSS, fmtWhen, lessonLabel, mergedSubjects,
+} from "../lib/trafikljus-stats.js";
+import { attribution } from "../data/plans.js";
+import { teacherOptions as sharedTeacherOptions, teacherFilterFn, validTeacherFilter } from "../lib/teacher-filter.js";
 import { currentLessonBlock, teacherLabel, escapeHtml } from "./elever/shared.js";
 
 const CONFIG_ID = "trafikljus";       // settings/trafikljus  → { value: { overgang:{yellowSec, redSec}, datorer:{…} } }
@@ -34,19 +39,6 @@ const settingsPath = (classId) => `classes/${classId}/settings`;
 const sessionsPath = (classId) => `classes/${classId}/sessions`;
 
 const MIN_SEC = 5;
-
-/** Passtyper. Gamla pass/config utan typ räknas som "overgang". */
-const KINDS = {
-  overgang: { key: "overgang", label: "Övergång", icon: "signal",  defaults: { yellowSec: 60,  redSec: 120 } },
-  datorer:  { key: "datorer",  label: "Datorer",  icon: "monitor", defaults: { yellowSec: 180, redSec: 300 } },
-};
-const KIND_KEYS = Object.keys(KINDS);
-const DEFAULT_KIND = "overgang";
-
-/** Giltig typnyckel (allt okänt/saknat → "overgang"). */
-const kindOf = (k) => (KINDS[k] ? k : DEFAULT_KIND);
-/** Ett loggat pass typ — gamla pass utan `kind` är övergångar. */
-const sessionKind = (s) => kindOf(s?.kind);
 
 /** Faser: bara färg + etikett. Ingen instruktionstext visas på skärmen
     — den stora klockan och färgskiftet räcker (saklig ton mot eleverna). */
@@ -62,15 +54,6 @@ const PHASES = {
 function elapsedMs(t, now = Date.now()) {
   if (!t) return 0;
   return Math.max(0, (t.pausedAt ?? now) - t.startedAt);
-}
-
-/** "MM:SS" med GOLV (första sekunden visar 00:00 — räknar uppåt). */
-function fmtMMSS(ms) {
-  const total = Math.floor(ms / 1000);
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${pad(m)}:${pad(s)}`;
 }
 
 /** Fas för ett antal förflutna sekunder givet gränserna. */
@@ -102,70 +85,8 @@ function normalizeConfig(raw) {
   );
 }
 
-/** Måndag 00:00 (lokal tid) för given tidpunkt — start på innevarande vecka. */
-function startOfWeek(now = Date.now()) {
-  const d = new Date(now);
-  d.setHours(0, 0, 0, 0);
-  const monday = (d.getDay() + 6) % 7; // mån = 0
-  d.setDate(d.getDate() - monday);
-  return d.getTime();
-}
-
-/**
- * Veckostatistik för EN passtyp ur loggade pass: antal per färg,
- * snabbaste gröna stopp (veckans rekord) och alla pass nyast först.
- * Typerna blandas aldrig — datorer jämförs aldrig med övergångar.
- * `filter` (valfri) begränsar vidare, t.ex. till en viss lärare.
- */
-function computeStats(sessions, kind = DEFAULT_KIND, { now = Date.now(), filter = null } = {}) {
-  const weekStart = startOfWeek(now);
-  const tl = sessions.filter(
-    (s) => s.type === "trafikljus" && s.result && sessionKind(s) === kindOf(kind) && (!filter || filter(s)),
-  );
-  const week = tl.filter((s) => (s.startedAt ?? 0) >= weekStart);
-
-  const counts = { green: 0, yellow: 0, red: 0 };
-  let recordSec = null;
-  let recordId = null;
-  for (const s of week) {
-    const c = s.result.color;
-    if (counts[c] != null) counts[c]++;
-    if (c === "green" && (recordSec == null || s.result.durationSec < recordSec)) {
-      recordSec = s.result.durationSec;
-      recordId = s.id;
-    }
-  }
-
-  const latest = [...tl].sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
-  return { counts, recordSec, recordId, latest, weekTotal: week.length };
-}
-
-/** "tis 10:15" inom innevarande vecka, annars "tis 15 sep 10:15". */
-function fmtWhen(ts, now = Date.now()) {
-  const d = new Date(ts);
-  const day = d.toLocaleDateString("sv-SE", { weekday: "short" }).replace(/\.$/, "");
-  const time = d.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
-  if (ts >= startOfWeek(now) && ts < startOfWeek(now) + 7 * 86_400_000) return `${day} ${time}`;
-  const date = d.toLocaleDateString("sv-SE", { day: "numeric", month: "short" }).replace(/\.$/, "");
-  return `${day} ${date} ${time}`;
-}
-
-/** Lektionsnamn ur passets snapshot: blockets titel, annars ämnets namn. */
-function lessonLabel(lesson, subjects) {
-  if (!lesson) return "";
-  if (lesson.title) return lesson.title;
-  return subjects.find((x) => x.id === lesson.subjectId)?.name ?? lesson.subjectId ?? "";
-}
-
 /** "m:ss" för gränsvisning (180 → "3:00"). */
 const fmtLimit = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
-
-/** Inbyggda ämnen + klassens egna (settings/subjects, se Läge 2). */
-function mergedSubjects(settingsDocs) {
-  const custom = settingsDocs.find((d) => d.id === "subjects")?.value?.list ?? [];
-  const seen = new Set(SUBJECTS.map((s) => s.id));
-  return [...SUBJECTS, ...custom.filter((s) => s?.id && !seen.has(s.id))];
-}
 
 const HISTORY_PAGE = 8; // pass per "sida" i historiken
 
@@ -460,33 +381,12 @@ export default {
     // -- Statistik: filter (lärare + typ), veckosummering, rekord, historik --
 
     /** Lärarna som loggat trafikljuspass i klassen (för filtret). */
-    function teacherOptions() {
-      const byUid = new Map();
-      let unknown = false;
-      for (const s of sessions) {
-        if (s.type !== "trafikljus") continue;
-        if (!s.createdBy) { unknown = true; continue; }
-        if (!byUid.has(s.createdBy) || s.createdByName) byUid.set(s.createdBy, teacherLabel(s));
-      }
-      byUid.delete(currentUid()); // "Mina" täcker den inloggade läraren
-      const opts = [...byUid].sort((a, b) => a[1].localeCompare(b[1], "sv")).map(([uid, name]) => ({ value: `t:${uid}`, name }));
-      if (unknown) opts.push({ value: "unknown", name: "Okänd lärare" });
-      return opts;
-    }
-
-    function teacherFilterFn(value) {
-      if (value === "mine") return (s) => s.createdBy === currentUid();
-      if (value === "unknown") return (s) => !s.createdBy;
-      if (value?.startsWith("t:")) { const uid = value.slice(2); return (s) => s.createdBy === uid; }
-      return null; // "all"
-    }
+    const teacherOptions = () => sharedTeacherOptions(sessions.filter((s) => s.type === "trafikljus"));
 
     function drawStats() {
       const statsKind = kindOf(statsFilter.kind ?? kind);
       const others = teacherOptions();
-      if (statsFilter.teacher.startsWith("t:") || statsFilter.teacher === "unknown") {
-        if (!others.some((o) => o.value === statsFilter.teacher)) statsFilter.teacher = "all";
-      }
+      statsFilter.teacher = validTeacherFilter(statsFilter.teacher, others);
       const filterOn = statsFilter.teacher !== "all";
       const { counts, recordSec, recordId, latest, weekTotal } =
         computeStats(sessions, statsKind, { filter: teacherFilterFn(statsFilter.teacher) });
@@ -501,7 +401,7 @@ export default {
       const rows = latest.slice(0, shown);
       const latestRows =
         rows.length === 0
-          ? `<li class="tl-stat-empty">${filterOn ? "Inga sparade pass för det här urvalet." : "Inga sparade pass ännu."}</li>`
+          ? `<li class="tl-stat-empty">${filterOn ? "Inga sparade pass i veckan för det här urvalet." : "Inga sparade pass ännu i veckan."}</li>`
           : rows
               .map((s) => {
                 const lesson = lessonLabel(s.lesson, subjects);
@@ -545,9 +445,10 @@ export default {
           <p class="tl-week-total">${weekTotal} pass loggade i veckan.</p>
         </div>
         <div class="tl-stats-latest">
-          <h3>Senaste passen · ${KINDS[statsKind].label}</h3>
+          <h3>Veckans pass · ${KINDS[statsKind].label}</h3>
           <ul class="tl-passes">${latestRows}</ul>
           ${latest.length > shown ? `<button type="button" class="btn btn--ghost tl-more" data-stats-more>Visa fler (${latest.length - shown} till)</button>` : ""}
+          <p class="tl-archive-hint">Tidigare veckor finns i <a href="#/statistik">Statistik</a>.</p>
         </div>`;
     }
 

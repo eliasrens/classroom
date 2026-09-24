@@ -332,6 +332,9 @@
 }
 .tl-pass.is-record .tl-pass-time { color: var(--color-accent-text); }
 .tl-more { margin-top: var(--space-2); font-size: var(--text-s); }
+/* Veckorytm: listan visar bara innevarande vecka — äldre ligger i arkivet. */
+.tl-archive-hint { margin: var(--space-2) 0 0; color: var(--color-ink-soft); font-size: var(--text-s); }
+.tl-archive-hint a { color: var(--color-accent-text); }
 
 @media (max-width: 640px) {
   .tl-btn { flex-basis: 40%; }

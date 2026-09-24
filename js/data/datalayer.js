@@ -27,6 +27,8 @@
  *   data.remove(path, id)      → void
  *   data.watch(path, cb)       → unsubscribe     cb([doc]) direkt + vid varje ändring
  *                                                (lokal, annan flik/fönster, eller moln)
+ *   data.once(path, id, plan)  → boolean         villkorad skrivning EXAKT EN GÅNG över
+ *                                                alla enheter (Firestore-transaktion)
  *   data.syncState             → 'local' | 'online' | 'offline'
  *
  * 'local'  = Firebase ej konfigurerat (medvetet lokalt läge)
@@ -195,6 +197,49 @@ export function createDataLayer({ onSyncState } = {}) {
     /** Alla lagrade samlings-paths under ett prefix (t.ex. "classes/4a/"). */
     async collections(prefix) {
       return collectionPathsUnder(prefix);
+    },
+
+    /**
+     * Villkorad skrivning som ska ske EXAKT EN GÅNG — även om flera lärare
+     * öppnar appen samtidigt (t.ex. veckans tömning av Bra jobbat, se
+     * js/lib/week-rhythm.js). plan(doc|null) får aktuell version av
+     * (path,id) och returnerar null (inget att göra) eller [{ path, doc }].
+     * Med Firebase körs det som en transaktion mot SERVERNS version, så
+     * bara den första enheten skriver; resultatet mergas in lokalt direkt.
+     * Utan Firebase: mot den lokala lagringen. Firebase konfigurerat men
+     * inte nåbart → görs INTE (false; försök igen senare) — om inte
+     * allowLocal, då görs det lokalt och köas som vanliga skrivningar.
+     * Returnerar true om något skrevs.
+     */
+    async once(path, id, plan, { allowLocal = false } = {}) {
+      const stamp = (writes) => {
+        const now = Date.now();
+        return writes.map(({ path: p, doc }) => ({
+          path: p,
+          doc: { createdAt: doc.createdAt ?? now, ...doc, updatedAt: now },
+        }));
+      };
+      const runLocal = async () => {
+        const writes = plan(readCollection(path)[id] ?? null);
+        if (!writes?.length) return false;
+        for (const w of writes) await api.put(w.path, w.doc);
+        return true;
+      };
+
+      if (!isFirebaseConfigured()) return runLocal();
+      if (sync && (await sync.start())) {
+        try {
+          const written = await sync.transact(path, id, (doc) => {
+            const writes = plan(doc);
+            return writes?.length ? stamp(writes) : null;
+          });
+          for (const w of written) mergeRemote(w.path, { [w.doc.id]: w.doc });
+          return written.length > 0;
+        } catch (err) {
+          console.warn(`[data] once(${path}/${id}) nådde inte servern:`, err);
+        }
+      }
+      return allowLocal ? runLocal() : false;
     },
 
     watch(path, cb) {

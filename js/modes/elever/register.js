@@ -13,12 +13,15 @@ import {
   NOTE_TYPES, noteTypeById, activeStudents, escapeHtml,
   createNote, currentLessonBlock, fmtTime,
 } from "./shared.js";
+import { startOfWeek } from "../../lib/week.js";
 
-const startOfToday = () => new Date(new Date().setHours(0, 0, 0, 0)).getTime();
+const startOfToday = () => new Date(new Date(Date.now()).setHours(0, 0, 0, 0)).getTime();
 
 export function renderRegister(el, api) {
   const students = activeStudents(api.students);
-  const sessionStart = api.settings.sessionStart ?? startOfToday();
+  // Veckorytm: minneslistan börjar aldrig före måndag 00:00 — en
+  // nollställning i fredags visar alltså inte fredagens noteringar på måndag.
+  const sessionStart = Math.max(api.settings.sessionStart ?? startOfToday(), startOfWeek());
   const sessionNotes = api.notes.filter((n) => (n.createdAt ?? 0) >= sessionStart);
   const anyHotkeys = students.some((s) => s.hotkey);
 

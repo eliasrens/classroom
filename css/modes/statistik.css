@@ -1,0 +1,120 @@
+/* ============================================================
+   STATISTIK — veckoarkivet (endast lärarvy, issue #29).
+   Återanvänder trafikljusets statistikdelar (.tl-tally, .tl-pass …
+   i css/modes/trafikljus.css) och Elevlistans chips. Skriver mot
+   designtokens så både mörkt och ljust schema följer med.
+   ============================================================ */
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 72rem;
+  margin: 0 auto;
+  padding-block: var(--space-3);
+}
+
+/* ---- Huvud: rubrik + veckoväljare + lärarfilter ---- */
+.stat-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.stat-title h1 { margin: 0; font-size: var(--text-xl); }
+.stat-sub { margin: var(--space-1) 0 0; color: var(--color-ink-soft); font-size: var(--text-s); }
+.stat-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.stat-weeknav { display: flex; align-items: center; gap: var(--space-1); }
+.stat-controls select { min-height: 2.1rem; }
+
+/* ---- Siffror för veckan ---- */
+.stat-tiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: var(--space-2);
+}
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+}
+.stat-tile__n { font-size: var(--text-xl); font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat-tile__l { color: var(--color-ink-soft); font-size: var(--text-s); }
+
+/* ---- Sektioner ---- */
+.stat-section { display: flex; flex-direction: column; gap: var(--space-2); }
+.stat-h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-m);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+}
+.stat-h2 svg { color: var(--color-accent-text); }
+.stat-card { padding: var(--space-3) var(--space-4); }
+.stat-card h3 { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-3); font-size: var(--text-m); }
+.stat-empty { margin: 0; color: var(--color-ink-soft); font-size: var(--text-s); }
+.stat-note { margin: var(--space-3) 0 0; color: var(--color-ink-soft); font-size: var(--text-s); }
+.stat-zero { color: var(--color-ink-soft); opacity: 0.6; }
+
+.stat-kinds { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: var(--space-3); }
+
+/* ---- Elevtabell ---- */
+.stat-table-wrap { overflow-x: auto; }
+.stat-table { width: 100%; border-collapse: collapse; font-size: var(--text-s); }
+.stat-table th, .stat-table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-line);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.stat-table thead th { color: var(--color-ink-soft); font-weight: 600; }
+.stat-table th:first-child { text-align: left; }
+.stat-row.is-open th, .stat-row.is-open td { border-bottom-color: transparent; }
+.stat-student {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-m);
+  font-weight: 600;
+  cursor: pointer;
+}
+.stat-student svg { color: var(--color-ink-soft); }
+.stat-detail td { text-align: left; background: var(--color-surface-alt); }
+.stat-notes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.stat-noteitem { display: flex; flex-direction: column; gap: 2px; }
+.stat-noteitem__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); color: var(--color-ink-soft); }
+.stat-noteitem__text { color: var(--color-ink); }
+
+/* ---- Bra jobbat ---- */
+.stat-praise { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.stat-praise li {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-accent-soft);
+  font-weight: 600;
+}
+
+/* ---- Översikt: veckans siffror (js/modes/oversikt.js) ---- */
+.ov-week .stat-tiles { grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); }
+.ov-week__foot { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); color: var(--color-ink-soft); font-size: var(--text-s); }
+
+@media (max-width: 640px) {
+  .stat-kinds { grid-template-columns: 1fr; }
+}

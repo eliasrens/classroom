@@ -116,6 +116,27 @@ export function createFirestoreSync({ firebaseConfig, onRemoteDocs, onStatus }) 
     });
   }
 
+  /**
+   * Villkorad engångsskrivning mot SERVERN (data.once i datalagret).
+   * Läser (path,id) i en transaktion och låter plan(serverDoc|null) avgöra
+   * vad som ska skrivas: null = inget, annars [{ path, doc }] (doc.id krävs).
+   * Två enheter som kör samtidigt serialiseras av Firestore — den som kommer
+   * sist ser den första enhetens skrivning och får null. plan kan köras
+   * flera gånger (transaktionen görs om vid krock) och måste vara ren.
+   * Returnerar de skrivna dokumenten ([] om inget skrevs). Kastar vid fel.
+   */
+  async function transact(path, id, plan) {
+    if (!fs) throw new Error("Firestore ej uppkopplat");
+    const { db, api } = fs;
+    const ref = api.doc(db, ...path.split("/"), id);
+    return api.runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      const writes = plan(snap.exists() ? { ...snap.data(), id } : null) ?? [];
+      for (const w of writes) tx.set(api.doc(db, ...w.path.split("/"), w.doc.id), w.doc);
+      return writes;
+    });
+  }
+
   /** Nollställ "SDK:n gick inte att ladda" så nästa start() försöker igen
    *  (anropas när webbläsaren kommer online igen — kallstart offline ska
    *  inte låsa appen i lokalt läge för resten av sessionen). */
@@ -123,5 +144,5 @@ export function createFirestoreSync({ firebaseConfig, onRemoteDocs, onStatus }) 
     if (!fs) startFailed = false;
   }
 
-  return { start, watch, push, reset, get connected() { return fs != null; } };
+  return { start, watch, push, transact, reset, get connected() { return fs != null; } };
 }

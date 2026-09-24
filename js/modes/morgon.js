@@ -15,9 +15,11 @@ import { studentLabel } from "../lib/names.js";
 import { createPraiseBoard } from "../ui/praise-board.js";
 import {
   WEEKDAYS, UNSPLASH_IDS, unsplashUrl,
-  normalize, loadMorning, saveMorning, settingsPath, MORNING_KEY,
-  studentTextFor, orderedTasks, greetingText,
+  normalize, loadMorning, saveMorning, saveBackground, settingsPath, MORNING_KEY,
+  studentTextFor, orderedTasks, greetingText, currentPraise, praiseIsStale,
 } from "../lib/morning.js";
+import { rolloverPraise } from "../lib/week-rhythm.js";
+import { weekKey } from "../lib/week.js";
 
 const PANEL_KEY = "classroom:morgon:panelOpen";
 // Ny slumpad bild per sidladdning, men stabil inom sessionen (per klass).
@@ -114,7 +116,8 @@ export default {
 
     function renderNametavla() {
       if (!mounted()) return;
-      const names = settings.praise.map(praiseName).filter(Boolean);
+      // Veckorytm: förra veckans lista visas aldrig (ren från måndag 00:00).
+      const names = currentPraise(settings).map(praiseName).filter(Boolean);
       // Elevvyn ska aldrig visa "tom"-hjälptexten som en riktig rad.
       board.el.hidden = !settings.showNametavla || (!isTeacher && !names.length);
       board.setNames(names, { emptyText: isTeacher ? "Kryssa i elever i panelen →" : "" });
@@ -137,6 +140,18 @@ export default {
       await saveMorning(data, classId, settings);
     }
     const clone = () => structuredClone(settings);
+
+    // Ändring i Bra jobbat-listan. Hör listan fortfarande till förra
+    // veckan (tömningen har inte hunnit ske, t.ex. offline) arkiveras och
+    // töms den FÖRST — annars hamnar nya namn i förra veckans lista.
+    async function editPraise(fn) {
+      if (praiseIsStale(settings)) await rolloverPraise(data, classId, { allowLocal: true });
+      const next = clone();
+      if (praiseIsStale(next)) next.praise = []; // rollover misslyckades helt — börja ändå rent
+      next.weekOf = weekKey();
+      fn(next);
+      await commit(next);
+    }
 
     function applyExternal(value) {
       const next = normalize(value);
@@ -248,28 +263,28 @@ export default {
         const cb = e.target.closest("input[data-student]");
         if (!cb) return;
         const id = cb.dataset.student;
-        const next = clone();
-        const has = next.praise.some((p) => p.kind === "student" && p.studentId === id);
-        next.praise = has
-          ? next.praise.filter((p) => !(p.kind === "student" && p.studentId === id))
-          : [...next.praise, { id, kind: "student", studentId: id }];
-        if (!has) next.showNametavla = true;
-        commit(next);
+        void editPraise((next) => {
+          const has = next.praise.some((p) => p.kind === "student" && p.studentId === id);
+          next.praise = has
+            ? next.praise.filter((p) => !(p.kind === "student" && p.studentId === id))
+            : [...next.praise, { id, kind: "student", studentId: id }];
+          if (!has) next.showNametavla = true;
+        });
       });
       const ntFree = $(".morgon__ntfree-input");
       const addFree = () => {
         const text = ntFree.value.trim();
         if (!text) return;
-        const next = clone();
-        next.praise.push({ id: crypto.randomUUID?.() ?? String(Date.now()), kind: "free", text });
-        next.showNametavla = true;
         ntFree.value = "";
-        commit(next);
+        void editPraise((next) => {
+          next.praise.push({ id: crypto.randomUUID?.() ?? String(Date.now()), kind: "free", text });
+          next.showNametavla = true;
+        });
         ntFree.focus();
       };
       $(".morgon__ntfree-btn").addEventListener("click", addFree);
       ntFree.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addFree(); } });
-      clearNt = () => { const next = clone(); next.praise = []; commit(next); };
+      clearNt = () => void editPraise((next) => { next.praise = []; });
       $(".morgon__ntclear").addEventListener("click", clearNt);
       // Töm-knappen på själva namntavlan (teacher-only) går via onClear ovan.
 
@@ -335,7 +350,7 @@ export default {
 
       function syncNtStudents() {
         ntStudents.querySelectorAll("input[data-student]").forEach((cb) => {
-          cb.checked = settings.praise.some((p) => p.kind === "student" && p.studentId === cb.dataset.student);
+          cb.checked = currentPraise(settings).some((p) => p.kind === "student" && p.studentId === cb.dataset.student);
         });
       }
       function renderNtStudents() {
@@ -386,17 +401,28 @@ export default {
       }));
     }
 
+    // Veckoskifte medan skärmen står på (t.ex. över helgen): rita om
+    // namntavlan när listan blir "förra veckans" — även offline.
+    let wasStale = null;
+    const weekTick = setInterval(() => {
+      const stale = praiseIsStale(settings);
+      if (stale !== wasStale) { wasStale = stale; renderNametavla(); if (isTeacher) syncPanel(); }
+    }, 30_000);
+    stops.push(() => clearInterval(weekTick));
+
     // ---------- Init ----------
     settings = await loadMorning(data, classId);
 
     // Slumpa bakgrund vid sidladdning (stabil inom sessionen per klass).
+    // Bara bakgrunden skrivs (mot senaste versionen) — den lokala kopian
+    // kan vara inaktuell precis efter sidladdning, se saveBackground.
     if (isTeacher) {
       const key = classId ?? "__noclass__";
       const needsRandom = !settings.background.current || !randomizedThisSession.has(key);
       if (needsRandom) {
         randomizedThisSession.add(key);
         settings.background.current = pickRandomBg() || settings.background.current;
-        await saveMorning(data, classId, settings);
+        void saveBackground(data, classId, settings.background.current);
       }
     }
 

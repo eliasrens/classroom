@@ -9,6 +9,8 @@
  * Ingenting här rör DOM — bara ren datamodell och härledningar.
  */
 
+import { weekKey, weekStartFromKey, startOfWeek } from "./week.js";
+
 export const MORNING_KEY = "morningScreen";
 export const settingsPath = (classId) => `classes/${classId}/settings`;
 
@@ -66,6 +68,9 @@ export function normalize(value) {
     tasks,
     showNametavla: !!v.showNametavla,
     praise: Array.isArray(v.praise) ? v.praise.map(normPraise).filter(Boolean) : [],
+    // Veckan som Bra jobbat-listan hör till ("2026-W39"). Listan töms
+    // och arkiveras första gången appen öppnas en ny vecka (week-rhythm.js).
+    weekOf: typeof v.weekOf === "string" ? v.weekOf : null,
     background: {
       current: typeof v.background?.current === "string" ? v.background.current : "",
       extraUrls: Array.isArray(v.background?.extraUrls) ? v.background.extraUrls.filter((u) => typeof u === "string") : [],
@@ -115,6 +120,24 @@ export function greetingText(settings, activeClass) {
   return `${word} ${activeClass.name}!`;
 }
 
+// ---- Veckorytm: Bra jobbat gäller innevarande vecka ----
+
+/**
+ * Hör listan till en TIDIGARE vecka (ännu ej tömd)? Då visas den inte —
+ * vyn är ren från måndag 00:00 även innan tömningen hunnit sparas (t.ex.
+ * offline). Saknad weekOf (äldre data) räknas som innevarande vecka; en
+ * weekOf i framtiden (fel klocka på någon enhet) rörs inte.
+ */
+export function praiseIsStale(settings, now = Date.now()) {
+  const start = weekStartFromKey(settings?.weekOf);
+  return start != null && start < startOfWeek(now);
+}
+
+/** Bra jobbat-listan som ska VISAS nu (tom om den hör till förra veckan). */
+export function currentPraise(settings, now = Date.now()) {
+  return praiseIsStale(settings, now) ? [] : (settings?.praise ?? []);
+}
+
 // ---- Läsning/skrivning mot datalagret ----
 
 export async function loadMorning(data, classId) {
@@ -126,4 +149,22 @@ export async function loadMorning(data, classId) {
 export async function saveMorning(data, classId, settings) {
   if (!classId) return; // ingen klass vald — ändringar blir efemära
   await data.put(settingsPath(classId), { id: MORNING_KEY, value: settings });
+}
+
+/**
+ * Byt BARA bakgrunden — mot senaste versionen av dokumentet (servern när
+ * Firebase finns). Slumpningen sker vid varje sidladdning, ofta innan
+ * molndatan hunnit komma: en vanlig put av den lokala (kanske inaktuella)
+ * kopian skulle då skriva över andra lärares ändringar — t.ex. måndagens
+ * tömning av Bra jobbat, som annars kom tillbaka.
+ */
+export async function saveBackground(data, classId, url) {
+  if (!classId) return;
+  await data.once(settingsPath(classId), MORNING_KEY, (doc) => {
+    const value = normalize(doc?.value);
+    if (doc && value.background.current === url) return null;
+    value.background.current = url;
+    value.weekOf ??= weekKey();
+    return [{ path: settingsPath(classId), doc: { ...(doc ?? {}), id: MORNING_KEY, value } }];
+  }, { allowLocal: true });
 }
