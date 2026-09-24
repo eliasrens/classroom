@@ -104,6 +104,11 @@ export function renderCard(el, api) {
     api.refresh();
   });
 
+  main.querySelector("[data-report]")?.addEventListener("click", (e) => {
+    api._rep = { ...(api._rep ?? {}), scope: e.currentTarget.dataset.report, focusSubmit: true };
+    api.setTab("rapporter");
+  });
+
   main.querySelector("[data-insats-open]")?.addEventListener("click", () => {
     api._cardInsats = !api._cardInsats;
     api.refresh();
@@ -188,6 +193,7 @@ function cardHtml(student, api) {
         <h2>${api.label(student)}</h2>
         <div class="ekort__head-actions">
           <button class="btn" data-insats-open>${icon("pen")}Logga insats</button>
+          <button class="btn" data-report="${student.id}" title="Ladda ned en krypterad rapport för eleven">${icon("lock")}Rapport</button>
         </div>
       </header>
 
