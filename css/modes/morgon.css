@@ -8,6 +8,13 @@
 .view:has(.morgon) { padding: 0; max-width: none; }
 
 .morgon {
+  /* STORLEKSRATT för hela morgonskärmen (issue #38): hälsning, uppgifter,
+     kortets bredd/padding, luft/avstånd och Bra jobbat-tavlan (text, titel,
+     min-bredd, padding) multipliceras alla med denna via calc(). Ändra
+     BARA här för att göra skärmen större/mindre — proportionerna följer
+     med. 1 = storleken före #38. Gäller endast inom .morgon, så
+     lektionsplaneringens Bra jobbat-ruta påverkas inte. */
+  --morgon-scale: 0.8;
   --morgon-fallback: #2b3a34; /* lugn djupgrön om bilden inte laddar */
   position: relative;
   width: 100%;
@@ -47,6 +54,8 @@
   place-items: center;
   padding: var(--space-5) var(--space-4);
   pointer-events: none; /* klick går till bakgrund/paneler; kortet slår på nedan */
+  /* Storlekscontainer: kortets text skalas mot den yta kortet får (cqi). */
+  container-type: inline-size;
   transition: padding 0.25s ease;
 }
 /* Öppen kontrollpanel: centrera kortet i ytan TILL HÖGER om panelen. */
@@ -57,18 +66,21 @@
    --nt-space sätts av js/modes/morgon.js efter tavlans faktiska bredd
    (den växer med fler kolumner); reservvärdet gäller före första mätningen. */
 @media (min-width: 721px) {
-  .morgon:has(.morgon__nametavla:not([hidden])) .morgon__center { padding-right: var(--nt-space, min(21rem, 28vw)); }
+  .morgon:has(.morgon__nametavla:not([hidden])) .morgon__center { padding-right: var(--nt-space, calc(var(--morgon-scale) * min(21rem, 28vw))); }
 }
 
 .morgon__card {
   pointer-events: auto;
-  width: min(56rem, 100%);
+  /* Kortets innerbredd som den var FÖRE skalningen (bredd − padding, mätt
+     mot centerytan). Hälsning och uppgifter skalas mot den (i st.f. mot
+     kortet självt, som ju redan är skalat) så att de blir exakt
+     --morgon-scale × tidigare storlek — och aldrig bryts när kortet blir
+     smalare bredvid en bred namntavla (de ryms alltid i det nya kortet). */
+  --morgon-inner0: calc(min(56rem, 100cqi) - 2 * clamp(var(--space-4), 4vw, var(--space-5)));
+  width: min(calc(var(--morgon-scale) * 56rem), 100%);
   max-height: 88dvh;
-  /* Hälsningen skalas mot kortets egen bredd (cqi) så att den inte bryts
-     när kortet blir smalare bredvid en bred namntavla. */
-  container-type: inline-size;
   overflow: auto;
-  padding: clamp(var(--space-4), 4vw, var(--space-5));
+  padding: calc(var(--morgon-scale) * clamp(var(--space-4), 4vw, var(--space-5)));
   border-radius: var(--radius-l);
   background: rgb(18 20 26 / 52%);
   backdrop-filter: blur(14px) saturate(120%);
@@ -82,20 +94,20 @@
 .morgon__greeting {
   margin: 0;
   /* vh-taket håller kortet inom skärmhöjden på låga projektorer (720p). */
-  font-size: clamp(2rem, min(10.5cqi, 10vh), 4.8rem);
+  font-size: calc(var(--morgon-scale) * clamp(2rem, min(0.105 * var(--morgon-inner0), 10vh), 4.8rem));
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: -0.015em;
   color: #fff;
   text-shadow: 0 2px 12px rgb(0 0 0 / 55%);
 }
-.morgon[data-view="student"] .morgon__greeting { font-size: clamp(2.4rem, min(10.5cqi, 12.5vh), 5.6rem); }
+.morgon[data-view="student"] .morgon__greeting { font-size: calc(var(--morgon-scale) * clamp(2.4rem, min(0.105 * var(--morgon-inner0), 12.5vh), 5.6rem)); }
 
 .morgon__rule {
   border: 0;
   height: 2px;
-  width: 4.5rem;
-  margin: clamp(var(--space-3), 2vw, var(--space-4)) auto;
+  width: calc(var(--morgon-scale) * 4.5rem);
+  margin: calc(var(--morgon-scale) * clamp(var(--space-3), 2vw, var(--space-4))) auto;
   background: var(--hue-accent);
   border-radius: var(--radius-round);
   opacity: 0.9;
@@ -108,18 +120,18 @@
   counter-reset: mg;
   text-align: left;
   display: grid;
-  gap: clamp(var(--space-2), 1.4vw, var(--space-3));
-  max-width: 52rem;
+  gap: calc(var(--morgon-scale) * clamp(var(--space-2), 1.4vw, var(--space-3)));
+  max-width: calc(var(--morgon-scale) * 52rem);
 }
 .morgon__tasks li {
   counter-increment: mg;
   position: relative;
   padding-left: 1.75em;
-  font-size: clamp(1.2rem, min(5.6cqi, 4.8vh), 2.2rem);
+  font-size: calc(var(--morgon-scale) * clamp(1.2rem, min(0.056 * var(--morgon-inner0), 4.8vh), 2.2rem));
   line-height: 1.3;
   text-shadow: 0 1px 8px rgb(0 0 0 / 55%);
 }
-.morgon[data-view="student"] .morgon__tasks li { font-size: clamp(1.6rem, min(5.6cqi, 6vh), 2.9rem); }
+.morgon[data-view="student"] .morgon__tasks li { font-size: calc(var(--morgon-scale) * clamp(1.6rem, min(0.056 * var(--morgon-inner0), 6vh), 2.9rem)); }
 .morgon__tasks li::before {
   content: counter(mg);
   position: absolute;
@@ -143,7 +155,7 @@
   box-shadow: 0 1px 6px rgb(0 0 0 / 35%);
 }
 .morgon__tasks-empty {
-  margin: var(--space-3) 0 0;
+  margin: calc(var(--morgon-scale) * var(--space-3)) 0 0;
   color: rgb(255 255 255 / 78%);
   text-shadow: 0 1px 8px rgb(0 0 0 / 55%);
 }
@@ -154,19 +166,27 @@
    bestäms bara placering och storlekar för morgonskärmen. */
 .morgon__nametavla {
   position: absolute;
-  top: clamp(var(--space-4), 5vh, 3.5rem);
+  /* Höjden (som styr när kolumner läggs till och hur stor texten blir med
+     många namn) skalas också: rutan får --morgon-scale × den tidigare
+     höjden och centreras lodrätt. */
+  --nt-inset: clamp(var(--space-4), 5vh, 3.5rem);
+  --nt-inset-y: calc(var(--nt-inset) + max(0px, (1 - var(--morgon-scale)) / 2 * (100% - 2 * var(--nt-inset))));
+  top: var(--nt-inset-y);
   right: clamp(var(--space-3), 2.5vw, var(--space-5));
-  bottom: clamp(var(--space-4), 5vh, 3.5rem);
-  min-width: min(14rem, 26vw);
-  --praise-font-max: clamp(1.5rem, min(3.2vw, 5vh), 2.6rem);
-  --praise-font-min: 1.1rem;
+  bottom: var(--nt-inset-y);
+  min-width: calc(var(--morgon-scale) * min(14rem, 26vw));
+  --praise-font-max: calc(var(--morgon-scale) * clamp(1.5rem, min(3.2vw, 5vh), 2.6rem));
+  --praise-font-min: calc(var(--morgon-scale) * 1.1rem);
 }
-.morgon__nametavla .praise-board__title { font-size: clamp(1.4rem, min(2.8vw, 4.4vh), 2.2rem); }
+/* Glas-rutans padding (css/ui/praise-board.css) i morgonskärmens skala. */
+.morgon__nametavla.praise-board--glass { padding: calc(var(--morgon-scale) * clamp(var(--space-3), 2vw, var(--space-4))); }
+.morgon__nametavla .praise-board__title { font-size: calc(var(--morgon-scale) * clamp(1.4rem, min(2.8vw, 4.4vh), 2.2rem)); }
+.morgon__nametavla .praise-board__names { margin-top: calc(var(--morgon-scale) * var(--space-3)); }
 .morgon[data-view="student"] .morgon__nametavla {
-  --praise-font-max: clamp(1.8rem, min(4vw, 6.4vh), 3rem);
-  --praise-font-min: 1.1rem;
+  --praise-font-max: calc(var(--morgon-scale) * clamp(1.8rem, min(4vw, 6.4vh), 3rem));
+  --praise-font-min: calc(var(--morgon-scale) * 1.1rem);
 }
-.morgon[data-view="student"] .morgon__nametavla .praise-board__title { font-size: clamp(1.6rem, min(3.2vw, 5vh), 2.6rem); }
+.morgon[data-view="student"] .morgon__nametavla .praise-board__title { font-size: calc(var(--morgon-scale) * clamp(1.6rem, min(3.2vw, 5vh), 2.6rem)); }
 
 /* Smala skärmar: namntavlan lägger sig under kortet i stället för bredvid. */
 @media (max-width: 720px) {
@@ -176,7 +196,7 @@
     margin: 0 auto var(--space-4);
     --praise-fit: off;
   }
-  .morgon__nametavla .praise-board__names { flex: none; grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); }
+  .morgon__nametavla .praise-board__names { flex: none; grid-template-columns: repeat(auto-fill, minmax(calc(var(--morgon-scale) * 8rem), 1fr)); }
   .morgon__center { position: static; min-height: calc(100dvh - var(--topbar-height)); }
 }
 
