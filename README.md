@@ -1,8 +1,8 @@
 # Klassrumsverktyget
 
 Webbaserat klassrumsverktyg för mellanstadiet (åk 4) — morgonskärm,
-lektionsplanering, trafikljusur för övergångar, elevlista med noteringar och en
-översiktsvy. Ren frontend (HTML5 + CSS + Vanilla JS, **inget byggsteg**), delad
+lektionsplanering, trafikljusur för övergångar, elevlista med noteringar, en
+översiktsvy och Statistik med veckoarkiv (vyerna börjar om rent varje måndag). Ren frontend (HTML5 + CSS + Vanilla JS, **inget byggsteg**), delad
 data mellan lärare via Firebase/Firestore med **offline-first**-datalager.
 
 ## Köra
@@ -35,9 +35,17 @@ i realtid (onSnapshot). Appen kraschar aldrig utan Firebase.
 Steg-för-steg för idrifttagning — config, inbjudan av fler lärare och
 deploy av säkerhetsreglerna: **[docs/DRIFTSATTNING.md](docs/DRIFTSATTNING.md)**.
 
-Delat mellan alla inloggade lärare: klasser, elever, noteringar, pass och
-klassinställningar. Privat per lärare: lektionsplaneringar. Se
-[DATAMODELL.md](DATAMODELL.md).
+**All elevdata är bara lokal** (issue #32): elevlistor, noteringar och
+Bra jobbat lagras enbart i webbläsaren på varje lärardator och lämnar
+aldrig den via appen. Rapporter per elev eller klass laddas ned som
+**krypterade `.klassrum`-filer** (Elevlista → Rapporter) och kan slås
+samman med kollegors filer — helt lokalt, filerna flyttas för hand (#33). Delat mellan alla inloggade lärare (molnet): klasser,
+trafikljuspass, **anonyma noteringsräkningar** (`noteStats` — utan
+elev-id, utan text), klassinställningar och **klassåtgärder** (#34 —
+lärarnas logg över arbetssätt de testat med klassen och hur det gick; en
+namnspärr stoppar texter med elevnamn ur datorns lokala elevlista). Privat per lärare:
+lektionsplaneringar. Se [DATAMODELL.md](DATAMODELL.md) och
+[docs/DATASKYDD.md](docs/DATASKYDD.md).
 
 ## Arkitektur
 
@@ -54,14 +62,24 @@ js/
   router.js             hashrouter: #/<läge> (lärare), #/elev/<läge> (elevskärm)
   firebase-config.js    PLATSHÅLLARE — fyll i för molnsynk + Firebase Auth
   data/                 offline-first-datalager (lokalt + Firestore-synk + outbox)
+  lib/class-actions.js  klassåtgärder (#34): modell, namnspärr, koppling till klasstatistiken
   lib/color.js          ämnespalett + automatisk luminans/kontrast-uträkning
   lib/icons.js          linje-ikoner (inline-SVG) — inga emoji i gränssnittet
   lib/names.js          elevnamn: endast förnamn, valfri tag, initial-läge
   lib/privacy.js        integritet: auto-radering av noteringar + radera all klassdata
-  modes/                de fem lägena + registret (Läge 5 = oversikt.js: startvyn)
+  lib/report-crypto.js  krypterade rapportfiler (.klassrum): WebCrypto AES-GCM + PBKDF2
+  modes/elever/report-*.js, reports.js
+                        Elevlista → Rapporter: ladda ned krypterad rapport/utskrift,
+                        öppna och slå samman flera lärares filer (helt lokalt)
+  modes/                lägena + registret (oversikt.js = startvyn, statistik.js = veckoarkivet,
+                        vecka.js = Veckans övergångar — elevvänlig veckosammanfattning för mentorstiden)
+  lib/week.js           veckologik (måndag 00:00) · lib/week-rhythm.js  rent varje måndag
+  lib/week-goal.js      trafikljusets veckomål · lib/week-recap.js  veckosammanfattningen (Veckans övergångar)
   ui/login.js           login-vy + elevskärmens väntevy
   ui/class-picker.js    klassval i topbaren
+  ui/class-actions.js   klassåtgärder: dialoger (ny/ändra, "Testade också") + listan
   ui/help.js            genvägslista under "?" · ui/shortcuts.js  globala tangentgenvägar
+  ui/praise-board.js    "Bra jobbat"-tavlan (växer i kolumner, scrollar aldrig) — morgonskärm, lektion
 firestore.rules         Firestore-säkerhetsregler: inloggning krävs för all läs/skriv
 firebase.json           pekar firebase-CLI:t på firestore.rules (för deploy av regler)
 docs/

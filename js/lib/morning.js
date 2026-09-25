@@ -9,14 +9,31 @@
  * Ingenting här rör DOM — bara ren datamodell och härledningar.
  */
 
+import { weekStartFromKey, startOfWeek } from "./week.js";
+import { serverNow } from "./clock.js";
+
 export const MORNING_KEY = "morningScreen";
 export const settingsPath = (classId) => `classes/${classId}/settings`;
+
+// Bra jobbat-listan är ELEVDATA och lagras BARA lokalt (issue #32):
+// classes/{cid}/praise, doc "board" = { praise, weekOf }. Pathen routas
+// av datalagret till js/data/local-only.js och når aldrig Firestore.
+// I minnet håller lägena kvar den sammanslagna formen (normalize nedan,
+// med praise/weekOf) — load/save/watch nedan delar upp och slår ihop.
+export const PRAISE_DOC = "board";
+export const praisePath = (classId) => `classes/${classId}/praise`;
+
+/** Dela upp ett normaliserat värde i delat (moln) och lokalt (praise). */
+export function splitMorning(settings) {
+  const { praise, weekOf, ...shared } = normalize(settings);
+  return { shared, praise, weekOf };
+}
 
 export const WEEKDAYS = ["Måndag", "Tisdag", "Onsdag", "Torsdag", "Fredag"];
 
 /** Dagens veckodag (Mån–Fre); helg → Måndag. */
 export function todayWeekday() {
-  const d = new Date().getDay(); // 0 sön … 6 lör
+  const d = new Date(serverNow()).getDay(); // 0 sön … 6 lör
   return WEEKDAYS[Math.min(Math.max(d - 1, 0), 4)];
 }
 
@@ -66,6 +83,9 @@ export function normalize(value) {
     tasks,
     showNametavla: !!v.showNametavla,
     praise: Array.isArray(v.praise) ? v.praise.map(normPraise).filter(Boolean) : [],
+    // Veckan som Bra jobbat-listan hör till ("2026-W39"). Listan töms
+    // och arkiveras första gången appen öppnas en ny vecka (week-rhythm.js).
+    weekOf: typeof v.weekOf === "string" ? v.weekOf : null,
     background: {
       current: typeof v.background?.current === "string" ? v.background.current : "",
       extraUrls: Array.isArray(v.background?.extraUrls) ? v.background.extraUrls.filter((u) => typeof u === "string") : [],
@@ -115,15 +135,95 @@ export function greetingText(settings, activeClass) {
   return `${word} ${activeClass.name}!`;
 }
 
+// ---- Veckorytm: Bra jobbat gäller innevarande vecka ----
+
+/**
+ * Hör listan till en TIDIGARE vecka (ännu ej tömd)? Då visas den inte —
+ * vyn är ren från måndag 00:00 även innan tömningen hunnit sparas (t.ex.
+ * offline). Saknad weekOf (äldre data) räknas som innevarande vecka, och
+ * likaså en weekOf i framtiden (fel klocka på någon enhet, issue #31):
+ * den är ogiltig och rättas av veckorytmen (js/lib/week-rhythm.js).
+ */
+export function praiseIsStale(settings, now = serverNow()) {
+  const start = weekStartFromKey(settings?.weekOf);
+  return start != null && start < startOfWeek(now);
+}
+
+/** Ligger listans weekOf i en FRAMTIDA vecka (skriven med fel klocka)? */
+export function praiseWeekInFuture(settings, now = serverNow()) {
+  const start = weekStartFromKey(settings?.weekOf);
+  return start != null && start > startOfWeek(now);
+}
+
+/** Bra jobbat-listan som ska VISAS nu (tom om den hör till förra veckan). */
+export function currentPraise(settings, now = serverNow()) {
+  return praiseIsStale(settings, now) ? [] : (settings?.praise ?? []);
+}
+
 // ---- Läsning/skrivning mot datalagret ----
+
+/** Slå ihop det delade molnvärdet med den lokala Bra jobbat-listan. */
+function mergeMorning(cloudValue, board) {
+  return normalize({
+    ...(cloudValue && typeof cloudValue === "object" ? cloudValue : {}),
+    praise: board?.praise ?? [],
+    weekOf: board?.weekOf ?? null,
+  });
+}
 
 export async function loadMorning(data, classId) {
   if (!classId) return normalize(null);
-  const doc = await data.get(settingsPath(classId), MORNING_KEY);
-  return normalize(doc?.value);
+  const [doc, board] = await Promise.all([
+    data.get(settingsPath(classId), MORNING_KEY),
+    data.get(praisePath(classId), PRAISE_DOC),
+  ]);
+  return mergeMorning(doc?.value, board);
 }
 
 export async function saveMorning(data, classId, settings) {
   if (!classId) return; // ingen klass vald — ändringar blir efemära
-  await data.put(settingsPath(classId), { id: MORNING_KEY, value: settings });
+  const { shared, praise, weekOf } = splitMorning(settings);
+  await Promise.all([
+    data.put(settingsPath(classId), { id: MORNING_KEY, value: shared }),
+    data.put(praisePath(classId), { id: PRAISE_DOC, praise, weekOf }),
+  ]);
+}
+
+/**
+ * Lyssna på morgonskärmens SAMMANSLAGNA tillstånd: det delade dokumentet
+ * (moln) + den lokala Bra jobbat-listan. cb(normaliserat värde) vid varje
+ * ändring från någon av källorna. Returnerar unsubscribe.
+ */
+export function watchMorning(data, classId, cb) {
+  let cloud = null;
+  let board = null;
+  const emit = () => cb(mergeMorning(cloud, board));
+  const offSettings = data.watch(settingsPath(classId), (docs) => {
+    cloud = docs.find((d) => d.id === MORNING_KEY)?.value ?? null;
+    emit();
+  });
+  const offBoard = data.watch(praisePath(classId), (docs) => {
+    board = docs.find((d) => d.id === PRAISE_DOC) ?? null;
+    emit();
+  });
+  return () => { offSettings(); offBoard(); };
+}
+
+/**
+ * Byt BARA bakgrunden — mot senaste versionen av dokumentet (servern när
+ * Firebase finns). Slumpningen sker vid varje sidladdning, ofta innan
+ * molndatan hunnit komma: en vanlig put av den lokala (kanske inaktuella)
+ * kopian skulle då skriva över andra lärares ändringar — t.ex. måndagens
+ * tömning av Bra jobbat, som annars kom tillbaka.
+ */
+export async function saveBackground(data, classId, url) {
+  if (!classId) return;
+  await data.once(settingsPath(classId), MORNING_KEY, (doc) => {
+    // Delade dokumentet får ALDRIG innehålla praise/weekOf (issue #32) —
+    // strippa även om ett äldre moln-dokument råkar ha fälten kvar.
+    const { shared } = splitMorning(doc?.value);
+    if (doc && shared.background.current === url) return null;
+    shared.background.current = url;
+    return [{ path: settingsPath(classId), doc: { ...(doc ?? {}), id: MORNING_KEY, value: shared } }];
+  }, { allowLocal: true });
 }

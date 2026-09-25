@@ -225,3 +225,26 @@
 @media (max-width: 520px) {
   .help__row { grid-template-columns: 1fr; gap: var(--space-1); }
 }
+
+/* Diskret genväg på fredagseftermiddagen: "Mentorstid?" (issue #36) */
+.ov-mentor {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+/* Uppgraderingsskydd: pausad gallring (issue #32) */
+.ov-retention-pause {
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-m);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  font-size: var(--text-s);
+}
+.ov-retention-pause p { margin: 0 0 var(--space-2); }
+
+/* Påminnelse före gallring (issue #33): uppföljningar som inte laddats ned */
+.ov-retention-risk { color: var(--color-warn); font-size: var(--text-s); }
+.ov-retention-risk strong { color: var(--color-warn); }

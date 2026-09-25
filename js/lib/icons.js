@@ -52,6 +52,7 @@ const PATHS = {
   pen: `<path d="m4 20 1-4L16.5 4.5a2.12 2.12 0 0 1 3 3L8 19l-4 1z"/>`,
   archive: `<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11h14V8M10 12h4"/>`,
   download: `<path d="M12 4v11m0 0 4-4m-4 4-4-4M4 19h16"/>`,
+  printer: `<path d="M7 8V3.5h10V8M7 17H4.5A1.5 1.5 0 0 1 3 15.5v-6A1.5 1.5 0 0 1 4.5 8h15A1.5 1.5 0 0 1 21 9.5v6a1.5 1.5 0 0 1-1.5 1.5H17"/><rect x="7" y="13.5" width="10" height="7"/>`,
   copy: `<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5"/>`,
   // Lektionsplanering (Läge 2)
   // Läge 5 — Översikt, hjälp & integritet
@@ -59,6 +60,16 @@ const PATHS = {
   layout: `<rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M9 9.5V20"/>`,
   shield: `<path d="M12 3l7 3v5c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6z"/><path d="M9 12l2 2 4-4.5"/>`,
   calendar: `<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16M8 3v4M16 3v4"/>`,
+  // Rapporter (issue #33) — krypterad fil, öppna/slå samman
+  lock: `<rect x="5" y="10.5" width="14" height="10" rx="1.8"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3M12 14.5v2.5"/>`,
+  file: `<path d="M14 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3.5V8h4.5"/>`,
+  merge: `<path d="M6 4v5a6 6 0 0 0 6 6h0a6 6 0 0 1 6 6M18 4v5a6 6 0 0 1-3.5 5.4M4 6.5 6 4l2 2.5M16 6.5 18 4l2 2.5"/>`,
+  // Klassåtgärder (issue #34) — utfallen (bättre/ingen skillnad/sämre; osäkert = help)
+  bulb: `<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/>`,
+  "trend-up": `<path d="M4 17 10 11l4 4 6-7M15 8h5v5"/>`,
+  "trend-down": `<path d="M4 7l6 6 4-4 6 7M15 16h5v-5"/>`,
+  equal: `<path d="M5 9.5h14M5 14.5h14"/>`,
+  reply: `<path d="M9.5 7 4.5 12l5 5M5 12h9a5 5 0 0 1 5 5v1"/>`,
 };
 
 /**

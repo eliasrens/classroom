@@ -38,6 +38,7 @@
  */
 
 import { firebaseConfig, isFirebaseConfigured } from "./firebase-config.js";
+import { serverNow, clockCalibrated, onClockChange } from "./lib/clock.js";
 
 const SDK_BASE = "https://www.gstatic.com/firebasejs/10.12.2";
 
@@ -53,6 +54,25 @@ export function nameToEmail(name) {
 
 export const SESSION_KEY = "classroom:auth:session"; // 'local' eller Firebase-uid
 const LOCAL_HASH_KEY = "classroom:auth:localHash";
+
+/** Visningsnamn för inloggad lärare ("Elias"), delas mellan fönster. */
+export const TEACHER_NAME_KEY = "classroom:auth:displayName";
+
+/** "elias@klassrum.local" → "Elias" (lokal del, versal första bokstav). */
+export function displayNameFromEmail(email) {
+  const local = String(email ?? "").split("@")[0].trim();
+  if (!local) return "";
+  return local.charAt(0).toLocaleUpperCase("sv") + local.slice(1);
+}
+
+/**
+ * Den inloggade lärarens visningsnamn, eller null om okänt (t.ex. gammal
+ * session från före namnstämplingen, eller rent lokalt läge). Används för
+ * attribution (createdByName) på pass och noteringar.
+ */
+export function currentTeacherName() {
+  try { return localStorage.getItem(TEACHER_NAME_KEY) || null; } catch { return null; }
+}
 
 /** SHA-256 → hex. Fallback-hash om crypto.subtle saknas (t.ex. http via LAN-ip). */
 async function hashPassword(password) {
@@ -115,15 +135,49 @@ export function createAuth() {
       const cred = await fbAuth.api
         .signInWithEmailAndPassword(fbAuth.auth, email, password)
         .catch((err) => { throw new Error(friendlyFirebaseError(err)); });
+      rememberTeacher(cred.user);
       setSignedIn(cred.user.uid);
     },
 
     async signOut() {
       if (fbAuth) await fbAuth.api.signOut(fbAuth.auth).catch(() => {});
       writeLS(SESSION_KEY, null); // storage-eventet loggar ut övriga fönster
+      writeLS(TEACHER_NAME_KEY, null);
       setState("signedOut");
     },
   };
+
+  /**
+   * Stämpla in lärarens visningsnamn lokalt (för attribution på pass och
+   * noteringar) och upserta lärarprofilen teachers/{uid} i Firestore
+   * (email + displayName, se DATAMODELL.md). Fel är aldrig fatala —
+   * profilen är metadata, inloggningen får inte falla på den.
+   */
+  function rememberTeacher(user) {
+    const name = user.displayName || displayNameFromEmail(user.email);
+    if (name) writeLS(TEACHER_NAME_KEY, name);
+    void (async () => {
+      try {
+        const [appMod, fsApi] = await Promise.all([
+          import(`${SDK_BASE}/firebase-app.js`),
+          import(`${SDK_BASE}/firebase-firestore.js`),
+        ]);
+        const app = appMod.getApps().length ? appMod.getApp() : appMod.initializeApp(firebaseConfig);
+        const db = fsApi.getFirestore(app);
+        // updatedAt med servertid: vänta (högst 20 s) på att datalagret mätt
+        // klockan — annars skrivs profilen utan updatedAt (issue #31).
+        const calibrated = clockCalibrated() || await new Promise((resolve) => {
+          const off = onClockChange(() => { off(); clearTimeout(t); resolve(true); });
+          const t = setTimeout(() => { off(); resolve(false); }, 20_000);
+        });
+        const profile = { email: user.email ?? null, displayName: name || null };
+        if (calibrated) profile.updatedAt = serverNow();
+        await fsApi.setDoc(fsApi.doc(db, "teachers", user.uid), profile, { merge: true });
+      } catch (err) {
+        console.warn("[auth] kunde inte spara lärarprofilen (försöker vid nästa inloggning):", err);
+      }
+    })();
+  }
 
   function notify() { for (const fn of subscribers) fn(auth); }
   function setState(state) { auth.state = state; notify(); }
@@ -151,7 +205,7 @@ export function createAuth() {
       fbAuth = { auth: api.getAuth(app), api };
       // SDK:n är sanningen: den återställer en persisterad session (även offline).
       api.onAuthStateChanged(fbAuth.auth, (user) => {
-        if (user) setSignedIn(user.uid);
+        if (user) { rememberTeacher(user); setSignedIn(user.uid); }
         else { writeLS(SESSION_KEY, null); setState("signedOut"); }
       });
     } catch (err) {

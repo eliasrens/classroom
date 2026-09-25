@@ -11,8 +11,10 @@ import { icon } from "../../lib/icons.js";
 import { studentLabel } from "../../lib/names.js";
 import {
   notesPath, activeStudents, escapeHtml, noteTypeById,
-  createNote, fmtTime, fmtDateTime, todayISO,
+  createNote, deleteNote, fmtTime, fmtDateTime, todayISO, teacherLabel,
 } from "./shared.js";
+import { startOfWeek } from "../../lib/week.js";
+import { serverNow } from "../../lib/clock.js";
 
 export function renderCard(el, api) {
   const students = activeStudents(api.students);
@@ -97,6 +99,16 @@ export function renderCard(el, api) {
   const path = notesPath(api.cid);
 
   // ---- Insatsformulär ----
+  main.querySelector("[data-show-older]")?.addEventListener("click", () => {
+    api._cardShowOlder = !api._cardShowOlder;
+    api.refresh();
+  });
+
+  main.querySelector("[data-report]")?.addEventListener("click", (e) => {
+    api._rep = { ...(api._rep ?? {}), scope: e.currentTarget.dataset.report, focusSubmit: true };
+    api.setTab("rapporter");
+  });
+
   main.querySelector("[data-insats-open]")?.addEventListener("click", () => {
     api._cardInsats = !api._cardInsats;
     api.refresh();
@@ -149,7 +161,8 @@ export function renderCard(el, api) {
 
     const del = e.target.closest("[data-delnote]");
     if (del && confirm("Radera noteringen? Det går inte att ångra.")) {
-      void api.data.remove(path, del.dataset.delnote).then(() => api.refresh());
+      // Tar även bort noteringens anonyma streck i molnet (issue #32).
+      void deleteNote(api.data, api.cid, del.dataset.delnote).then(() => api.refresh());
     }
   });
   main.querySelector("[data-editnoteform]")?.addEventListener("submit", (e) => {
@@ -164,9 +177,14 @@ export function renderCard(el, api) {
 }
 
 function cardHtml(student, api) {
-  const notes = api.notes.filter((n) => n.studentId === student.id); // redan nyast först
+  const all = api.notes.filter((n) => n.studentId === student.id); // redan nyast först
+  // Veckorytm: tidslinjen visar innevarande vecka; äldre veckor fälls ut
+  // på begäran (gäller tills läget lämnas). Sök och uttag omfattar allt.
+  const weekStart = startOfWeek();
+  const older = all.filter((n) => (n.createdAt ?? 0) < weekStart);
+  const notes = api._cardShowOlder ? all : all.filter((n) => (n.createdAt ?? 0) >= weekStart);
   const editing = api._cardEditingNote ?? null;
-  const from = api._cardFrom ?? todayISO(new Date(Date.now() - 28 * 864e5));
+  const from = api._cardFrom ?? todayISO(new Date(serverNow() - 28 * 864e5));
   const to = api._cardTo ?? todayISO();
 
   return `
@@ -175,6 +193,7 @@ function cardHtml(student, api) {
         <h2>${api.label(student)}</h2>
         <div class="ekort__head-actions">
           <button class="btn" data-insats-open>${icon("pen")}Logga insats</button>
+          <button class="btn" data-report="${student.id}" title="Ladda ned en krypterad rapport för eleven">${icon("lock")}Rapport</button>
         </div>
       </header>
 
@@ -213,10 +232,16 @@ function cardHtml(student, api) {
           <pre>${escapeHtml(api._cardExport)}</pre>
         </div>` : ""}
 
-      ${notes.length === 0 ? `<p class="ekort__empty">Inga noteringar om ${api.label(student)} ännu.</p>` : `
+      ${notes.length === 0 ? `<p class="ekort__empty">Inga noteringar om ${api.label(student)} ${older.length ? "den här veckan" : "ännu"}.</p>` : `
       <ol class="ekort__timeline">
         ${notes.map((n) => n.id === editing ? editHtml(n) : noteHtml(n, api)).join("")}
       </ol>`}
+      ${older.length ? `
+        <button class="btn btn--ghost ekort__older" data-show-older aria-expanded="${!!api._cardShowOlder}">
+          ${icon(api._cardShowOlder ? "chevron-up" : "chevron-down")}${api._cardShowOlder
+            ? "Visa bara den här veckan"
+            : `Visa tidigare veckor (${older.length} ${older.length === 1 ? "notering" : "noteringar"})`}
+        </button>` : ""}
     </article>`;
 }
 
@@ -226,6 +251,7 @@ function noteHtml(n, api) {
     <li class="ekort__note ${n.positive ? "ekort__note--pos" : ""} ${n.kind === "insats" ? "ekort__note--insats" : ""}">
       <div class="ekort__note-meta">
         <time>${fmtDateTime(n.createdAt)}</time>
+        <span class="ekort__note-teacher">${escapeHtml(teacherLabel(n))}</span>
         ${chipFor(n)}
         ${label ? `<span class="chip chip--label" style="--label-color:${escapeHtml(label.color)}">${escapeHtml(label.name)}</span>` : ""}
         ${n.followUp ? `<span class="chip chip--follow">${icon("flag")}Uppföljning</span>` : ""}

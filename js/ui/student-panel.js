@@ -16,9 +16,10 @@
 
 import { icon } from "../lib/icons.js";
 import { DEFAULT_MODE_ID, isStudentMode, getMode } from "../modes/registry.js";
+import { SINGLESCREEN_RETURN_KEY } from "../sync.js";
 
 const COLLAPSED_KEY = "classroom:ui:studentPanelCollapsed";
-const RETURN_KEY = "classroom:singlescreenReturn"; // sessionStorage: lärarens läge att återvända till
+const RETURN_KEY = SINGLESCREEN_RETURN_KEY; // sessionStorage: lärarens läge att återvända till
 
 const readReturnMode = () => { try { return sessionStorage.getItem(RETURN_KEY); } catch { return null; } };
 const writeReturnMode = (v) => {

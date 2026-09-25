@@ -13,13 +13,15 @@
  *   classes/{cid}/settings/display   — value: { nameDisplay }
  */
 
-import { plansPath as plansPathFor, currentUid } from "../../data/plans.js";
+import { plansPath as plansPathFor, attribution } from "../../data/plans.js";
+import { serverNow } from "../../lib/clock.js";
 
 // ---- Paths ----
 
-export const studentsPath = (cid) => `classes/${cid}/students`;
-export const notesPath = (cid) => `classes/${cid}/notes`;
-export const settingsPath = (cid) => `classes/${cid}/settings`;
+export const studentsPath = (cid) => `classes/${cid}/students`;   // ENDAST LOKALT (issue #32)
+export const notesPath = (cid) => `classes/${cid}/notes`;         // ENDAST LOKALT (issue #32)
+export const settingsPath = (cid) => `classes/${cid}/settings`;   // delat (moln)
+export const noteStatsPath = (cid) => `classes/${cid}/noteStats`; // delat (moln) — anonyma streck
 
 // ---- Noteringstyper (kind: "typ") ----
 // Fast, saklig uppsättning. "Positivt" har egen tangentväg (Shift+tangent)
@@ -70,7 +72,7 @@ export async function saveNameDisplay(data, cid, initials) {
 
 // ---- Pågående lektion (läses ur Läge 2:s lessonPlans) ----
 
-export const todayISO = (d = new Date()) => {
+export const todayISO = (d = new Date(serverNow())) => {
   const p = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 };
@@ -90,11 +92,14 @@ export async function currentLessonBlock(data, cid) {
   try {
     const plans = await data.list(plansPathFor(cid));
     const date = todayISO();
-    const now = new Date();
+    const now = new Date(serverNow());
     const nowMin = now.getHours() * 60 + now.getMinutes();
     for (const plan of plans) {
       if (plan.date !== date) continue;
-      for (const b of plan.blocks ?? []) {
+      // En planering i Läge 2 ÄR ett block: start/end/subjectId/name ligger
+      // direkt på planeringen. (Äldre form med plan.blocks stöds också.)
+      const blocks = plan.blocks ?? [{ start: plan.start, end: plan.end, subjectId: plan.subjectId, title: plan.name }];
+      for (const b of blocks) {
         const s = minutesOf(b.start);
         const e = minutesOf(b.end);
         if (s != null && e != null && s <= nowMin && nowMin < e) {
@@ -108,12 +113,20 @@ export async function currentLessonBlock(data, cid) {
 
 // ---- Skapa notering ----
 
-const createdBy = () => currentUid();
-
 /**
  * Skapar en notering med automatiskt datum/tid (createdAt sätts av
- * datalagret), lärar-id och snapshot av pågående lektion. Läraren
- * fyller aldrig i tid eller lektion själv.
+ * datalagret), lärar-attribution (createdBy = uid, createdByName =
+ * visningsnamn) och snapshot av pågående lektion. Läraren fyller
+ * aldrig i tid eller lektion själv.
+ *
+ * INTEGRITET (issue #32): själva noteringen (med studentId, text,
+ * followUp, helped, labelId) lagras BARA lokalt på den här datorn.
+ * Samtidigt skrivs ett ANONYMT "streck" till molnet
+ * (classes/{cid}/noteStats) med enbart typ, kind, positiv-flaggan,
+ * lärare och lektions-snapshot — ALDRIG något elevspecifikt. Strecket
+ * får det deterministiska id:t "note-{noteId}" så att kopplingen
+ * notering → streck finns implicit (och bara) lokalt, och så att en
+ * borttagen notering kan ta bort sitt streck.
  *
  * kind: "typ" (kategoriserad snabbnotering) | "text" (fritext) | "insats"
  */
@@ -128,11 +141,38 @@ export async function createNote(data, cid, fields) {
     followUp: false,
     helped: null, // endast kind "insats": "ja" | "delvis" | "nej"
     lesson,
-    createdBy: createdBy(),
+    ...attribution(),
     ...fields,
   };
   const id = await data.put(notesPath(cid), doc);
+  await data.put(noteStatsPath(cid), noteStatFor(id, doc));
   return id;
+}
+
+/** Det anonyma molnstrecket för en notering. Innehåller ALDRIG
+ *  studentId, text, labelId, followUp eller helped. */
+export function noteStatFor(noteId, note) {
+  return {
+    id: `note-${noteId}`,
+    kind: note.kind ?? "typ",
+    typeId: note.typeId ?? null,
+    positive: Boolean(note.positive),
+    lesson: note.lesson ?? null,
+    createdBy: note.createdBy ?? null,
+    createdByName: note.createdByName ?? null,
+  };
+}
+
+/** Ta bort en notering OCH dess anonyma streck i molnet. */
+export async function deleteNote(data, cid, noteId) {
+  await data.remove(notesPath(cid), noteId);
+  await data.remove(noteStatsPath(cid), `note-${noteId}`);
+}
+
+/** Lärarnamn för visning ur ett pass/en notering — gamla dokument utan
+ *  attribution visas som "okänd lärare". */
+export function teacherLabel(doc) {
+  return doc?.createdByName || "okänd lärare";
 }
 
 // ---- Mönsterhjälpare ----

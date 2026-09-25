@@ -12,11 +12,15 @@
 
 import { icon } from "../lib/icons.js";
 import { studentLabel } from "../lib/names.js";
+import { createPraiseBoard } from "../ui/praise-board.js";
 import {
   WEEKDAYS, UNSPLASH_IDS, unsplashUrl,
-  normalize, loadMorning, saveMorning, settingsPath, MORNING_KEY,
-  studentTextFor, orderedTasks, greetingText,
+  normalize, loadMorning, saveMorning, saveBackground, watchMorning,
+  studentTextFor, orderedTasks, greetingText, currentPraise, praiseIsStale,
 } from "../lib/morning.js";
+import { rolloverPraise } from "../lib/week-rhythm.js";
+import { weekKey } from "../lib/week.js";
+import { serverNow } from "../lib/clock.js";
 
 const PANEL_KEY = "classroom:morgon:panelOpen";
 // Ny slumpad bild per sidladdning, men stabil inom sessionen (per klass).
@@ -42,6 +46,28 @@ export default {
     const $ = (sel) => el.querySelector(sel);
     const stage = $(".morgon");
     const bgImg = $(".morgon__bgimg");
+
+    // "Bra jobbat"-tavlan: återanvändbar komponent som växer i kolumner.
+    // Centerytans högermarginal följer tavlans faktiska bredd (--nt-space).
+    const board = createPraiseBoard({
+      className: "morgon__nametavla praise-board--glass",
+      clearable: isTeacher,
+      onClear: () => clearNt(),
+      maxWidth: () => {
+        const panel = isTeacher && stage.querySelector('.morgon__panel[data-open="true"]');
+        const free = stage.clientWidth - (panel ? panel.offsetWidth : 0);
+        return Math.max(free * 0.36, 240);
+      },
+      onLayout: (w) => {
+        if (!w) { stage.style.removeProperty("--nt-space"); return; }
+        const right = parseFloat(getComputedStyle(board.el).right) || 0;
+        stage.style.setProperty("--nt-space", `${Math.ceil(w + right * 2)}px`);
+      },
+    });
+    board.el.hidden = true;
+    stage.append(board.el);
+    this._board = board;
+    let clearNt = () => {};
 
     // Skyddsnät: om vyn redan bytts ut (routern har rensat <main> medan
     // ett watch-callback ligger i kö) är .morgon inte längre i DOM:en —
@@ -91,14 +117,11 @@ export default {
 
     function renderNametavla() {
       if (!mounted()) return;
-      const nt = $(".morgon__nametavla");
-      nt.hidden = !settings.showNametavla;
-      const names = settings.praise.map(praiseName).filter(Boolean);
-      $(".morgon__nt-names").innerHTML = names.length
-        ? names.map((n) => `<li>${escapeHtml(n)}</li>`).join("")
-        : `<li class="morgon__nt-empty">Kryssa i elever i panelen →</li>`;
+      // Veckorytm: förra veckans lista visas aldrig (ren från måndag 00:00).
+      const names = currentPraise(settings).map(praiseName).filter(Boolean);
       // Elevvyn ska aldrig visa "tom"-hjälptexten som en riktig rad.
-      if (!isTeacher && !names.length) nt.hidden = true;
+      board.el.hidden = !settings.showNametavla || (!isTeacher && !names.length);
+      board.setNames(names, { emptyText: isTeacher ? "Kryssa i elever i panelen →" : "" });
     }
 
     function renderDisplay() {
@@ -118,6 +141,18 @@ export default {
       await saveMorning(data, classId, settings);
     }
     const clone = () => structuredClone(settings);
+
+    // Ändring i Bra jobbat-listan. Hör listan fortfarande till förra
+    // veckan (tömningen har inte hunnit ske, t.ex. offline) arkiveras och
+    // töms den FÖRST — annars hamnar nya namn i förra veckans lista.
+    async function editPraise(fn) {
+      if (praiseIsStale(settings)) await rolloverPraise(data, classId, { allowLocal: true });
+      const next = clone();
+      if (praiseIsStale(next)) next.praise = []; // rollover misslyckades helt — börja ändå rent
+      next.weekOf = weekKey();
+      fn(next);
+      await commit(next);
+    }
 
     function applyExternal(value) {
       const next = normalize(value);
@@ -147,6 +182,7 @@ export default {
       applyOpen();
       toggle.addEventListener("click", () => {
         open = !open; applyOpen();
+        board.fit(); // tavlans maxbredd beror på panelen
         try { localStorage.setItem(PANEL_KEY, open ? "1" : "0"); } catch { /* ok */ }
       });
 
@@ -169,7 +205,7 @@ export default {
         if (cb) {
           const next = clone();
           const t = next.tasks.find((x) => x.id === cb.dataset.task);
-          if (t) { t.checked = cb.checked; if (cb.checked) t.checkedAt = Date.now(); }
+          if (t) { t.checked = cb.checked; if (cb.checked) t.checkedAt = serverNow(); }
           commit(next);
           return;
         }
@@ -210,7 +246,7 @@ export default {
         next.tasks.push({
           id: crypto.randomUUID?.() ?? String(Date.now() + Math.random()),
           kind: "custom", label: text, studentText: text,
-          checked: true, checkedAt: Date.now(), // auto-ikryssad, hamnar sist
+          checked: true, checkedAt: serverNow(), // auto-ikryssad, hamnar sist
         });
         addInput.value = "";
         commit(next).then(renderTaskControls);
@@ -228,31 +264,30 @@ export default {
         const cb = e.target.closest("input[data-student]");
         if (!cb) return;
         const id = cb.dataset.student;
-        const next = clone();
-        const has = next.praise.some((p) => p.kind === "student" && p.studentId === id);
-        next.praise = has
-          ? next.praise.filter((p) => !(p.kind === "student" && p.studentId === id))
-          : [...next.praise, { id, kind: "student", studentId: id }];
-        if (!has) next.showNametavla = true;
-        commit(next);
+        void editPraise((next) => {
+          const has = next.praise.some((p) => p.kind === "student" && p.studentId === id);
+          next.praise = has
+            ? next.praise.filter((p) => !(p.kind === "student" && p.studentId === id))
+            : [...next.praise, { id, kind: "student", studentId: id }];
+          if (!has) next.showNametavla = true;
+        });
       });
       const ntFree = $(".morgon__ntfree-input");
       const addFree = () => {
         const text = ntFree.value.trim();
         if (!text) return;
-        const next = clone();
-        next.praise.push({ id: crypto.randomUUID?.() ?? String(Date.now()), kind: "free", text });
-        next.showNametavla = true;
         ntFree.value = "";
-        commit(next);
+        void editPraise((next) => {
+          next.praise.push({ id: crypto.randomUUID?.() ?? String(Date.now()), kind: "free", text });
+          next.showNametavla = true;
+        });
         ntFree.focus();
       };
       $(".morgon__ntfree-btn").addEventListener("click", addFree);
       ntFree.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addFree(); } });
-      const clearNt = () => { const next = clone(); next.praise = []; commit(next); };
+      clearNt = () => void editPraise((next) => { next.praise = []; });
       $(".morgon__ntclear").addEventListener("click", clearNt);
-      // Töm-knapp på själva namntavlan (teacher-only, döljs i elevvyn)
-      $(".morgon__nt-clear").addEventListener("click", clearNt);
+      // Töm-knappen på själva namntavlan (teacher-only) går via onClear ovan.
 
       // ---- Bakgrund ----
       $(".morgon__bg-random").addEventListener("click", () => {
@@ -316,7 +351,7 @@ export default {
 
       function syncNtStudents() {
         ntStudents.querySelectorAll("input[data-student]").forEach((cb) => {
-          cb.checked = settings.praise.some((p) => p.kind === "student" && p.studentId === cb.dataset.student);
+          cb.checked = currentPraise(settings).some((p) => p.kind === "student" && p.studentId === cb.dataset.student);
         });
       }
       function renderNtStudents() {
@@ -339,14 +374,15 @@ export default {
     }
 
     // ================= WATCHERS =================
+    // Registreras direkt (inte först i slutet av mount): kraschar eller
+    // hänger resten av mount städar unmount ändå bort det som hann starta.
     const stops = [];
+    this._stops = stops;
 
-    // Inställningarna (hälsning, uppgifter, namntavla, bakgrund)
+    // Inställningarna (hälsning, uppgifter, namntavla, bakgrund) + den
+    // LOKALA Bra jobbat-listan (issue #32) — sammanslagna av watchMorning.
     stops.push(classId
-      ? data.watch(settingsPath(classId), (docs) => {
-          const doc = docs.find((d) => d.id === MORNING_KEY);
-          applyExternal(doc?.value);
-        })
+      ? watchMorning(data, classId, (value) => applyExternal(value))
       : () => {});
 
     // Namnvisning (initialer) + elevlista (för namntavlan)
@@ -364,31 +400,42 @@ export default {
       }));
     }
 
+    // Veckoskifte medan skärmen står på (t.ex. över helgen): rita om
+    // namntavlan när listan blir "förra veckans" — även offline.
+    let wasStale = null;
+    const weekTick = setInterval(() => {
+      const stale = praiseIsStale(settings);
+      if (stale !== wasStale) { wasStale = stale; renderNametavla(); if (isTeacher) syncPanel(); }
+    }, 30_000);
+    stops.push(() => clearInterval(weekTick));
+
     // ---------- Init ----------
     settings = await loadMorning(data, classId);
 
     // Slumpa bakgrund vid sidladdning (stabil inom sessionen per klass).
+    // Bara bakgrunden skrivs (mot senaste versionen) — den lokala kopian
+    // kan vara inaktuell precis efter sidladdning, se saveBackground.
     if (isTeacher) {
       const key = classId ?? "__noclass__";
       const needsRandom = !settings.background.current || !randomizedThisSession.has(key);
       if (needsRandom) {
         randomizedThisSession.add(key);
         settings.background.current = pickRandomBg() || settings.background.current;
-        await saveMorning(data, classId, settings);
+        void saveBackground(data, classId, settings.background.current);
       }
     }
 
     renderDisplay();
     showBackground(settings.background.current);
     if (isTeacher) { syncPanel(); }
-
-    this._stops = stops;
   },
 
   async unmount() {
     for (const stop of this._stops ?? []) { try { stop(); } catch { /* ok */ } }
     this._stops = null;
     this._renderNtStudents = null;
+    this._board?.destroy();
+    this._board = null;
   },
 };
 
@@ -418,14 +465,6 @@ function renderShell(isTeacher) {
           <p class="morgon__tasks-empty" hidden>Kryssa i dagens uppgifter i panelen.</p>
         </div>
       </div>
-
-      <aside class="morgon__nametavla" hidden aria-label="Bra jobbat">
-        <header class="morgon__nt-head">
-          <h2 class="morgon__nt-title">⭐ Bra jobbat!</h2>
-          <button class="morgon__nt-clear teacher-only btn btn--ghost btn--icon" title="Töm namntavlan" aria-label="Töm namntavlan">${icon("trash")}</button>
-        </header>
-        <ul class="morgon__nt-names"></ul>
-      </aside>
     </div>`;
 }
 

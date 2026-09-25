@@ -18,6 +18,8 @@ import { initStudentPanel } from "./ui/student-panel.js";
 import { createSyncBus, isPreviewWindow, announceStudentScreen, watchStudentScreen } from "./sync.js";
 import { icon } from "./lib/icons.js";
 import { runRetention } from "./lib/privacy.js";
+import { startWeekRhythm } from "./lib/week-rhythm.js";
+import { clockState, clockCalibrated, onClockChange, CLOCK_WARN_MS } from "./lib/clock.js";
 import { getProjectorScreen, screenOpenFeatures } from "./lib/screens.js";
 import { initHelp } from "./ui/help.js";
 import { initShortcuts } from "./ui/shortcuts.js";
@@ -142,12 +144,42 @@ function startApp() {
   // lärarvyn när en klass är aktiv — gränsen sätts per klass i
   // Översikten. Registreras efter att vyn satts så ett elevfönster
   // aldrig råkar skriva. Elevskärmen rör aldrig noteringar.
+  // Med Firebase väntar raderingen tills klockan är mätt mot servern — en
+  // dator vars klocka går före skulle annars radera noteringar för tidigt.
   let lastPurgedClass = null;
-  store.subscribe(["classId", "view"], ({ classId, view }) => {
+  const maybePurge = () => {
+    const { classId, view } = store.get();
     if (view !== "teacher" || !classId || classId === lastPurgedClass) return;
+    if (data.syncState !== "local" && !clockCalibrated()) return;
     lastPurgedClass = classId;
     void runRetention(data, classId);
-  });
+  };
+  store.subscribe(["classId", "view"], maybePurge);
+  onClockChange(maybePurge);
+
+  // KLOCKVARNING (lärarvyn): går datorns klocka mer än ~2 min fel mot
+  // servern visas en diskret varning i topbaren. Skrivningarna stämplas
+  // ändå med servertid (js/lib/clock.js) — varningen är för läraren.
+  const clockWarnEl = $("#clock-warning");
+  const renderClockWarning = () => {
+    const { calibrated, offset } = clockState();
+    const wrong = calibrated && Math.abs(offset) > CLOCK_WARN_MS;
+    clockWarnEl.hidden = !wrong || store.get().view !== "teacher";
+    if (wrong) {
+      const min = Math.round(Math.abs(offset) / 60_000);
+      const amount = min >= 2880 ? `${Math.round(min / 1440)} dygn` : min >= 120 ? `${Math.round(min / 60)} timmar` : `${min} minuter`;
+      clockWarnEl.title = `Datorns klocka går ${amount} ${offset < 0 ? "före" : "efter"}. `
+        + "Appen använder serverns tid, men ställ gärna om datorns tid och datum.";
+    }
+  };
+  onClockChange(renderClockWarning);
+  store.subscribe(["view"], renderClockWarning);
+
+  // VECKORYTM: rent varje måndag. Statistikvyerna filtrerar själva på
+  // innevarande vecka; här arkiveras + töms förra veckans Bra jobbat —
+  // exakt en gång per vecka, även om flera lärare öppnar samtidigt
+  // (se js/lib/week-rhythm.js). Bara lärarvyn skriver.
+  startWeekRhythm({ store, data });
 
   // Lärarfönstret publicerar KLASSVALET — vid varje klassbyte och på
   // begäran. Klassen följer alltid med automatiskt (samma aktiva klass

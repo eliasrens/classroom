@@ -326,6 +326,7 @@ kbd {
 }
 
 .ekort__timeline { list-style: none; margin: 0; padding: 0; }
+.ekort__older { align-self: flex-start; margin-top: var(--space-2); font-size: var(--text-s); }
 .ekort__note {
   position: relative;
   padding: var(--space-2) 0 var(--space-2) var(--space-4);
@@ -356,6 +357,7 @@ kbd {
 .pat__toolbar { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
 .pat__toolbar label { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-s); color: var(--color-ink-soft); }
 .pat__sum { font-size: var(--text-s); color: var(--color-ink-soft); margin-left: auto; }
+.pat__archive { font-size: var(--text-s); color: var(--color-accent-text); }
 
 .pat__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-3); }
 .pat__card h2 { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-m); }
@@ -418,3 +420,10 @@ kbd {
 .quick-note__labels input { flex: 1; min-width: 9em; font-size: var(--text-s); }
 .quick-note__reminder { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); }
 .quick-note__actions { display: flex; justify-content: flex-end; }
+
+/* Lokal lagring-notis (issue #32) */
+.roster__local-note {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+}

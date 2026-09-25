@@ -47,6 +47,9 @@ export function renderRoster(el, api) {
           <input type="checkbox" data-initials ${api.initials ? "checked" : ""}>
           Visa initialer i stället för förnamn (gäller hela lärarvyn)
         </label>
+        <p class="roster__local-note">Elevlistan och noteringarna sparas <strong>bara på den här
+          datorn</strong> — ingenting om enskilda elever lämnar den. Det som ska sparas
+          långsiktigt dokumenteras i skolans system.</p>
       </div>
 
       <details class="roster__paste card">

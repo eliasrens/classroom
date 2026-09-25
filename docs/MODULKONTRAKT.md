@@ -12,7 +12,12 @@ export default {
   icon: "signal",          // ikonnamn ur js/lib/icons.js (linje-SVG, ALDRIG emoji)
 
   /**
-   * Rendera läget in i el (en tömd <main>).
+   * Rendera läget in i el (en tom behållare i <main>, display: contents —
+   * layoutmässigt som om du renderade direkt i <main>).
+   * mount och unmount har en tidsgräns i routern (STEP_TIMEOUT_MS, 3 s):
+   * ett läge som hänger eller kraschar loggas och routern går vidare, så
+   * navigeringen låser sig aldrig (issue #25). Vänta därför ALDRIG på nät
+   * i mount — rendera direkt från lokal data och uppdatera via watch.
    * Anropas när läget aktiveras — och IGEN vid klassbyte samt vid
    * växling lärarvy ↔ elevvy (alltid med unmount() emellan).
    * Lägen behöver alltså ingen egen klassbyteslogik.
@@ -33,6 +38,8 @@ export default {
   /**
    * Städa upp ALLT mount startade: timers, data.watch-prenumerationer,
    * event-lyssnare utanför el. Routern tömmer el efteråt.
+   * Registrera städningen INNAN du startar något (inte sist i mount):
+   * unmount anropas även för ett läge vars mount kraschade/hängde halvvägs.
    */
   async unmount() {},
 };

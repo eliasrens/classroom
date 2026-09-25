@@ -1,0 +1,193 @@
+/* ============================================================
+   STATISTIK — veckoarkivet (endast lärarvy, issue #29).
+   Återanvänder trafikljusets statistikdelar (.tl-tally, .tl-pass …
+   i css/modes/trafikljus.css) och Elevlistans chips. Skriver mot
+   designtokens så både mörkt och ljust schema följer med.
+   ============================================================ */
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 72rem;
+  margin: 0 auto;
+  padding-block: var(--space-3);
+}
+
+/* ---- Huvud: rubrik + veckoväljare + lärarfilter ---- */
+.stat-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.stat-title h1 { margin: 0; font-size: var(--text-xl); }
+.stat-sub { margin: var(--space-1) 0 0; color: var(--color-ink-soft); font-size: var(--text-s); }
+.stat-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.stat-weeknav { display: flex; align-items: center; gap: var(--space-1); }
+.stat-controls select { min-height: 2.1rem; }
+
+/* ---- Siffror för veckan ---- */
+.stat-tiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: var(--space-2);
+}
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+}
+.stat-tile__n { font-size: var(--text-xl); font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat-tile__l { color: var(--color-ink-soft); font-size: var(--text-s); }
+
+/* ---- Sektioner ---- */
+.stat-section { display: flex; flex-direction: column; gap: var(--space-2); }
+.stat-h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-m);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+}
+.stat-h2 svg { color: var(--color-accent-text); }
+.stat-card { padding: var(--space-3) var(--space-4); }
+.stat-card h3 { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-3); font-size: var(--text-m); }
+.stat-empty { margin: 0; color: var(--color-ink-soft); font-size: var(--text-s); }
+.stat-note { margin: var(--space-3) 0 0; color: var(--color-ink-soft); font-size: var(--text-s); }
+.stat-zero { color: var(--color-ink-soft); opacity: 0.6; }
+
+.stat-kinds { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: var(--space-3); }
+
+/* ---- Elevtabell ---- */
+.stat-table-wrap { overflow-x: auto; }
+.stat-table { width: 100%; border-collapse: collapse; font-size: var(--text-s); }
+.stat-table th, .stat-table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-line);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.stat-table thead th { color: var(--color-ink-soft); font-weight: 600; }
+.stat-table th:first-child { text-align: left; }
+.stat-row.is-open th, .stat-row.is-open td { border-bottom-color: transparent; }
+.stat-student {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-m);
+  font-weight: 600;
+  cursor: pointer;
+}
+.stat-student svg { color: var(--color-ink-soft); }
+.stat-detail td { text-align: left; background: var(--color-surface-alt); }
+.stat-notes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.stat-noteitem { display: flex; flex-direction: column; gap: 2px; }
+.stat-noteitem__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); color: var(--color-ink-soft); }
+.stat-noteitem__text { color: var(--color-ink); }
+
+/* ---- Bra jobbat ---- */
+.stat-praise { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.stat-praise li {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-accent-soft);
+  font-weight: 600;
+}
+
+/* ---- Översikt: veckans siffror (js/modes/oversikt.js) ---- */
+.ov-week .stat-tiles { grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); }
+.ov-week__foot { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); color: var(--color-ink-soft); font-size: var(--text-s); }
+
+@media (max-width: 640px) {
+  .stat-kinds { grid-template-columns: 1fr; }
+}
+
+/* ---- Veckoresultat + veckomål per typ (issue #35) ---- */
+.stat-goal {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-m);
+  background: var(--color-surface-alt);
+  font-size: var(--text-s);
+  font-variant-numeric: tabular-nums;
+}
+.stat-goal p { margin: 0 0 var(--space-1); }
+.stat-goal p:last-child { margin-bottom: 0; }
+.stat-goal__label { color: var(--color-ink-soft); margin-right: 0.35em; }
+.stat-goal-ok { font-weight: 600; color: var(--color-ok); }
+.stat-goal svg { width: 1em; height: 1em; vertical-align: -0.12em; }
+.stat-trend__m { color: var(--color-ok); }
+.stat-goal-no { color: var(--color-ink-soft); }
+.stat-trend {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+}
+.stat-trend li { display: inline-flex; gap: 0.35em; color: var(--color-ink-soft); }
+.stat-trend li[aria-current="true"] { color: var(--color-ink); font-weight: 600; }
+.stat-trend__m { min-width: 1.2em; }
+
+/* ---- Per lektion: klassens anonyma statistik (issue #32) ---- */
+.stat-day {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+  text-transform: none;
+}
+.stat-day:first-child { margin-top: 0; }
+.stat-lessons { list-style: none; margin: 0; padding: 0; }
+.stat-lesson {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.stat-lesson:last-child { border-bottom: none; }
+.stat-lesson__teacher { color: var(--color-ink-soft); font-weight: 400; }
+.stat-lesson__counts {
+  color: var(--color-ink-soft);
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35em;
+}
+.stat-lesson__counts .tl-dot { width: 0.7em; height: 0.7em; }
+
+/* "Endast den här datorn"-märkning (issue #32) */
+.stat-localonly {
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 500;
+  vertical-align: middle;
+  margin-left: var(--space-2);
+}
+
+/* Utskrift = KLASSTATISTIKEN: aldrig elevdata (issue #32). */
+@media print {
+  .stat-section--local,
+  .stat-controls,
+  #topbar,
+  .student-panel { display: none !important; }
+}

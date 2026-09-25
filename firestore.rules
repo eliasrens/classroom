@@ -7,27 +7,34 @@ rules_version = '2';
 // helst kan läsa den, plocka isär datalagret och prata direkt med
 // Firestore-API:t. Lösenordsväggen i js/auth.js skyddar bara
 // gränssnittet, inte databasen. Därför MÅSTE dessa regler göra det
-// riktiga jobbet: utan dem skulle elevdata (förnamn, noteringar) vara
-// öppet läs- och skrivbart för vem som helst på nätet.
+// riktiga jobbet.
 //
-// PRINCIP: ingen oautentiserad åtkomst. All läsning och skrivning
-// kräver en inloggad lärare (request.auth != null via Firebase Auth).
-// Konton skapas i Firebase-konsolen — ingen öppen självregistrering
-// (matchar ett arbetslag runt samma klasser, se docs/AUTH.md).
+// PRINCIP (skärpt i issue #32): ingen oautentiserad åtkomst — och
+// INGEN ELEVDATA ALLS i molnet. All elevdata (elevlistor, noteringar,
+// Bra jobbat) lagras enbart lokalt på varje lärardator
+// (js/data/local-only.js). Molnet innehåller bara klasstatistik:
+// trafikljuspass och ANONYMA noteringsräkningar (noteStats).
+// Reglerna nekar därför classes/{id}/students och /notes helt, och
+// validerar noteStats fältvis så att studentId/text aldrig ens KAN
+// skrivas dit.
 //
 // ÅTKOMSTMODELL (se DATAMODELL.md):
 //   DELAT mellan alla inloggade lärare (läs+skriv):
 //     - klasser (classes/{id})
-//     - elever, noteringar, pass/resultat, inställningar
-//       (classes/{id}/students | notes | sessions | settings)
-//     En lärare ska se alla andras noteringar på eleverna, sparade
-//     pass och delade klassinställningar — realtid via onSnapshot.
+//     - pass/resultat (classes/{id}/sessions)
+//     - anonyma noteringsstreck (classes/{id}/noteStats) — endast
+//       kända, icke-elevspecifika fält
+//     - inställningar (classes/{id}/settings) — morningScreen får
+//       ALDRIG innehålla praise/weekOf (Bra jobbat är lokal elevdata)
+//     - klassåtgärder (classes/{id}/classActions + classActionReplies,
+//       issue #34) — alla läser och skapar, bara upphovspersonen ändrar
+//       och tar bort sin egen post
+//   NEKAT HELT (elevdata hör inte hemma i molnet):
+//     - classes/{id}/students/**, classes/{id}/notes/**,
+//       classes/{id}/praiseArchive/**, classes/{id}/reports/**
+//       (rapportloggen, issue #33 — lokal; nekas även av standardregeln)
 //   PRIVAT per lärare (bara ägaren läser+skriver):
-//     - lektionsplaneringar, under lärarens uid
-//       (teachers/{uid}/classes/{cid}/lessonPlans/{planId})
-//     Pathen bär ägarskapet: en lyssnare på det egna subträdet kan
-//     aldrig råka få en annan lärares planeringar, så ingen where-sats
-//     behövs på klienten och ingen extra get()-läsning i reglerna.
+//     - teachers/{uid}/** (profil, klockmätning, lektionsplaneringar)
 // ============================================================
 
 service cloud.firestore {
@@ -38,30 +45,141 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // ---- Klassåtgärder (issue #34): fältvalidering -------------------
+    // Gränserna speglar js/lib/class-actions.js (TEXT_MAX m.fl.).
+    function optString(d, key, max) {
+      return !(key in d) || d[key] == null || (d[key] is string && d[key].size() <= max);
+    }
+    function validLesson(d) {
+      return !('lesson' in d) || d.lesson == null
+        || (d.lesson is map && d.lesson.keys().hasOnly(['date', 'start', 'end', 'subjectId', 'title']));
+    }
+    function validOutcome(o) {
+      return o in ['better', 'same', 'worse', 'unsure'];
+    }
+    function validClassAction(d) {
+      return d.keys().hasOnly(['id', 'text', 'outcome', 'category', 'lesson',
+               'createdBy', 'createdByName', 'createdAt', 'updatedAt'])
+        && d.keys().hasAll(['text', 'outcome', 'createdBy'])
+        && d.text is string && d.text.size() > 0 && d.text.size() <= 500
+        && validOutcome(d.outcome)
+        && optString(d, 'category', 40)
+        && optString(d, 'createdByName', 100)
+        && validLesson(d);
+    }
+    function validReply(d) {
+      return d.keys().hasOnly(['id', 'actionId', 'text', 'outcome',
+               'createdBy', 'createdByName', 'createdAt', 'updatedAt'])
+        && d.keys().hasAll(['actionId', 'outcome', 'createdBy'])
+        && d.actionId is string && d.actionId.size() > 0 && d.actionId.size() <= 128
+        && validOutcome(d.outcome)
+        && optString(d, 'text', 300)
+        && optString(d, 'createdByName', 100);
+    }
+
     // ---- PRIVAT per lärare -------------------------------------------
-    // Lärarprofilen (email, displayName) OCH lärarens privata
-    // lektionsplaneringar (teachers/{uid}/classes/{cid}/lessonPlans/…).
-    // Var och en kommer bara åt sitt eget subträd.
     match /teachers/{uid} {
       allow read, write: if signedIn() && request.auth.uid == uid;
 
-      // Allt under lärarens uid — inkl. de privata planeringarna.
       match /{document=**} {
         allow read, write: if signedIn() && request.auth.uid == uid;
       }
     }
 
     // ---- DELAT mellan alla inloggade lärare --------------------------
-    // Klassen och all delad klassdata: elever, noteringar, pass,
-    // inställningar. Alla inloggade lärare läser och skriver — så att
-    // ändringar syns hos alla i realtid (onSnapshot).
     match /classes/{classId} {
       allow read, write: if signedIn();
 
-      // Subkollektioner: students, notes, sessions, settings.
-      // (Lektionsplaneringar ligger INTE här — de är privata, se ovan.)
-      match /{document=**} {
+      // Trafikljuspass och andra genomförda pass — klasstatistik.
+      match /sessions/{sessionId} {
         allow read, write: if signedIn();
+      }
+
+      // ANONYMA noteringsstreck (issue #32). Bara de kända fälten får
+      // skrivas — studentId, text, followUp, helped, labelId kan
+      // aldrig ta sig in (hasOnly), inte heller extra fält i
+      // lektions-snapshoten. Uppdatering tillåts med samma validering
+      // (pushen är en idempotent LWW-set); radering behövs när en
+      // lokal notering tas bort eller klassen raderas.
+      match /noteStats/{statId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn()
+          && request.resource.data.keys().hasOnly(
+               ['id', 'kind', 'typeId', 'positive', 'lesson',
+                'createdBy', 'createdByName', 'createdAt', 'updatedAt'])
+          && (!('lesson' in request.resource.data)
+              || request.resource.data.lesson == null
+              || request.resource.data.lesson.keys().hasOnly(
+                   ['date', 'start', 'end', 'subjectId', 'title']));
+        allow delete: if signedIn();
+      }
+
+      // Klassinställningar. morningScreen får aldrig bära Bra jobbat
+      // (praise/weekOf) — den listan är elevdata och lever lokalt.
+      match /settings/{key} {
+        allow read, delete: if signedIn();
+        allow create, update: if signedIn()
+          && (key != 'morningScreen'
+              || !('value' in request.resource.data)
+              || !request.resource.data.value.keys().hasAny(['praise', 'weekOf']));
+      }
+
+      // KLASSÅTGÄRDER (issue #34) — delad logg över arbetssätt som testats
+      // i klassen och hur det gick. Gäller KLASSEN, aldrig en elev. Alla
+      // inloggade lärare läser och skapar; bara upphovspersonen
+      // (createdBy == auth.uid) ändrar och tar bort sin egen post, och
+      // createdBy kan inte skrivas om. Bara kända fält (hasOnly)
+      // med storleksgränser. Namnspärren (inga elevnamn i texten) finns
+      // bara i klienten — elevnamnen finns aldrig i molnet.
+      // Radering tillåts även när klassdokumentet redan är borttaget
+      // ("Radera all data" städar då bort alla lärares poster).
+      match /classActions/{actionId} {
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && request.resource.data.createdBy == request.auth.uid
+          && validClassAction(request.resource.data);
+        allow update: if signedIn()
+          && resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdBy == resource.data.createdBy
+          && validClassAction(request.resource.data);
+        allow delete: if signedIn()
+          && (resource == null
+              || resource.data.createdBy == request.auth.uid
+              || !exists(/databases/$(database)/documents/classes/$(classId)));
+      }
+
+      // "Testade också"-svar på en klassåtgärd (actionId). Samma
+      // ägarregler; ett svar får dessutom städas bort när åtgärden det
+      // svarar på är borttagen (upphovspersonen raderar sin åtgärd).
+      match /classActionReplies/{replyId} {
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && request.resource.data.createdBy == request.auth.uid
+          && validReply(request.resource.data);
+        allow update: if signedIn()
+          && resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.actionId == resource.data.actionId
+          && validReply(request.resource.data);
+        allow delete: if signedIn()
+          && (resource == null
+              || resource.data.createdBy == request.auth.uid
+              || !exists(/databases/$(database)/documents/classes/$(classId)/classActions/$(resource.data.actionId))
+              || !exists(/databases/$(database)/documents/classes/$(classId)));
+      }
+
+      // ELEVDATA — nekas helt (lagras enbart lokalt, issue #32).
+      match /students/{document=**} {
+        allow read, write: if false;
+      }
+      match /notes/{document=**} {
+        allow read, write: if false;
+      }
+      match /praiseArchive/{document=**} {
+        allow read, write: if false;
+      }
+      match /reports/{document=**} {
+        allow read, write: if false;
       }
     }
 
@@ -72,20 +190,3 @@ service cloud.firestore {
     }
   }
 }
-
-// ------------------------------------------------------------
-// NOT: planeringarna bär dessutom ett ownerUid-fält (sätts av
-// js/data/plans.js). Det behövs inte av reglerna ovan — pathen under
-// teachers/{uid} avgör redan ägarskapet — men gör ägaren explicit i
-// datat. Vill man i stället lägga planeringar i en DELAD kollektion och
-// skydda dem per fält ser regeln ut så här:
-//
-//   match /plans/{planId} {
-//     allow read: if signedIn() && resource.data.ownerUid == request.auth.uid;
-//     allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
-//     allow update, delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
-//   }
-//
-// (Då MÅSTE klientens lyssnare filtrera med where("ownerUid","==",uid),
-//  annars nekas hela lyssnaren. Path-varianten ovan slipper det.)
-// ------------------------------------------------------------
