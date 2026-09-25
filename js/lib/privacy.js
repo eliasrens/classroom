@@ -28,7 +28,7 @@
  * i lärarvyn.
  */
 
-import { plansPath as plansPathFor } from "../data/plans.js";
+import { plansPath as plansPathFor, lessonSettingsPath } from "../data/plans.js";
 import { serverNow } from "./clock.js";
 import { classActionsPath, classActionRepliesPath } from "./class-actions.js";
 
@@ -138,6 +138,7 @@ export async function deleteAllClassData(data, cid) {
   // classes/{cid}/ (teachers/{uid}/…) — ta med dem. Andra lärares privata
   // planeringar rörs aldrig (och kan inte röras, se firestore.rules).
   paths.add(plansPathFor(cid));
+  paths.add(lessonSettingsPath(cid)); // vad elevskärmen visar (issue #39)
   // Klassåtgärder (issue #34) får bara tas bort av upphovspersonen — UTOM
   // när klassdokumentet redan är borta (firestore.rules). De raderas därför
   // EFTER klassdokumentet; outboxen pushar i ordning.

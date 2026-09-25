@@ -58,5 +58,11 @@ i riktig klassdata. Det har hänt: under testet av #29 fick 4A:s
    borta. Radera därför **klassdokumentet först** och sedan subkollektionerna
    (`classActions`, `classActionReplies`, `noteStats`, `sessions`,
    `settings`), så räcker ett konto för att städa allt.
+   Glöm inte lärarnas PRIVATA subträd för testklassen:
+   `teachers/{uid}/classes/{testklass}/lessonPlans` och `…/settings`
+   (vad elevskärmen visar, issue #39). De kan bara raderas med respektive
+   lärares eget konto — en omgång per testkonto. Räkna upp
+   subkollektionerna uttryckligen: `:listCollectionIds` kräver
+   admin-behörighet och svarar tyst med en tom lista för en lärartoken.
 6. **Resurssnålt.** Maskinen har ungefär 8 GB RAM. Kör en webbserver och så få
    Chrome-sidor som möjligt, och stäng allt efteråt.

@@ -16,7 +16,14 @@ mot detta — sync-lagret själv ändras inte per läge.
 
 Tumregel: **innehåll** går via datalagret (elevskärmen ser ändringen
 via `ctx.data.watch`); **händelser** ("nu startade timern", "byt läge")
-går via sync-bussen. Ska något överleva en omladdning av elevskärmen
+går via sync-bussen.
+
+Exempel: "Visa på elevskärm" i topbaren skickar ut *läget* (bussen),
+medan "Visa för eleverna" i Lektionsplanering väljer *vilken planering*
+läget visar — det är innehåll och skrivs till lärarens privata
+`teachers/{uid}/classes/{cid}/settings/lektion` i datalagret (issue #39).
+Elevskärmen delar lärarens uid och ser bytet via `watch`; vilken
+planering läraren redigerar når aldrig elevskärmen. Ska något överleva en omladdning av elevskärmen
 måste det ligga i datalagret — bussen är bara ett rör.
 
 Transport: `BroadcastChannel` när webbläsaren har den (alla moderna),

@@ -1,5 +1,5 @@
 /**
- * LEKTIONSPLANERINGAR — PRIVATA per lärare.
+ * LEKTIONSPLANERINGAR — PRIVATA per lärare (planeringar + vad elevskärmen visar).
  *
  * Till skillnad från klasser, elever, noteringar, pass och inställningar
  * (som DELAS av alla inloggade lärare, se DATAMODELL.md) är varje lärares
@@ -34,4 +34,36 @@ export function attribution() {
 /** Path till en lärares privata lektionsplaneringar för en klass. */
 export function plansPath(cid, uid = currentUid()) {
   return `teachers/${uid}/classes/${cid}/lessonPlans`;
+}
+
+/**
+ * Lektionslägets inställning — också PRIVAT per lärare (issue #39):
+ *
+ *   teachers/{uid}/classes/{cid}/settings/lektion
+ *     value: { presentedPlanId }   — planeringen som elevskärmen visar
+ *
+ * Ändras BARA när läraren trycker "Visa för eleverna". Elevskärmen delar
+ * lärarens session (samma uid) och läser samma dokument; en annan lärare
+ * i klassen kan varken läsa eller skriva det. (Den gamla DELADE
+ * classes/{cid}/settings/lektion → activePlanId läses inte längre.)
+ */
+export const LESSON_SETTINGS_DOC = "lektion";
+export function lessonSettingsPath(cid, uid = currentUid()) {
+  return `teachers/${uid}/classes/${cid}/settings`;
+}
+
+/**
+ * Planeringen som är öppen i redigeraren — bara UI-tillstånd för just
+ * den här fliken (sessionStorage), aldrig datalagret. Översikten sätter
+ * den innan den byter till Lektionsplanering.
+ */
+const editingKey = (cid) => `classroom:lektion:editing:${currentUid()}:${cid}`;
+export function getEditingPlanId(cid) {
+  try { return sessionStorage.getItem(editingKey(cid)) || null; } catch { return null; }
+}
+export function setEditingPlanId(cid, id) {
+  try {
+    if (id) sessionStorage.setItem(editingKey(cid), id);
+    else sessionStorage.removeItem(editingKey(cid));
+  } catch { /* ingen lagring — minnet räcker */ }
 }

@@ -32,6 +32,16 @@
   gap: var(--space-4);
   align-items: stretch;
 }
+/* Högerdelen: "Visa för eleverna"-raden över förhandsvisningen. */
+.lesson__main {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.lesson__main > .lesson__stage { flex: 1; }
+
 /* Ytan är ett stor-container (både bredd OCH höjd via container-type:size)
    med definit höjd — så tavlan kan skalas efter den faktiska ytan. */
 .lesson__stage {
@@ -57,6 +67,8 @@
   .view:has(.lesson) { display: block; }
   .lesson { grid-template-columns: 1fr; }
   .lesson-panel { overflow: visible; }
+  .lesson__main { display: block; }
+  .lesson__main > .present-bar { margin-bottom: var(--space-2); }
   .lesson__stage { container-type: inline-size; }
   .lesson__stage .lb-fit { width: 100%; aspect-ratio: auto; }
 }
@@ -180,6 +192,56 @@
 .plan-list__text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .plan-list__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plan-list__meta { color: var(--color-ink-soft); font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* "Visas nu" — planeringen som elevskärmen visar (issue #39) */
+.plan-list__badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-round);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* "Visa för eleverna" + vad eleverna ser — raden över förhandsvisningen */
+.present-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  font-size: 0.9rem;
+}
+.present-bar--live {
+  border-style: solid;
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+.present-bar__state { font-weight: 700; color: var(--color-ink-soft); }
+.present-bar__state--live {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-accent-text);
+}
+.present-bar__seen {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  color: var(--color-ink-soft);
+}
+.present-bar__seen strong { color: var(--color-ink); font-weight: 600; }
+.present-bar__jump { padding-block: 0; }
 
 /* Fältredigerare — en rad per fält, med kryssruta */
 .field-edit {
