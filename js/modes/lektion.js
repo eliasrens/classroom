@@ -36,6 +36,7 @@ import { createPraiseBoard } from "../ui/praise-board.js";
 import { normalize as normalizeMorning, PRAISE_DOC, praisePath } from "../lib/morning.js";
 import { studentLabel } from "../lib/names.js";
 import { serverNow } from "../lib/clock.js";
+import { openClassActionDialog } from "../ui/class-actions.js";
 
 /* De nio av-/påslagbara delarna, i den ordning kryssrutorna visas.
    `slot` säger var i tavlan de bor; `list` = flerradsfält. */
@@ -498,7 +499,11 @@ export default {
           </section>
 
           <section class="lesson-panel__group">
-            <h2>Om lektionen</h2>
+            <div class="lesson-panel__headrow">
+              <h2>Om lektionen</h2>
+              <button class="btn ca-add" data-act="class-action"
+                title="Testade ni något nytt arbetssätt på lektionen? Dela hur det gick med de andra lärarna">${icon("plus")}<span>Klassåtgärd</span></button>
+            </div>
             <label class="field-label">Namn
               <input type="text" data-meta="name" autocomplete="off">
             </label>
@@ -798,6 +803,15 @@ export default {
       const act = e.target.closest("[data-act]")?.dataset.act;
       if (!act) return;
       if (act === "new") await createPlan();
+      else if (act === "class-action") {
+        // Den öppna planeringen förväljs som lektion (issue #34); utan
+        // datum → den pågående lektionen enligt schemat.
+        const p = activePlan();
+        void openClassActionDialog({
+          data, cid: activeClass.id,
+          lesson: p?.date ? { date: p.date, start: p.start ?? null, end: p.end ?? null, subjectId: p.subjectId ?? null, title: p.name ?? "" } : undefined,
+        });
+      }
       else if (act === "dup") await copyPlan(activePlan());
       else if (act === "del") {
         const p = activePlan();

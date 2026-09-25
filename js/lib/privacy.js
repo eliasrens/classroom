@@ -30,6 +30,7 @@
 
 import { plansPath as plansPathFor } from "../data/plans.js";
 import { serverNow } from "./clock.js";
+import { classActionsPath, classActionRepliesPath } from "./class-actions.js";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -137,15 +138,22 @@ export async function deleteAllClassData(data, cid) {
   // classes/{cid}/ (teachers/{uid}/…) — ta med dem. Andra lärares privata
   // planeringar rörs aldrig (och kan inte röras, se firestore.rules).
   paths.add(plansPathFor(cid));
-  for (const path of paths) {
+  // Klassåtgärder (issue #34) får bara tas bort av upphovspersonen — UTOM
+  // när klassdokumentet redan är borta (firestore.rules). De raderas därför
+  // EFTER klassdokumentet; outboxen pushar i ordning.
+  const owned = [classActionsPath(cid), classActionRepliesPath(cid)];
+  for (const p of owned) paths.delete(p);
+  const removeAll = async (path) => {
     const docs = await data.list(path);
     for (const d of docs) {
       await data.remove(path, d.id);
       removed++;
     }
-  }
-  // Själva klassdokumentet sist.
+  };
+  for (const path of paths) await removeAll(path);
+  // Själva klassdokumentet sist (före klassåtgärderna, se ovan).
   await data.remove("classes", cid);
   removed++;
+  for (const path of owned) await removeAll(path);
   return removed;
 }

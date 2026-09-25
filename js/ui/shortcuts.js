@@ -55,7 +55,7 @@ export function typingInField(t) {
 
 export function initShortcuts({ store, openStudentWindow, openHelp }) {
   const dialogOpen = () =>
-    document.querySelector(".quick-note[data-open], .help[data-open]") != null;
+    document.querySelector(".quick-note[data-open], .help[data-open], .ca-modal") != null;
 
   function onKeydown(e) {
     if (store.get().view !== "teacher") return;      // aldrig på elevskärmen

@@ -1,0 +1,183 @@
+/* ============================================================
+   KLASSÅTGÄRDER (issue #34) — lista, utfallsmärken och dialoger.
+   Endast lärarvy (.teacher-only). Skriver mot designtokens så både
+   mörkt och ljust schema följer med. Inga emoji — utfallen har
+   linje-ikoner (js/lib/icons.js) och en dämpad statusfärg.
+   ============================================================ */
+
+.ca-section__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.ca-section__head > h2 { margin-right: auto; }
+.ca-section__head select { min-height: 2.1rem; }
+.ca-add { display: inline-flex; align-items: center; gap: var(--space-1); }
+
+/* ---- Utfallsmärket ---- */
+.ca-badge {
+  --ca-c: var(--color-ink-soft);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px var(--space-2);
+  border: 1px solid var(--ca-c);
+  border-radius: var(--radius-s);
+  color: var(--ca-c);
+  font-size: var(--text-s);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ca-badge--s { padding: 0 6px; font-weight: 500; }
+:is(.ca-badge, .ca-item, .ca-outcome)[data-outcome="better"] { --ca-c: var(--color-ok); }
+:is(.ca-badge, .ca-item, .ca-outcome)[data-outcome="same"]   { --ca-c: var(--color-ink-soft); }
+:is(.ca-badge, .ca-item, .ca-outcome)[data-outcome="worse"]  { --ca-c: var(--color-danger); }
+:is(.ca-badge, .ca-item, .ca-outcome)[data-outcome="unsure"] { --ca-c: var(--color-warn); }
+.ca-badge[data-outcome="unsure"] { border-style: dashed; }
+
+/* ---- Listan ---- */
+.ca-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.ca-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-left: 3px solid var(--ca-c);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+}
+.ca-item__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.ca-item__who { font-weight: 600; }
+.ca-item__when { color: var(--color-ink-soft); font-size: var(--text-s); }
+.ca-item__own { margin-left: auto; display: inline-flex; gap: 2px; }
+.ca-item__text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ca-item__stats, .ca-item__trend {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  color: var(--color-ink-soft);
+  font-size: var(--text-s);
+}
+.ca-item__stats > svg, .ca-item__trend > svg { flex: none; align-self: center; }
+.ca-item__stats .tl-dot { width: 0.7em; height: 0.7em; vertical-align: baseline; }
+.ca-soft { color: var(--color-ink-soft); }
+.ca-item__reply { align-self: flex-start; font-size: var(--text-s); }
+.ca-chip { font-size: var(--text-s); }
+.ca-empty, .ca-more { margin: 0; color: var(--color-ink-soft); font-size: var(--text-s); }
+
+.ca-replies {
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: 0 0 0 var(--space-3);
+  border-left: 1px solid var(--color-line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.ca-reply { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: var(--text-s); }
+.ca-reply__text { overflow-wrap: anywhere; }
+.ca-reply__del { margin-left: auto; }
+
+/* ---- Dialogen (eget lager på <body>) ---- */
+.ca-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: var(--space-3);
+  background: rgb(0 0 0 / 45%);
+}
+.ca-dialog {
+  width: min(36rem, 100%);
+  max-height: calc(100dvh - 2 * var(--space-3));
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-m);
+}
+.ca-dialog h2 { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--text-l); }
+.ca-dialog p { margin: 0; }
+.ca-dialog__lead { color: var(--color-ink-soft); font-size: var(--text-s); }
+.ca-field { display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-s); color: var(--color-ink-soft); min-width: 0; }
+.ca-field textarea, .ca-field input, .ca-field select { width: 100%; font: inherit; font-size: var(--text-m); color: var(--color-ink); }
+.ca-field textarea { resize: vertical; min-height: 4.5rem; }
+.ca-count { align-self: flex-end; font-variant-numeric: tabular-nums; }
+.ca-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+@media (max-width: 34rem) { .ca-row { grid-template-columns: 1fr; } }
+
+.ca-outcomes { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; border: 0; }
+.ca-outcomes legend { padding: 0; margin-bottom: var(--space-1); font-size: var(--text-s); color: var(--color-ink-soft); }
+.ca-outcome {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  cursor: pointer;
+  color: var(--color-ink);
+}
+.ca-outcome > svg { color: var(--ca-c); }
+.ca-outcome input { position: absolute; opacity: 0; pointer-events: none; }
+.ca-outcome:has(input:checked) { border-color: var(--ca-c); background: var(--color-surface-alt); font-weight: 600; }
+.ca-outcome:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+.ca-quote {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-line);
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-s);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  overflow-wrap: anywhere;
+}
+
+/* Namnspärren: tydlig men vänlig — ingen larmröd yta. */
+.ca-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-warn);
+  border-radius: var(--radius-m);
+  font-size: var(--text-s);
+}
+.ca-block__msg { display: flex; gap: var(--space-2); align-items: flex-start; font-weight: 600; }
+.ca-block__msg > svg { color: var(--color-warn); flex: none; margin-top: 0.1em; }
+.ca-block__text { color: var(--color-ink-soft); overflow-wrap: anywhere; }
+.ca-block__label { font-weight: 600; }
+.ca-block mark {
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+  border-bottom: 2px solid var(--color-warn);
+  padding: 0 2px;
+  border-radius: 2px;
+}
+.ca-error { color: var(--color-danger); font-size: var(--text-s); }
+.ca-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+
+/* Lektionsplaneringens panelrubrik med knapp bredvid. */
+.lesson-panel__headrow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.lesson-panel__headrow > h2 {
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+  margin: 0;
+}
+
+@media print {
+  .ca-add, .ca-item__own, .ca-item__reply, .ca-reply__del, .ca-section__head select { display: none !important; }
+}

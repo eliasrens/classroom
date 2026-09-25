@@ -42,6 +42,7 @@ import {
 } from "../lib/week-goal.js";
 import { teacherOptions as sharedTeacherOptions, teacherFilterFn, validTeacherFilter } from "../lib/teacher-filter.js";
 import { currentLessonBlock, teacherLabel, escapeHtml } from "./elever/shared.js";
+import { openClassActionDialog } from "../ui/class-actions.js";
 
 const CONFIG_ID = "trafikljus";       // settings/trafikljus  → { value: { overgang:{yellowSec, redSec}, datorer:{…},
                                      //                                   goalMetric:{overgang, datorer}, showGoalToStudents } }
@@ -252,6 +253,8 @@ export default {
     const stopBtn = el.querySelector('[data-act="stop"]');
     const resetBtn = el.querySelector('[data-act="reset"]');
     const saveBtn = el.querySelector('[data-act="save"]');
+    const actionBtn = el.querySelector('[data-act="class-action"]');
+    let savedLesson; // lektionen för senast sparade pass (förväljs i klassåtgärden)
     const yellowInput = el.querySelector('[data-cfg="yellow"]');
     const redInput = el.querySelector('[data-cfg="red"]');
     const settingsKindEl = el.querySelector(".tl-settings-kind");
@@ -267,6 +270,8 @@ export default {
       resetBtn.disabled = !timer;
       saveBtn.disabled = !stopped || savedCurrent;
       saveBtn.querySelector("span").textContent = savedCurrent ? "Pass sparat" : "Spara pass";
+      // Direkt efter ett sparat pass: "＋ Klassåtgärd" (issue #34).
+      actionBtn.hidden = !savedCurrent;
       // Typen väljs INNAN start och ligger fast tills passet återställs.
       for (const b of kindBtns) {
         const on = b.dataset.kind === kind;
@@ -369,6 +374,7 @@ export default {
       // Attribution: vem loggade passet + snapshot av pågående block ur den
       // inloggade lärarens planering (null om inget block pågår just nu).
       const lesson = await currentLessonBlock(data, classId);
+      savedLesson = lesson;
       await data.put(sessionsPath(classId), { ...pass, lesson, ...attribution() });
       // sessions-watch ritar om statistiken (med ev. rekordmarkering).
     }
@@ -388,6 +394,7 @@ export default {
     stopBtn.addEventListener("click", stop);
     resetBtn.addEventListener("click", reset);
     saveBtn.addEventListener("click", () => void savePass());
+    actionBtn.addEventListener("click", () => void openClassActionDialog({ data, cid: classId, lesson: savedLesson }));
 
     // -- Inställningar: gränser i sekunder per typ (kan sänkas progressivt) --
 
@@ -674,6 +681,8 @@ function teacherMarkup() {
         <button class="btn tl-btn" data-act="stop">${icon("stop")}<span>Stopp</span></button>
         <button class="btn tl-btn" data-act="reset">${icon("reset")}<span>Återställ</span></button>
         <button class="btn tl-btn tl-btn--save" data-act="save">${icon("save")}<span>Spara pass</span></button>
+        <button class="btn tl-btn ca-add" data-act="class-action" hidden
+          title="Testade ni något nytt arbetssätt? Dela hur det gick med de andra lärarna">${icon("plus")}<span>Klassåtgärd</span></button>
       </div>
       <p class="tl-hint teacher-only">Mellanslag startar och stoppar. <kbd>R</kbd> återställer.</p>
 

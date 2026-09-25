@@ -6,7 +6,8 @@
  * veckans siffror (rena varje måndag, tidigare veckor i Statistik). Här
  * bor även de tvärgående integritetsinställningarna (Läge 5): namn­visning
  * (förnamn/initialer), auto-radering av noteringar och "radera all data
- * för klassen".
+ * för klassen". Klassåtgärderna (issue #34) — lärarnas delade logg över
+ * arbetssätt de testat — visas här med de senaste först.
  *
  * INTEGRITETSSPÄRR: översikten (klassdata, noteringsinställningar) får
  * ALDRIG nå elevskärmen. Läget står inte i STUDENT_MODE_IDS, så routern
@@ -32,6 +33,14 @@ import { moveStudentDataFromCloud } from "../data/cloud-cleanup.js";
 import { serverNow } from "../lib/clock.js";
 import { isMentorTime } from "../lib/week-recap.js";
 import { followUpsAtRisk, reportsPath, REPORTS_LOG_ID } from "./elever/report-data.js";
+import {
+  classActionsPath, classActionRepliesPath, categoryKey, categoryOptions, lessonIndex,
+} from "../lib/class-actions.js";
+import { renderClassActionList, handleClassActionClick, addButton } from "../ui/class-actions.js";
+import { teacherOptions, teacherFilterFn, validTeacherFilter } from "../lib/teacher-filter.js";
+import { mergedSubjects } from "../lib/trafikljus-stats.js";
+
+const OV_ACTIONS = 5; // senaste klassåtgärderna i översikten (resten i Statistik)
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -91,6 +100,9 @@ export default {
     let sessions = [];
     let localNotes = [];     // LOKALA noteringar — bara för påminnelsen före gallring (issue #33)
     let reportLog = null;    // lokal exportlogg (classes/{cid}/reports → log)
+    let actions = [];        // klassåtgärder (moln, delade — issue #34)
+    let replies = [];
+    const caFilter = { teacher: "all", category: "all" };
     const activeId = () => store.get().classId ?? null;
 
     el.innerHTML = `<div class="oversikt"></div>`;
@@ -223,6 +235,43 @@ export default {
         </section>`;
     }
 
+    // ---- Klassåtgärder (issue #34): de senaste, delade mellan lärarna ----
+    function actionSection(cls) {
+      if (!cls) return "";
+      const others = teacherOptions(actions);
+      caFilter.teacher = validTeacherFilter(caFilter.teacher, others);
+      const tf = teacherFilterFn(caFilter.teacher);
+      const byTeacher = tf ? actions.filter(tf) : actions;
+      const cats = categoryOptions(byTeacher);
+      if (caFilter.category !== "all" && !cats.some((c) => c.value === caFilter.category)) caFilter.category = "all";
+      const shown = caFilter.category === "all" ? byTeacher : byTeacher.filter((a) => categoryKey(a.category) === caFilter.category);
+      const opt = (key, value, name) =>
+        `<option value="${esc(value)}"${caFilter[key] === value ? " selected" : ""}>${esc(name)}</option>`;
+      return `
+        <section class="ov-section ca-section teacher-only" aria-label="Klassåtgärder">
+          <div class="ca-section__head">
+            <h2 class="ov-section__title">${icon("bulb")} Klassåtgärder</h2>
+            ${actions.length ? `
+            <select data-ca-teacher aria-label="Lärare">
+              ${opt("teacher", "all", "Alla lärare")}${opt("teacher", "mine", "Mina")}
+              ${others.map((o) => opt("teacher", o.value, o.name)).join("")}
+            </select>
+            ${cats.length ? `<select data-ca-cat aria-label="Kategori">
+              ${opt("category", "all", "Alla kategorier")}${cats.map((c) => opt("category", c.value, c.name)).join("")}
+            </select>` : ""}` : ""}
+            ${addButton()}
+          </div>
+          ${renderClassActionList(shown, {
+            replies, index: lessonIndex(noteStats, sessions), subjects: mergedSubjects(settingsDocs), limit: OV_ACTIONS,
+            empty: actions.length
+              ? "Inga klassåtgärder för det här urvalet."
+              : "Inga klassåtgärder ännu. Testade ni ett nytt arbetssätt? Dela hur det gick med de andra lärarna.",
+          })}
+          <p class="ov-week__foot">Delas med alla lärare — om klassen, aldrig om enskilda elever.
+            <button class="ov-link" data-mode="statistik">Alla veckor finns i Statistik.</button></p>
+        </section>`;
+    }
+
     // ---- Rendering ----
     function render() {
       const cid = activeId();
@@ -266,6 +315,8 @@ export default {
         </section>
 
         ${weekSection(cls)}
+
+        ${actionSection(cls)}
 
         <section class="ov-section" aria-label="Dagens planeringar">
           <h2 class="ov-section__title">${icon("calendar")} Dagens lektionsplaneringar</h2>
@@ -356,6 +407,16 @@ export default {
       rootEl.querySelector("[data-del]")?.addEventListener("click", () => void deleteClass());
     }
 
+    // Klassåtgärder: delegerat (markupen ritas om vid varje ändring).
+    rootEl.addEventListener("click", (e) => {
+      const cid = activeId();
+      if (cid) handleClassActionClick(e, { data, cid, actions, replies });
+    });
+    rootEl.addEventListener("change", (e) => {
+      if (e.target.matches("[data-ca-teacher]")) { caFilter.teacher = e.target.value; render(); }
+      else if (e.target.matches("[data-ca-cat]")) { caFilter.category = e.target.value; render(); }
+    });
+
     // ---- Datakällor (live) ----
     this._offs.push(data.watch("classes", (docs) => { classes = docs; render(); }));
 
@@ -369,6 +430,8 @@ export default {
         render();
       }));
       this._offs.push(data.watch(`classes/${cid}/sessions`, (docs) => { sessions = docs; render(); }));
+      this._offs.push(data.watch(classActionsPath(cid), (docs) => { actions = docs; render(); }));
+      this._offs.push(data.watch(classActionRepliesPath(cid), (docs) => { replies = docs; render(); }));
       this._offs.push(data.watch(`classes/${cid}/settings`, (docs) => {
         settingsDocs = docs;
         initials = docs.find((d) => d.id === "display")?.value?.nameDisplay === "initials";

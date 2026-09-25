@@ -26,6 +26,9 @@ rules_version = '2';
 //       kända, icke-elevspecifika fält
 //     - inställningar (classes/{id}/settings) — morningScreen får
 //       ALDRIG innehålla praise/weekOf (Bra jobbat är lokal elevdata)
+//     - klassåtgärder (classes/{id}/classActions + classActionReplies,
+//       issue #34) — alla läser och skapar, bara upphovspersonen ändrar
+//       och tar bort sin egen post
 //   NEKAT HELT (elevdata hör inte hemma i molnet):
 //     - classes/{id}/students/**, classes/{id}/notes/**,
 //       classes/{id}/praiseArchive/**, classes/{id}/reports/**
@@ -40,6 +43,38 @@ service cloud.firestore {
     // En inloggad lärare (Firebase Auth). Ingen anonym åtkomst.
     function signedIn() {
       return request.auth != null;
+    }
+
+    // ---- Klassåtgärder (issue #34): fältvalidering -------------------
+    // Gränserna speglar js/lib/class-actions.js (TEXT_MAX m.fl.).
+    function optString(d, key, max) {
+      return !(key in d) || d[key] == null || (d[key] is string && d[key].size() <= max);
+    }
+    function validLesson(d) {
+      return !('lesson' in d) || d.lesson == null
+        || (d.lesson is map && d.lesson.keys().hasOnly(['date', 'start', 'end', 'subjectId', 'title']));
+    }
+    function validOutcome(o) {
+      return o in ['better', 'same', 'worse', 'unsure'];
+    }
+    function validClassAction(d) {
+      return d.keys().hasOnly(['id', 'text', 'outcome', 'category', 'lesson',
+               'createdBy', 'createdByName', 'createdAt', 'updatedAt'])
+        && d.keys().hasAll(['text', 'outcome', 'createdBy'])
+        && d.text is string && d.text.size() > 0 && d.text.size() <= 500
+        && validOutcome(d.outcome)
+        && optString(d, 'category', 40)
+        && optString(d, 'createdByName', 100)
+        && validLesson(d);
+    }
+    function validReply(d) {
+      return d.keys().hasOnly(['id', 'actionId', 'text', 'outcome',
+               'createdBy', 'createdByName', 'createdAt', 'updatedAt'])
+        && d.keys().hasAll(['actionId', 'outcome', 'createdBy'])
+        && d.actionId is string && d.actionId.size() > 0 && d.actionId.size() <= 128
+        && validOutcome(d.outcome)
+        && optString(d, 'text', 300)
+        && optString(d, 'createdByName', 100);
     }
 
     // ---- PRIVAT per lärare -------------------------------------------
@@ -87,6 +122,50 @@ service cloud.firestore {
           && (key != 'morningScreen'
               || !('value' in request.resource.data)
               || !request.resource.data.value.keys().hasAny(['praise', 'weekOf']));
+      }
+
+      // KLASSÅTGÄRDER (issue #34) — delad logg över arbetssätt som testats
+      // i klassen och hur det gick. Gäller KLASSEN, aldrig en elev. Alla
+      // inloggade lärare läser och skapar; bara upphovspersonen
+      // (createdBy == auth.uid) ändrar och tar bort sin egen post, och
+      // createdBy kan inte skrivas om. Bara kända fält (hasOnly)
+      // med storleksgränser. Namnspärren (inga elevnamn i texten) finns
+      // bara i klienten — elevnamnen finns aldrig i molnet.
+      // Radering tillåts även när klassdokumentet redan är borttaget
+      // ("Radera all data" städar då bort alla lärares poster).
+      match /classActions/{actionId} {
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && request.resource.data.createdBy == request.auth.uid
+          && validClassAction(request.resource.data);
+        allow update: if signedIn()
+          && resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdBy == resource.data.createdBy
+          && validClassAction(request.resource.data);
+        allow delete: if signedIn()
+          && (resource == null
+              || resource.data.createdBy == request.auth.uid
+              || !exists(/databases/$(database)/documents/classes/$(classId)));
+      }
+
+      // "Testade också"-svar på en klassåtgärd (actionId). Samma
+      // ägarregler; ett svar får dessutom städas bort när åtgärden det
+      // svarar på är borttagen (upphovspersonen raderar sin åtgärd).
+      match /classActionReplies/{replyId} {
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && request.resource.data.createdBy == request.auth.uid
+          && validReply(request.resource.data);
+        allow update: if signedIn()
+          && resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.actionId == resource.data.actionId
+          && validReply(request.resource.data);
+        allow delete: if signedIn()
+          && (resource == null
+              || resource.data.createdBy == request.auth.uid
+              || !exists(/databases/$(database)/documents/classes/$(classId)/classActions/$(resource.data.actionId))
+              || !exists(/databases/$(database)/documents/classes/$(classId)));
       }
 
       // ELEVDATA — nekas helt (lagras enbart lokalt, issue #32).
