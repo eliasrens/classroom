@@ -53,5 +53,10 @@ i riktig klassdata. Det har hänt: under testet av #29 fick 4A:s
    autosparning) eller, i äldre versioner, byta till en annan riktig klass.
    Efter "Radera all data" i appen är ingen klass vald ("Välj klass…"),
    men det skyddet ska inte vara det enda som står mellan testet och 4A.
+   Klassåtgärder (`classActions`, `classActionReplies`, issue #34) får bara
+   tas bort av den lärare som skrev dem — utom när klassdokumentet redan är
+   borta. Radera därför **klassdokumentet först** och sedan subkollektionerna
+   (`classActions`, `classActionReplies`, `noteStats`, `sessions`,
+   `settings`), så räcker ett konto för att städa allt.
 6. **Resurssnålt.** Maskinen har ungefär 8 GB RAM. Kör en webbserver och så få
    Chrome-sidor som möjligt, och stäng allt efteråt.

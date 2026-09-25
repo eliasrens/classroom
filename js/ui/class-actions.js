@@ -73,7 +73,7 @@ const outcomeRadios = (name, selected) => `
     <legend>Hur gick det?</legend>
     ${OUTCOMES.map((o) => `
       <label class="ca-outcome" data-outcome="${o.id}">
-        <input type="radio" name="${name}" value="${o.id}"${o.id === selected ? " checked" : ""} required>
+        <input type="radio" name="${name}" value="${o.id}"${o.id === selected ? " checked" : ""}>
         ${icon(o.icon)}<span>${escapeHtml(o.label)}</span>
       </label>`).join("")}
   </fieldset>`;
@@ -356,9 +356,11 @@ function statsLine(action, index, subjects) {
   }
   let trend = "";
   if (action.lesson.subjectId && (st.before.lessons || st.after.lessons)) {
-    const side = (x) => (x.lessons ? `${round(x.avg)} <span class="ca-soft">(${x.lessons} ${x.lessons === 1 ? "lektion" : "lektioner"})</span>` : `<span class="ca-soft">inga lektioner${x === st.after ? " ännu" : ""}</span>`);
-    trend = `<p class="ca-item__trend">${icon("chart")}<span>Före och efter i ${escapeHtml(subject)} (veckan före → veckan efter):
-      ${side(st.before)} → ${side(st.after)} noteringar per lektion</span></p>`;
+    const side = (x, label) => (x.lessons
+      ? `${label} ${round(x.avg)} noteringar per lektion <span class="ca-soft">(${x.lessons} ${x.lessons === 1 ? "lektion" : "lektioner"})</span>`
+      : `${label} <span class="ca-soft">inga lektioner${x === st.after ? " ännu" : ""}</span>`);
+    trend = `<p class="ca-item__trend">${icon("chart")}<span>${escapeHtml(subject)}:
+      ${side(st.before, "veckan före")} → ${side(st.after, "veckan efter")}</span></p>`;
   }
   return `<p class="ca-item__stats">${icon("calendar")}<span>Vid lektionen: ${parts.join(" · ")}</span></p>${trend}`;
 }

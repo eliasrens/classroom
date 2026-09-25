@@ -41,7 +41,9 @@ aldrig den via appen. Rapporter per elev eller klass laddas ned som
 **krypterade `.klassrum`-filer** (Elevlista → Rapporter) och kan slås
 samman med kollegors filer — helt lokalt, filerna flyttas för hand (#33). Delat mellan alla inloggade lärare (molnet): klasser,
 trafikljuspass, **anonyma noteringsräkningar** (`noteStats` — utan
-elev-id, utan text) och klassinställningar. Privat per lärare:
+elev-id, utan text), klassinställningar och **klassåtgärder** (#34 —
+lärarnas logg över arbetssätt de testat med klassen och hur det gick; en
+namnspärr stoppar texter med elevnamn ur datorns lokala elevlista). Privat per lärare:
 lektionsplaneringar. Se [DATAMODELL.md](DATAMODELL.md) och
 [docs/DATASKYDD.md](docs/DATASKYDD.md).
 
@@ -60,6 +62,7 @@ js/
   router.js             hashrouter: #/<läge> (lärare), #/elev/<läge> (elevskärm)
   firebase-config.js    PLATSHÅLLARE — fyll i för molnsynk + Firebase Auth
   data/                 offline-first-datalager (lokalt + Firestore-synk + outbox)
+  lib/class-actions.js  klassåtgärder (#34): modell, namnspärr, koppling till klasstatistiken
   lib/color.js          ämnespalett + automatisk luminans/kontrast-uträkning
   lib/icons.js          linje-ikoner (inline-SVG) — inga emoji i gränssnittet
   lib/names.js          elevnamn: endast förnamn, valfri tag, initial-läge
@@ -74,6 +77,7 @@ js/
   lib/week-goal.js      trafikljusets veckomål · lib/week-recap.js  veckosammanfattningen (Veckans övergångar)
   ui/login.js           login-vy + elevskärmens väntevy
   ui/class-picker.js    klassval i topbaren
+  ui/class-actions.js   klassåtgärder: dialoger (ny/ändra, "Testade också") + listan
   ui/help.js            genvägslista under "?" · ui/shortcuts.js  globala tangentgenvägar
   ui/praise-board.js    "Bra jobbat"-tavlan (växer i kolumner, scrollar aldrig) — morgonskärm, lektion
 firestore.rules         Firestore-säkerhetsregler: inloggning krävs för all läs/skriv

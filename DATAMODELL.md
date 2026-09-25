@@ -9,9 +9,10 @@ lämnar lärardatorn: samlingarna `students`, `notes`, `praise`,
 en egen lokal lagring (`js/data/local-only.js`, prefix
 `classroom:local:`) som aldrig går via outboxen eller Firestore.
 Molnet innehåller bara klasstatistik: `sessions` (trafikljuspass) och
-`noteStats` (anonyma noteringsräkningar), plus klassinställningar och
-lärarnas privata planeringar. `firestore.rules` nekar elevsamlingarna
-helt och fältvaliderar `noteStats`. Se `docs/DATASKYDD.md`.
+`noteStats` (anonyma noteringsräkningar), plus klassinställningar,
+lärarnas delade klassåtgärder (`classActions`, issue #34) och lärarnas
+privata planeringar. `firestore.rules` nekar elevsamlingarna helt och
+fältvaliderar `noteStats` och `classActions`. Se `docs/DATASKYDD.md`.
 
 ## Struktur
 
@@ -96,6 +97,47 @@ classes/{classId}/noteStats/{eventId}   — ANONYMT "streck" per notering (issue
                        Append-only i praktiken (inga räknare som krockar);
                        radering sker när noteringen tas bort lokalt eller
                        klassen raderas.
+
+classes/{classId}/classActions/{id}     — KLASSÅTGÄRD (issue #34) — DELAD mellan lärarna
+                       "Testade par i stället för enskilt — lugnare. → Bättre".
+                       Gäller KLASSEN, aldrig en elev. Skapas via
+                       js/ui/class-actions.js (logik: js/lib/class-actions.js).
+  text               — vad man testade och hur det gick (1–500 tecken)
+  outcome            — "better" | "same" | "worse" | "unsure"
+                       (Bättre / Ingen skillnad / Sämre / Osäkert; visas med
+                       linje-ikoner, inga emoji)
+  category           — VALFRI: förvald (arbetssatt | placering | struktur |
+                       rorelse | ljud | ovrigt) eller lärarens egen text
+                       (högst 40 tecken) | null
+  lesson             — SNAPSHOT { date, start, end, subjectId, title } | null
+                       (samma form som noteStats/sessions; förvald = den
+                       pågående lektionen, eller passets/den öppna planeringens)
+  createdBy, createdByName, createdAt, updatedAt
+                     — firestore.rules: alla inloggade läser och skapar
+                       (createdBy == auth.uid), bara upphovspersonen ändrar
+                       och tar bort; createdBy kan inte skrivas om; hasOnly
+                       + storleksgränser. Radering av andras poster tillåts
+                       först när klassdokumentet är borta ("Radera all data").
+                     — NAMNSPÄRR i klienten: texten (och en egen kategori)
+                       prövas mot datorns LOKALA elevlistor (alla klasser),
+                       skiftlägesokänsligt, hela ord (+ genitiv-s). Träff →
+                       sparas inte. Kan inte finnas i reglerna — namnen
+                       finns aldrig i molnet.
+                     — Följer INTE måndagsrensningen: kunskap som ska finnas
+                       kvar. Statistik bläddrar dem per vecka (createdAt);
+                       Översikt visar de senaste.
+
+classes/{classId}/classActionReplies/{id} — "Testade också" (issue #34) — DELAD
+  actionId           — klassåtgärden svaret gäller
+  outcome            — som ovan
+  text               — kort kommentar, 0–300 tecken (namnspärr som ovan)
+  createdBy, createdByName, createdAt, updatedAt
+                     — samma ägarregler; actionId kan inte ändras. Ett svar
+                       får tas bort av vem som helst när åtgärden det svarar
+                       på är borta — upphovspersonen raderar sin åtgärd FÖRST
+                       och städar sedan svaren (outboxen pushar i ordning).
+                       PLATT samling (inte en subkollektion per åtgärd): en
+                       lyssnare per klass i stället för en per åtgärd.
 
 classes/{classId}/praise/board          — Bra jobbat-listan — ENDAST LOKALT
   praise: [ { id, kind: "student", studentId } | { id, kind: "free", text } ]
@@ -271,16 +313,25 @@ outboxen som `js/data/datalayer.js` tömmer mot Firestore. Semantik:
   konflikter i rad; varje lyckad push nollställer den. Övriga fel = synkstatus
   `offline`; kön försöker igen vid nästa skrivning, `online`-event eller
   när en server-snapshot kommer tillbaka.
+- **Ägarskyddade samlingar** (`classActions`, `classActionReplies`, issue
+  #34): en op som reglerna nekar (`permission-denied`) kan aldrig lyckas
+  och får inte stoppa kön — den tas bort med en varning, och molnets
+  version kommer tillbaka med nästa server-snapshot. Undantag: en EGEN
+  ny/ändrad post (createdBy = inloggad lärare) försöks igen som vanligt
+  (auth-token kan vara sen). Nya ägarskyddade samlingar läggs till i
+  `OWNED_PATH` i `js/data/datalayer.js`.
 - Test: `node docs/test-outbox.mjs` (två fönster, 20 snabba skrivningar,
-  flush från flera håll, med och utan Web Locks, med konflikter samt
-  med en gammal array-outbox).
+  flush från flera håll, med och utan Web Locks, med konflikter, med
+  en gammal array-outbox samt en nekad op i en ägarskyddad samling).
 
 ## Delat kontra privat kontra endast lokalt (issue #32)
 
 - **DELAT mellan alla inloggade lärare** (läs+skriv, realtid via
   onSnapshot): klasser, pass/resultat, ANONYMA noteringsräkningar
-  (`noteStats`) och klassinställningar. En lärare ser alla andras pass
-  och räkningar per lektion — men aldrig något om enskilda elever.
+  (`noteStats`), klassinställningar och klassåtgärder med svar
+  (`classActions`, `classActionReplies` — bara upphovspersonen ändrar och
+  tar bort sin post). En lärare ser alla andras pass, räkningar och
+  klassåtgärder — men aldrig något om enskilda elever.
 - **ENDAST LOKALT per lärardator** (aldrig via outboxen/Firestore, se
   `js/data/local-only.js`): elevlistan, noteringarna, Bra jobbat med
   arkiv, gallringsinställningen och rapportloggen (issue #33). Elevskärmen i samma webbläsare
@@ -308,6 +359,9 @@ outboxen som `js/data/datalayer.js` tömmer mot Firestore. Semantik:
   fönster på samma dator konvergerar. Vyerna visar aldrig förra veckans
   lista, inte heller innan tömningen hunnit sparas.
 - **Lektionsplaneringar rörs aldrig** av veckorytmen.
+- **Klassåtgärder** (`classActions`, issue #34) följer inte måndagsrensningen:
+  Översikt visar de senaste oavsett vecka, och Statistik bläddrar dem per
+  vecka (på `createdAt`) i arkivet som resten.
 - **Enhetsklockor** (issue #31): veckan räknas på servertid (`serverNow()`,
   se Tidsstämplar och klocka nedan), och med Firebase körs veckorytmen först
   när klockan är mätt mot servern. En dator vars klocka går fel rullar alltså

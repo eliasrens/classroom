@@ -16,6 +16,15 @@ Princip: **ingenting om enskilda elever lämnar lärardatorn.**
   inte ens skrivas dit av misstag.
 - **Klassinställningar** — trafikljusets gränser, visningsläge,
   morgonskärmens hälsning och att-göra-lista. Inga elevuppgifter.
+- **Klassåtgärder** (issue #34) — lärarnas delade logg över arbetssätt
+  de testat med **hela klassen** och hur det gick, t.ex. "Catalin · Matte
+  tis 10:15 · Testade att låta dem arbeta i par — lugnare. → Bättre",
+  plus korta "Testade också"-svar från andra lärare. Varje post har
+  lärarens namn, ett utfall, en valfri kategori och en ögonblicksbild av
+  lektionen. **Klassåtgärder handlar om klassen och innehåller inga
+  elevuppgifter.** Bara den som skrivit en post kan ändra eller ta bort
+  den. De rensas inte på måndagar (det är kunskap som ska finnas kvar),
+  men raderas med "Radera all data för klassen".
 - **Lärarnas privata lektionsplaneringar** — under respektive lärares
   eget konto; ingen annan lärare kommer åt dem.
 
@@ -33,6 +42,25 @@ självregistrering).
 Datan lagras i webbläsarens lokala lagring på datorn och visas i
 lärarvyerna med märkningen "Endast den här datorn". Elevskärmen
 (projektorn) läser samma lokala lagring i samma webbläsare.
+
+## Namnspärren för klassåtgärder (issue #34)
+
+Klassåtgärder delas med alla lärare, så innan en klassåtgärd eller ett
+svar sparas kontrolleras texten mot **den här datorns lokala
+elevlistor** (alla klasser på datorn) — skiftlägesokänsligt och som hela
+ord, även med genitiv-s ("Omars grupp"). Innehåller texten ett elevnamn
+**sparas den inte**: läraren får ett vänligt meddelande ("Klassåtgärder
+delas med alla lärare — skriv om utan elevnamn (t.ex. 'några elever')")
+och namnet markeras. Samma kontroll gäller en egen kategori.
+
+Spärren är ett skydd i gränssnittet mot misstag. Den **kan inte** finnas
+i säkerhetsreglerna, eftersom elevnamnen aldrig finns i molnet — servern
+vet alltså inte vilka namn som ska stoppas. Den fångar heller bara namn
+som står i elevlistan på just den datorn, och inte smeknamn,
+felstavningar eller efternamn. Reglerna begränsar i stället vilka fält
+som får skrivas (inga elev-id) och hur långa texterna får vara.
+Grundregeln gäller därför fortfarande: skriv om **klassen**, aldrig om en
+enskild elev.
 
 ## Lokal gallring
 
@@ -59,7 +87,10 @@ trafikljushistorik ligger kvar i molnet och påverkas inte.
 - **En notering** som tas bort lokalt tar också bort sitt anonyma
   streck i molnet.
 - **"Radera all data för klassen"** (Översikt) raderar både det lokala
-  och klassens molndata (pass, anonym statistik, inställningar).
+  och klassens molndata (pass, anonym statistik, inställningar,
+  klassåtgärder — även andra lärares, när klassen tas bort).
+- **En klassåtgärd** tas bort av den som skrev den; svaren från andra
+  lärare följer med.
 
 ## Rapporter och överlämning mellan lärare (issue #33)
 
