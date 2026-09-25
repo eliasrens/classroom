@@ -23,7 +23,7 @@ import { loadNameDisplay, saveNameDisplay } from "./elever/shared.js";
 import {
   savePrivacy, runRetention, RETENTION_OPTIONS, DEFAULT_RETENTION_WEEKS, deleteAllClassData,
 } from "../lib/privacy.js";
-import { plansPath as plansPathFor } from "../data/plans.js";
+import { plansPath as plansPathFor, setEditingPlanId } from "../data/plans.js";
 import { createClass } from "../data/classes.js";
 import { startOfWeek, inWeek, weekLabel, weekRangeLabel, weekKey } from "../lib/week.js";
 import { KIND_KEYS, KINDS, computeStats } from "../lib/trafikljus-stats.js";
@@ -130,10 +130,12 @@ export default {
       goMode("elever");
     }
 
-    async function openPlan(planId) {
+    // Öppnar planeringen i redigeraren — ändrar INTE vad elevskärmen
+    // visar (det gör bara "Visa för eleverna", issue #39).
+    function openPlan(planId) {
       const cid = activeId();
       if (!cid) return;
-      await data.put(`classes/${cid}/settings`, { id: "lektion", value: { activePlanId: planId } });
+      setEditingPlanId(cid, planId);
       goMode("lektion");
     }
 

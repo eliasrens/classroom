@@ -21,17 +21,27 @@
  *   classes/{id}/settings/morningScreen → praise).
  * - Ämnesfärg + automatisk läsbar text (luminans, js/lib/color.js);
  *   läraren kan lägga till egna ämnen/färger utan oläslig text.
+ * - "Redigerar nu" och "Visas för eleverna" är två skilda saker (issue #39):
+ *   • editingId — planeringen som är öppen i redigeraren. Bara UI-tillstånd
+ *     för fliken (minnet + sessionStorage, se data/plans.js).
+ *   • presentedPlanId — planeringen som elevskärmen visar. Ändras BARA när
+ *     läraren trycker "Visa för eleverna"; skapa/kopiera/ta bort rör den
+ *     aldrig. Tas den visade bort visar elevvyn ett tomläge.
  * - Elevvyn visar planeringen ren (inga kontroller), synkad via
- *   datalagret (settings.activePlanId + planeringens innehåll).
+ *   datalagret (presentedPlanId + planeringens innehåll).
  *
  * Kontrakt: docs/MODULKONTRAKT.md. Data: DATAMODELL.md.
- * Planeringar är PRIVATA per lärare (teachers/{uid}/classes/{id}/lessonPlans,
- * se js/data/plans.js); inställningar delas (classes/{id}/settings).
+ * Planeringar OCH presentedPlanId är PRIVATA per lärare
+ * (teachers/{uid}/classes/{id}/lessonPlans resp. …/settings/lektion, se
+ * js/data/plans.js); ämnen och namnvisning delas (classes/{id}/settings).
  */
 
 import { icon } from "../lib/icons.js";
 import { readableTextColor, SUBJECTS } from "../lib/color.js";
-import { plansPath as plansPathFor, currentUid } from "../data/plans.js";
+import {
+  plansPath as plansPathFor, currentUid,
+  lessonSettingsPath, LESSON_SETTINGS_DOC, getEditingPlanId, setEditingPlanId,
+} from "../data/plans.js";
 import { createPraiseBoard } from "../ui/praise-board.js";
 import { normalize as normalizeMorning, PRAISE_DOC, praisePath } from "../lib/morning.js";
 import { studentLabel } from "../lib/names.js";
@@ -88,6 +98,41 @@ function nextSameWeekday(iso) {
   let x = d;
   while (x < today) x = addDays(x, 7);
   return isoLocal(x);
+}
+
+/* ---- Vilken planering visas för eleverna? ---- */
+
+const minutesOf = (hhmm) => {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm ?? ""));
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+};
+
+/**
+ * Planeringen elevskärmen visar, eller null (tomläge).
+ * `doc` = lärarens privata settings/lektion (null = finns inte ännu).
+ *  - Dokumentet finns → exakt presentedPlanId. Saknas planeringen (t.ex.
+ *    borttagen) blir det tomläge — aldrig ett tyst byte till en annan.
+ *  - Dokumentet finns inte (första användningen) → dagens planering som
+ *    förval: den som senast började, annars dagens första.
+ */
+function presentedPlanOf(plans, doc, now) {
+  if (doc) {
+    const id = doc.value?.presentedPlanId ?? null;
+    return id ? plans.find((p) => p.id === id) ?? null : null;
+  }
+  const d = new Date(now);
+  const today = isoLocal(d);
+  const nowMin = d.getHours() * 60 + d.getMinutes();
+  const todays = plans.filter((p) => p.date === today).sort((a, b) =>
+    (a.start ?? "").localeCompare(b.start ?? "") || (a.name ?? "").localeCompare(b.name ?? "", "sv"));
+  const started = todays.filter((p) => (minutesOf(p.start) ?? Infinity) <= nowMin);
+  return started.at(-1) ?? todays[0] ?? null;
+}
+
+/** "Matte · tis 22 sep · 10:15" — kort etikett för raden "Eleverna ser". */
+function planLabel(p) {
+  const d = parseISO(p.date);
+  return [p.name || "Namnlös planering", d ? fmtDay(d) : "", p.start ?? ""].filter(Boolean).join(" · ");
 }
 
 /* ---- Ämneshjälpare: inbyggd palett + lärarens egna ämnen ---- */
@@ -369,15 +414,18 @@ export default {
     }
 
     const base = `classes/${activeClass.id}`;
-    // Planeringar är PRIVATA per lärare (teachers/{uid}/…), se data/plans.js.
-    // Inställningar (aktiv planering, ämnen, Bra jobbat) ligger kvar i den DELADE klassnoden.
+    // Planeringar och vad elevskärmen visar är PRIVATA per lärare
+    // (teachers/{uid}/…), se data/plans.js. Ämnen och namnvisning ligger
+    // kvar i den DELADE klassnoden.
     const plansPath = plansPathFor(activeClass.id);
+    const privatePath = lessonSettingsPath(activeClass.id);
     const settingsPath = `${base}/settings`;
     const isTeacher = view !== "student";
 
     let plans = [];
     let subjects = SUBJECTS;
-    let activeId = null;
+    // Lärarens privata settings/lektion ({ value: { presentedPlanId } }), null = finns inte ännu.
+    let presentedDoc = null;
 
     // "Bra jobbat"-namnen: samma LOKALA data som morgonskärmen (issue #32) —
     // listan innehåller elevdata och lagras bara på den här datorn.
@@ -387,7 +435,20 @@ export default {
 
     const settingDoc = (id) => this._settings?.find((d) => d.id === id) ?? null;
 
-    const activePlan = () => plans.find((p) => p.id === activeId) ?? plans[0] ?? null;
+    const presentedPlan = () => presentedPlanOf(plans, presentedDoc, serverNow());
+
+    // Förvalet (dagens planering) beror på klockan så länge läraren inte
+    // valt något — rita om varje minut tills dess.
+    const tickUntilChosen = (render) => {
+      const t = setInterval(() => { if (!presentedDoc) render(); }, 60_000);
+      this._offs.push(() => clearInterval(t));
+    };
+    const watchPresented = (onChange) => {
+      this._offs.push(data.watch(privatePath, (docs) => {
+        presentedDoc = docs.find((d) => d.id === LESSON_SETTINGS_DOC) ?? null;
+        onChange();
+      }));
+    };
 
     const sortedPlans = () =>
       [...plans].sort((a, b) =>
@@ -458,15 +519,16 @@ export default {
       const stage = el.querySelector(".lesson-stage-student");
       const renderStudent = () => {
         if (!stage.isConnected) return;
-        const p = activePlan();
+        const p = presentedPlan();
         if (p) renderBoard(stage, p, subjects, praise());
-        else stage.innerHTML = `<div class="lesson-empty"><h1>Ingen planering vald</h1><p>Läraren väljer en lektion att visa.</p></div>`;
+        else stage.innerHTML = `<div class="lesson-empty"><h1>Ingen planering visas</h1><p>Läraren väljer en lektion att visa.</p></div>`;
       };
       observeStage(stage);
       this._offs.push(data.watch(plansPath, (docs) => { plans = docs; renderStudent(); }));
+      watchPresented(renderStudent);
+      tickUntilChosen(renderStudent);
       this._offs.push(data.watch(settingsPath, (docs) => {
         applySharedSettings.call(this, docs);
-        activeId = settingDoc("lektion")?.value?.activePlanId ?? activeId;
         renderStudent();
       }));
       watchStudents(renderStudent);
@@ -532,12 +594,16 @@ export default {
           </section>
         </aside>
 
-        <div class="lesson__stage" data-el="stage"></div>
+        <div class="lesson__main">
+          <div class="present-bar teacher-only" data-el="present" aria-live="polite"></div>
+          <div class="lesson__stage" data-el="stage"></div>
+        </div>
       </div>`;
 
     const listEl = el.querySelector('[data-el="list"]');
     const fieldsEl = el.querySelector('[data-el="fields"]');
     const stageEl = el.querySelector('[data-el="stage"]');
+    const presentEl = el.querySelector('[data-el="present"]');
     const bulkEl = el.querySelector('[data-el="bulk"]');
     const confirmEl = el.querySelector('[data-el="confirm"]');
     const statusEl = el.querySelector('[data-el="status"]');
@@ -551,10 +617,24 @@ export default {
     const selected = new Set();
     let pendingDelete = null; // [ids] som väntar på bekräftelse
 
-    // -- Persistens av valet av aktiv planering (delas med elevvyn) --
-    async function setActive(id) {
-      activeId = id;
-      await data.put(settingsPath, { id: "lektion", value: { activePlanId: id } });
+    // -- Redigerar nu (bara den här fliken) --
+    let editingId = null;
+    const editingPlan = () => plans.find((p) => p.id === editingId) ?? null;
+    function setEditing(id) {
+      editingId = id ?? null;
+      setEditingPlanId(activeClass.id, editingId);
+    }
+
+    // -- Visas för eleverna (lärarens PRIVATA inställning, delas med elevskärmen) --
+    async function present(id) {
+      presentedDoc = { id: LESSON_SETTINGS_DOC, value: { presentedPlanId: id ?? null } };
+      await data.put(privatePath, presentedDoc);
+    }
+    // Utan sparat val visas dagens planering som förval (presentedPlanOf).
+    // Innan läraren ändrar i planeringarna låses förvalet fast, så att en
+    // ny/kopierad/ändrad planering aldrig i tysthet tar över elevskärmen.
+    async function pinDefault() {
+      if (!presentedDoc) await present(presentedPlan()?.id ?? null);
     }
 
     // -- Ämnesväljare (inbyggda + egna, + skapa nytt) --
@@ -628,7 +708,7 @@ export default {
         (!q || searchText(p, subjects).includes(q)));
     }
 
-    function rowHTML(p, curId) {
+    function rowHTML(p, curId, shownId) {
       const st = styleFor(p.subjectId, subjects);
       const d = parseISO(p.date);
       const t = p.start ? `${p.start}${p.end ? "–" + p.end : ""}` : "";
@@ -644,6 +724,7 @@ export default {
             <span class="plan-list__name">${esc(p.name)}</span>
             <span class="plan-list__meta">${esc(meta)}</span>
           </span>
+          ${p.id === shownId ? `<span class="plan-list__badge" title="Den här planeringen visas på elevskärmen">${icon("monitor", { size: 14 })}Visas nu</span>` : ""}
         </button>
         ${selecting ? "" : `<button class="btn btn--ghost btn--icon plan-list__act" data-copy="${esc(p.id)}" title="Kopiera till samma veckodag framåt" aria-label="Kopiera ${esc(p.name)}">${icon("copy", { size: 16 })}</button>`}
       </div>`;
@@ -654,13 +735,14 @@ export default {
       if (plans.length === 0) { listEl.innerHTML = `<p class="field-edit__hint">Inga planeringar ännu — tryck på "Ny planering".</p>`; renderBulk(); return; }
       const vis = visiblePlans();
       if (vis.length === 0) { listEl.innerHTML = `<p class="field-edit__hint">Inga planeringar matchar sökningen.</p>`; renderBulk(); return; }
-      const curId = activePlan()?.id;
+      const curId = editingId;
+      const shownId = presentedPlan()?.id;
       listEl.innerHTML = groupByWeek(vis).map((g) => {
         const allSel = selecting && g.plans.every((p) => selected.has(p.id));
         const head = selecting
           ? `<label class="plan-week__head"><input type="checkbox" data-week="${esc(g.key)}" ${allSel ? "checked" : ""}> ${esc(g.label)}</label>`
           : `<div class="plan-week__head">${esc(g.label)}</div>`;
-        return `<div class="plan-week" data-weekgroup="${esc(g.key)}">${head}${g.plans.map((p) => rowHTML(p, curId)).join("")}</div>`;
+        return `<div class="plan-week" data-weekgroup="${esc(g.key)}">${head}${g.plans.map((p) => rowHTML(p, curId, shownId)).join("")}</div>`;
       }).join("");
       renderBulk();
     }
@@ -700,11 +782,39 @@ export default {
     }
     this._offs.push(() => clearTimeout(statusTimer));
 
+    // Förhandsvisningen visar planeringen som REDIGERAS — inte nödvändigtvis
+    // den som eleverna ser (raden ovanför säger vilken).
     function renderPreview() {
       if (!stageEl.isConnected) return;
-      const p = activePlan();
+      const p = editingPlan();
       if (p) renderBoard(stageEl, p, subjects, praise());
       else stageEl.innerHTML = `<div class="lesson-empty"><h1>Ingen planering</h1><p>Skapa en ny planering för att börja.</p></div>`;
+      renderPresentBar();
+    }
+
+    // "Visa för eleverna" + vad eleverna ser just nu.
+    function renderPresentBar() {
+      const p = editingPlan();
+      const shown = presentedPlan();
+      const isShown = !!p && p.id === shown?.id;
+      presentEl.classList.toggle("present-bar--live", isShown);
+      if (!p) {
+        presentEl.innerHTML = `<span class="present-bar__seen">Eleverna ser: <strong>${shown ? esc(planLabel(shown)) : "ingen planering"}</strong></span>`;
+        return;
+      }
+      if (isShown) {
+        presentEl.innerHTML = `<span class="present-bar__state present-bar__state--live">${icon("monitor", { size: 18 })}Visas för eleverna</span>`;
+        return;
+      }
+      presentEl.innerHTML = `
+        <span class="present-bar__state">Förhandsvisning — visas inte för eleverna</span>
+        <button class="btn btn--primary" data-act="present">${icon("monitor")} Visa för eleverna</button>
+        <span class="present-bar__seen">Eleverna ser:
+          ${shown
+            ? `<strong>${esc(planLabel(shown))}</strong>
+               <button class="btn btn--ghost present-bar__jump" data-act="goto-presented" title="Öppna planeringen som eleverna ser">Gå dit</button>`
+            : `<strong>ingen planering</strong>`}
+        </span>`;
     }
     observeStage(stageEl);
 
@@ -714,7 +824,7 @@ export default {
     // egna inputs; watch:en rör dem inte.
     let editorFor = Symbol("none");
     function renderEditor() {
-      const p = activePlan();
+      const p = editingPlan();
       const disabled = !p;
       for (const inp of metaInputs()) inp.disabled = disabled;
       editorFor = p?.id ?? null;
@@ -728,7 +838,7 @@ export default {
       fieldsEl.innerHTML = fieldsHTML(np);
     }
     function syncEditor() {
-      if ((activePlan()?.id ?? null) !== editorFor) renderEditor();
+      if ((editingPlan()?.id ?? null) !== editorFor) renderEditor();
     }
 
     function renderAll() {
@@ -737,17 +847,19 @@ export default {
       renderPreview();
     }
 
-    // -- Skriv en deländring till den aktiva planeringen --
-    async function patchActive(partial) {
-      const p = activePlan();
+    // -- Skriv en deländring till planeringen som redigeras --
+    async function patchEditing(partial) {
+      const p = editingPlan();
       if (!p) return;
+      await pinDefault();
       await data.patch(plansPath, p.id, partial);
     }
 
     // -- Skapa / kopiera / ta bort --
     async function createPlan() {
+      await pinDefault();
       const id = await data.put(plansPath, normalizePlan({ name: "Ny planering", date: todayISO(), ownerUid: currentUid() }));
-      await setActive(id);
+      setEditing(id);
       renderAll();
       const name = el.querySelector('[data-meta="name"]');
       name.focus();
@@ -761,19 +873,24 @@ export default {
       copy.ownerUid = currentUid();
       copy.date = nextSameWeekday(copy.date);
       if (copy.date === src.date) copy.name = `${copy.name} (kopia)`;
+      await pinDefault();
       const id = await data.put(plansPath, copy);
-      await setActive(id);
+      setEditing(id);
       renderAll();
       const d = parseISO(copy.date);
       flash(`Kopierad till ${d ? fmtDay(d) : copy.date} — byt datum under "Om lektionen" om det behövs`);
     }
 
     async function removePlans(ids) {
+      // Tas den visade planeringen bort blir elevskärmen tom ("Ingen
+      // planering visas") — den byter aldrig i tysthet till en annan.
+      if (ids.includes(presentedPlan()?.id)) await present(null);
+      else await pinDefault();
       for (const id of ids) {
         await data.remove(plansPath, id);
         selected.delete(id);
       }
-      if (ids.includes(activeId)) activeId = null;
+      if (ids.includes(editingId)) setEditing(null);
       pendingDelete = null;
       renderConfirm();
       flash(ids.length === 1 ? "Planeringen togs bort." : `${ids.length} planeringar togs bort.`);
@@ -795,7 +912,7 @@ export default {
           renderList();
           return;
         }
-        await setActive(id);
+        setEditing(id);
         renderAll();
         return;
       }
@@ -806,15 +923,15 @@ export default {
       else if (act === "class-action") {
         // Den öppna planeringen förväljs som lektion (issue #34); utan
         // datum → den pågående lektionen enligt schemat.
-        const p = activePlan();
+        const p = editingPlan();
         void openClassActionDialog({
           data, cid: activeClass.id,
           lesson: p?.date ? { date: p.date, start: p.start ?? null, end: p.end ?? null, subjectId: p.subjectId ?? null, title: p.name ?? "" } : undefined,
         });
       }
-      else if (act === "dup") await copyPlan(activePlan());
+      else if (act === "dup") await copyPlan(editingPlan());
       else if (act === "del") {
-        const p = activePlan();
+        const p = editingPlan();
         if (!p) return;
         pendingDelete = [p.id];
         renderConfirm();
@@ -843,6 +960,18 @@ export default {
       }
     });
 
+    // "Visa för eleverna" / "Gå dit" — raden över förhandsvisningen
+    presentEl.addEventListener("click", async (e) => {
+      const act = e.target.closest("[data-act]")?.dataset.act;
+      if (act === "present") {
+        const p = editingPlan();
+        if (p) { await present(p.id); renderList(); renderPresentBar(); }
+      } else if (act === "goto-presented") {
+        const p = presentedPlan();
+        if (p) { setEditing(p.id); renderAll(); }
+      }
+    });
+
     // Metadata (namn/datum/tid/ämne), kryssrutor och filter
     panel.addEventListener("change", async (e) => {
       const weekKey = e.target.dataset.week;
@@ -860,21 +989,21 @@ export default {
       const metaKey = e.target.dataset.meta;
       if (metaKey === "subjectId" && e.target.value === ADD_SUBJECT) {
         const id = await addCustomSubject.call(this);
-        const p = activePlan();
+        const p = editingPlan();
         // återställ eller sätt nytt ämne
         e.target.value = id ?? (p ? normalizePlan(p).subjectId : "");
-        if (id) await patchActive({ subjectId: id });
+        if (id) await patchEditing({ subjectId: id });
         renderAll();
         return;
       }
-      if (metaKey) { await patchActive({ [metaKey]: e.target.value }); renderList(); renderPreview(); return; }
+      if (metaKey) { await patchEditing({ [metaKey]: e.target.value }); renderList(); renderPreview(); return; }
 
       const showKey = e.target.dataset.show;
       if (showKey) {
-        const p = activePlan();
+        const p = editingPlan();
         if (!p) return;
         const show = { ...normalizePlan(p).show, [showKey]: e.target.checked };
-        await patchActive({ show });
+        await patchEditing({ show });
         e.target.closest("[data-fieldwrap]")?.classList.toggle("field-edit--off", !e.target.checked);
         renderPreview();
       }
@@ -885,17 +1014,17 @@ export default {
       if (e.target.dataset.filter === "q") { filter.q = e.target.value; renderList(); return; }
 
       const metaKey = e.target.dataset.meta;
-      if (metaKey === "name") { await patchActive({ name: e.target.value }); renderList(); return; }
+      if (metaKey === "name") { await patchEditing({ name: e.target.value }); renderList(); return; }
 
       const fieldKey = e.target.dataset.field;
       if (!fieldKey) return;
-      const p = activePlan();
+      const p = editingPlan();
       if (!p) return;
       const fields = { ...normalizePlan(p).fields };
       fields[fieldKey] = fieldKey === "attGora"
         ? e.target.value.split("\n")
         : e.target.value;
-      await patchActive({ fields });
+      await patchEditing({ fields });
       renderPreview();
     });
 
@@ -911,23 +1040,29 @@ export default {
       renderPreview();
     };
 
+    // OBS: den gamla DELADE settings/lektion → activePlanId läses inte
+    // längre (issue #39) — vad eleverna ser är privat per lärare.
     this._offs.push(data.watch(settingsPath, (docs) => {
       applySharedSettings.call(this, docs);
-      const savedActive = settingDoc("lektion")?.value?.activePlanId;
-      if (savedActive) activeId = savedActive;
       refreshPraise();
     }));
     watchStudents(refreshPraise);
     watchPraise(refreshPraise);
+    // Visas för eleverna — även ändringar från lärarens andra fönster.
+    watchPresented(() => { renderList(); renderPresentBar(); });
+    tickUntilChosen(() => { renderList(); renderPresentBar(); });
 
     this._offs.push(data.watch(plansPath, async (docs) => {
       plans = docs;
       // (Ingen auto-seed av testplaneringar längre: planeringarna är
       // PRIVATA per lärare — varje ny lärare/enhet fick annars fem
       // fejkplaneringar skapade i sitt namn. En ny lärare börjar tomt.)
-      if (!activeId || !plans.some((p) => p.id === activeId)) {
-        const first = sortedPlans()[0];
-        if (first) { activeId = first.id; void setActive(first.id); }
+      // Redigeraren behöver en planering: flikens senaste, annars den som
+      // visas, annars den första. (Bara UI — ingenting skrivs.)
+      if (!editingPlan()) {
+        const saved = getEditingPlanId(activeClass.id);
+        const pick = plans.find((p) => p.id === saved) ?? presentedPlan() ?? sortedPlans()[0];
+        if (pick) setEditing(pick.id);
       }
       // Planeringar som försvunnit (t.ex. borttagna i en annan flik) kan inte vara markerade.
       for (const id of [...selected]) if (!plans.some((p) => p.id === id)) selected.delete(id);

@@ -179,6 +179,13 @@ classes/{classId}/settings/{key}        — inställningar per klass
                                            t.ex. "schedule", "morningScreen")
   value: { … }
 
+classes/{classId}/settings/lektion      — OANVÄND sedan issue #39 (tidigare
+                       activePlanId). Var delad mellan alla lärare, så en
+                       lärares val styrde en annan lärares elevskärm. Läses
+                       och skrivs inte längre; ett kvarliggande dokument är
+                       ofarligt. Vad elevskärmen visar ligger nu PRIVAT under
+                       teachers/{uid}/classes/{classId}/settings/lektion.
+
 classes/{classId}/settings/morningScreen — Läge 1:s tillstånd (js/lib/morning.js)
   value: { greeting, tasks, showNametavla, background }
                      — Bra jobbat (praise/weekOf) är FLYTTAD till den
@@ -275,6 +282,28 @@ teachers/{uid}/classes/{classId}/lessonPlans/{planId}
                      — planeringar skapas och raderas aldrig automatiskt
                        (ingen testdata/auto-seed, ingen veckostädning);
                        bara läraren själv skapar, kopierar och tar bort
+
+teachers/{uid}/classes/{classId}/settings/lektion
+                     — vad elevskärmen visar i Läge 2 (issue #39). PRIVAT
+                       per lärare, som planeringarna: elevskärmen delar
+                       lärarens session (samma uid) och läser dokumentet,
+                       men ingen annan lärare kan läsa eller ändra det.
+  value: {
+    presentedPlanId  — planeringen som visas, eller null = "Ingen planering
+                       visas". Ändras BARA av "Visa för eleverna" (och sätts
+                       till null om den visade planeringen tas bort). Pekar
+                       id:t på en planering som inte finns visar elevvyn
+                       tomläget, aldrig en annan planering.
+  }
+                     — Saknas dokumentet (första användningen) visas dagens
+                       planering som förval (den som senast började, annars
+                       dagens första). Förvalet skrivs fast första gången
+                       läraren skapar/kopierar/ändrar/tar bort en planering,
+                       så att en ny planering aldrig tyst tar över skärmen.
+                     — Vilken planering läraren har öppen i redigeraren är
+                       bara UI-tillstånd för fliken (sessionStorage
+                       classroom:lektion:editing:{uid}:{classId}), aldrig
+                       datalagret.
 ```
 
 ## Outbox (synkkön)
@@ -339,8 +368,10 @@ outboxen som `js/data/datalayer.js` tömmer mot Firestore. Semantik:
   Varje notering skapar samtidigt ett anonymt `noteStats`-streck i
   molnet (`js/modes/elever/shared.js` → `createNote`).
 - **PRIVAT per lärare**: lektionsplaneringar
-  (`teachers/{uid}/classes/{classId}/lessonPlans`). Varje lärare
-  planerar sina egna lektioner; ingen annan lärare kommer åt dem.
+  (`teachers/{uid}/classes/{classId}/lessonPlans`) och vilken av dem
+  elevskärmen visar (`teachers/{uid}/classes/{classId}/settings/lektion`,
+  issue #39). Varje lärare planerar sina egna lektioner; ingen annan
+  lärare kommer åt dem eller kan byta vad en annan lärares elevskärm visar.
   Pathen bär ägarskapet, så en klientlyssnare på det egna subträdet
   behöver ingen `where`-filtrering (se `js/data/plans.js`).
 
