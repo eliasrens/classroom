@@ -12,9 +12,10 @@
      kortets bredd/padding, luft/avstånd och Bra jobbat-tavlan (text, titel,
      min-bredd, padding) multipliceras alla med denna via calc(). Ändra
      BARA här för att göra skärmen större/mindre — proportionerna följer
-     med. 1 = storleken före #38. Gäller endast inom .morgon, så
+     med. 1 = storleken före #38; 0.896 = 0.8 × 1.12 (#42, 12 % större
+     än #38:s 0.8). Gäller endast inom .morgon, så
      lektionsplaneringens Bra jobbat-ruta påverkas inte. */
-  --morgon-scale: 0.8;
+  --morgon-scale: 0.896;
   --morgon-fallback: #2b3a34; /* lugn djupgrön om bilden inte laddar */
   position: relative;
   width: 100%;
