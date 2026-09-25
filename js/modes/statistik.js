@@ -14,7 +14,10 @@
  *     Elias ser hur det gick på Catalins lektion.
  *   - noteringar PER ELEV — enbart den här datorns LOKALA noteringar
  *     (tydligt märkta "Endast den här datorn"),
- *   - veckans Bra jobbat (lokal lista + lokalt arkiv, se week-rhythm.js).
+ *   - veckans Bra jobbat (lokal lista + lokalt arkiv, se week-rhythm.js),
+ *   - KLASSÅTGÄRDER (issue #34): lärarnas delade logg över arbetssätt de
+ *     testat och hur det gick, med lektionens klasstatistik bredvid.
+ *     Följer inte måndagsrensningen — bläddras per vecka som resten.
  * Filter per lärare: Alla, Mina eller en viss lärare. CSV-export och
  * utskrift av klasstatistiken innehåller aldrig elevdata.
  *
@@ -37,12 +40,16 @@ import { PRAISE_DOC, praisePath, normalize as normalizeMorning, currentPraise } 
 import { praiseArchivePath } from "../lib/week-rhythm.js";
 import { escapeHtml, noteTypeById, teacherLabel, noteStatsPath, NOTE_TYPES } from "./elever/shared.js";
 import { downloadBlob } from "../lib/download.js";
+import {
+  classActionsPath, classActionRepliesPath, categoryKey, categoryOptions, lessonIndex,
+} from "../lib/class-actions.js";
+import { renderClassActionList, handleClassActionClick, addButton } from "../ui/class-actions.js";
 
 const PASS_PAGE = 10; // pass per typ innan "Visa alla"
 
 // Valen överlever byte av läge under sessionen. weekStart null = "Denna
 // vecka" — följer alltså med när en ny vecka börjar.
-const ui = { weekStart: null, teacher: "all", openStudent: null, allPasses: new Set() };
+const ui = { weekStart: null, teacher: "all", openStudent: null, allPasses: new Set(), caCategory: "all" };
 
 export default {
   id: "statistik",
@@ -84,6 +91,8 @@ export default {
     let initials = false;
     let morning = normalizeMorning(null); // praise/weekOf ur den LOKALA listan
     let goalCfg = normalizeGoalSettings(null);
+    let actions = [];    // klassåtgärder (moln, delade, issue #34)
+    let replies = [];
 
     el.innerHTML = `<div class="stat"></div>`;
     const root = el.querySelector(".stat");
@@ -104,6 +113,7 @@ export default {
       const bump = (ws, n = 1) => { if (ws != null && ws <= cur) counts.set(ws, (counts.get(ws) ?? 0) + n); };
       for (const s of trafikljus()) bump(startOfWeek(sessionTime(s)));
       for (const s of noteStats) if (s.createdAt) bump(startOfWeek(s.createdAt));
+      for (const a of actions) if (a.createdAt) bump(startOfWeek(a.createdAt));
       for (const a of archive) bump(weekStartFromKey(a.weekOf ?? a.id), 0);
       return [...counts].sort((a, b) => b[0] - a[0]);
     }
@@ -136,7 +146,7 @@ export default {
       const ws = selectedWeek();
       const weeks = weekIndex(ws);
       const oldest = weeks[weeks.length - 1][0];
-      const others = teacherOptions([...trafikljus(), ...noteStats]);
+      const others = teacherOptions([...trafikljus(), ...noteStats, ...actions]);
       ui.teacher = validTeacherFilter(ui.teacher, others);
       const filter = teacherFilterFn(ui.teacher);
 
@@ -152,6 +162,7 @@ export default {
       const typ = weekStats.filter((n) => (n.kind ?? "typ") === "typ");
       const neg = typ.filter((n) => !n.positive).length;
       const passTotal = KIND_KEYS.reduce((sum, k) => sum + stats[k].weekTotal, 0);
+      const weekActions = actions.filter((a) => inWeek(a.createdAt ?? 0, ws) && (!filter || filter(a)));
 
       const weekOpt = ([w, n]) => `
         <option value="${w}"${w === ws ? " selected" : ""}>${escapeHtml(
@@ -193,6 +204,7 @@ export default {
           ${tile(weekStats.filter((n) => n.kind === "insats").length, "insatser")}
           ${tile(passTotal, "trafikljuspass")}
           ${tile(praise.length, "Bra jobbat")}
+          ${tile(weekActions.length, "klassåtgärder")}
         </ul>
 
         <section class="stat-section" aria-label="Trafikljus">
@@ -204,6 +216,8 @@ export default {
           <h2 class="stat-h2">${icon("calendar")} Per lektion</h2>
           ${lessonSection(weekStats, ws, filter)}
         </section>
+
+        ${actionSection(weekActions, ws, cur)}
 
         <section class="stat-section stat-section--local" aria-label="Noteringar per elev">
           <h2 class="stat-h2">${icon("users")} Noteringar per elev
@@ -312,6 +326,34 @@ export default {
           </ul>`).join("")}
         <p class="stat-note">Klassens delade statistik — anonyma räkningar utan elevnamn och utan texter.</p>
       </div>`;
+    }
+
+    // ---- Klassåtgärder (issue #34) — delade, om klassen, aldrig elever ----
+
+    function actionSection(weekActions, ws, cur) {
+      const cats = categoryOptions(weekActions);
+      if (ui.caCategory !== "all" && !cats.some((c) => c.value === ui.caCategory)) ui.caCategory = "all";
+      const shown = ui.caCategory === "all" ? weekActions : weekActions.filter((a) => categoryKey(a.category) === ui.caCategory);
+      const catOpt = (value, name) =>
+        `<option value="${escapeHtml(value)}"${ui.caCategory === value ? " selected" : ""}>${escapeHtml(name)}</option>`;
+      return `
+        <section class="stat-section ca-section teacher-only" aria-label="Klassåtgärder">
+          <div class="ca-section__head">
+            <h2 class="stat-h2">${icon("bulb")} Klassåtgärder</h2>
+            ${cats.length ? `<select data-ca-cat data-focus="ca-cat" aria-label="Kategori">
+              ${catOpt("all", "Alla kategorier")}${cats.map((c) => catOpt(c.value, c.name)).join("")}
+            </select>` : ""}
+            ${addButton()}
+          </div>
+          <div class="card stat-card">
+            ${renderClassActionList(shown, {
+              replies, index: lessonIndex(noteStats, sessions), subjects,
+              empty: `Inga klassåtgärder ${ws === cur ? "ännu den här veckan" : "den veckan"}${ui.teacher !== "all" || ui.caCategory !== "all" ? " för det här urvalet" : ""}.`,
+            })}
+            <p class="stat-note">Delas med alla lärare — om klassen, aldrig om enskilda elever.
+              Klassåtgärder rensas inte på måndagar; tidigare veckor finns kvar här i arkivet.</p>
+          </div>
+        </section>`;
     }
 
     // ---- CSV-export & utskrift av KLASSTATISTIKEN (aldrig elevdata) ----
@@ -525,6 +567,7 @@ export default {
     // ---- Händelser (delegering — markupen ritas om) ----
 
     root.addEventListener("click", (e) => {
+      if (handleClassActionClick(e, { data, cid, actions, replies })) return;
       const step = e.target.closest("[data-week-step]");
       if (step && !step.disabled) {
         ui.weekStart = addWeeks(selectedWeek(), Number(step.dataset.weekStep));
@@ -568,6 +611,9 @@ export default {
       } else if (e.target.matches("[data-teacher]")) {
         ui.teacher = e.target.value;
         scheduleRender();
+      } else if (e.target.matches("[data-ca-cat]")) {
+        ui.caCategory = e.target.value;
+        scheduleRender();
       }
     });
 
@@ -577,6 +623,8 @@ export default {
     // noteringar, elever, Bra jobbat-listan och dess arkiv.
     offs.push(data.watch(`classes/${cid}/sessions`, (docs) => { sessions = docs; scheduleRender(); }));
     offs.push(data.watch(noteStatsPath(cid), (docs) => { noteStats = docs; scheduleRender(); }));
+    offs.push(data.watch(classActionsPath(cid), (docs) => { actions = docs; scheduleRender(); }));
+    offs.push(data.watch(classActionRepliesPath(cid), (docs) => { replies = docs; scheduleRender(); }));
     offs.push(data.watch(`classes/${cid}/notes`, (docs) => { notes = docs; scheduleRender(); }));
     offs.push(data.watch(`classes/${cid}/students`, (docs) => { students = docs; scheduleRender(); }));
     offs.push(data.watch(praiseArchivePath(cid), (docs) => { archive = docs; scheduleRender(); }));

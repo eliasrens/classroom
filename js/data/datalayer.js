@@ -62,6 +62,21 @@ const readCollection = (path) =>
 const writeCollection = (path, docs) =>
   isLocalOnlyPath(path) ? writeLocalCollection(path, docs) : writeSynced(path, docs);
 
+// ---- Ägarskyddade samlingar (issue #34) ----
+// Klassåtgärder och deras svar får bara ändras/tas bort av den som skrev
+// dem (firestore.rules). En op som reglerna nekar där kan aldrig lyckas —
+// den får inte ligga först i kön för gott och stoppa all annan synk.
+// Undantag: en EGEN ny/ändrad post (createdBy = inloggad lärare) kan nekas
+// tillfälligt innan auth-token hunnit fram — den försöks igen som vanligt.
+const OWNED_PATH = /^classes\/[^/]+\/(classActions|classActionReplies)$/;
+const SESSION_KEY = "classroom:auth:session"; // js/auth.js (importeras ej: datalagret testas i Node)
+function isRejectedForGood(op, err) {
+  if (err?.code !== "permission-denied" || !OWNED_PATH.test(op?.path ?? "")) return false;
+  let uid = null;
+  try { uid = localStorage.getItem(SESSION_KEY); } catch { /* ingen lagring */ }
+  return op.op === "delete" || !uid || op.doc?.createdBy !== uid;
+}
+
 const OUTBOX_PREFIX = "classroom:outbox:";      // en nyckel per op
 const OUTBOX_KEY = "classroom:outbox";          // gammal array-kö (före #30), töms bara
 const OUTBOX_LOCK = "classroom-outbox";          // Web Locks-namn
@@ -225,7 +240,14 @@ export function createDataLayer({ onSyncState, createSync = createFirestoreSync 
   async function drainOutbox(renewLease) {
     try {
       for (let e = readOutboxEntries()[0]; e; e = readOutboxEntries()[0]) {
-        await sync.push(e.op); // kastar vid fel → op ligger kvar
+        try {
+          await sync.push(e.op); // kastar vid fel → op ligger kvar
+        } catch (err) {
+          if (!isRejectedForGood(e.op, err)) throw err;
+          // Aldrig tillåten (annan lärares post) — får inte blockera kön.
+          // Molnets version kommer tillbaka lokalt med nästa server-snapshot.
+          console.warn(`[data] ${e.op.op} av ${e.op.path}/${e.op.id} nekades av reglerna — tas bort ur kön`);
+        }
         removeFromOutbox(e);
         renewLease?.();
         // Framsteg: backoffen växer bara vid konflikter I RAD. Annars kunde

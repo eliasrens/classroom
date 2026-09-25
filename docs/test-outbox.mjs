@@ -16,7 +16,8 @@
  * (ingen Web Locks), med slumpade externa transaktionskonflikter
  * (retry-vägen) och med en outbox i det gamla array-formatet (före #30).
  * Plus ett deterministiskt backoff-test (konflikter mellan lyckade pushar
- * får inte dubbla väntan).
+ * får inte dubbla väntan) och ett test av en op som reglerna nekar för gott
+ * i en ägarskyddad samling (klassåtgärder, issue #34).
  *
  *   node docs/test-outbox.mjs backoff        — bara backoff-testet
  *   node docs/test-outbox.mjs conflicts 1    — ett scenario, ett varv
@@ -242,6 +243,61 @@ async function backoffScenario() {
   return ok;
 }
 
+// ---- Deterministiskt: nekad op i en ägarskyddad samling (issue #34) ----
+//
+// Klassåtgärder får bara ändras/tas bort av upphovspersonen. En op som
+// reglerna nekar för gott (annan lärares post, eller en radering) får inte
+// ligga först i kön och stoppa all annan synk — den tas bort. En EGEN ny
+// post som nekas (t.ex. auth-token inte framme än) ligger kvar och försöks
+// igen, precis som förut. Andra samlingar påverkas inte.
+
+async function rejectedScenario() {
+  setNavigator({ locks: fakeLocks() });
+  localStorage.setItem("classroom:auth:session", "me");
+  let denyOwn = 2; // den egna posten nekas två gånger, sedan går den igenom
+  const pushed = [];
+  const denied = () => Object.assign(new Error("Missing or insufficient permissions."), { code: "permission-denied" });
+  const createSync = ({ onStatus }) => ({
+    async start() { onStatus?.("online"); return true; },
+    watch() {}, reset() {},
+    async push(op) {
+      if (op.path.endsWith("/classActions") && op.id === "theirs") throw denied();
+      if (op.path.endsWith("/classActions") && op.id === "mine" && denyOwn-- > 0) throw denied();
+      pushed.push(`${op.op}:${op.id}`);
+    },
+  });
+  const origInfo = console.info, origWarn = console.warn;
+  const warns = [];
+  console.info = () => {};
+  console.warn = (m) => { warns.push(String(m)); };
+
+  const data = createDataLayer({ createSync });
+  // Någon annans post i den lokala cachen som (felaktigt) ändras + tas bort.
+  localStorage.setItem("classroom:data:classes/T/classActions",
+    JSON.stringify({ theirs: { id: "theirs", text: "x", outcome: "same", createdBy: "other", createdAt: 1, updatedAt: 1 } }));
+  void data.patch("classes/T/classActions", "theirs", { text: "ändrad" });
+  void data.remove("classes/T/classActions", "theirs");
+  void data.put("classes/T/settings", { id: "after", n: 1 });
+  void data.put("classes/T/classActions", { id: "mine", text: "y", outcome: "better", createdBy: "me" });
+
+  // Ett vanligt fel pausar synken tills nästa signal (snapshot/online-event)
+  // — simulera den signalen.
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline && outboxLeft()) { await sleep(50); window.dispatchEvent(new Event("online")); }
+  console.info = origInfo; console.warn = origWarn;
+
+  const problems = [];
+  if (outboxLeft()) problems.push(`outboxen har ${outboxLeft()} ops kvar`);
+  if (!pushed.includes("set:after")) problems.push("en senare op i kön blockerades");
+  if (!pushed.includes("set:mine")) problems.push("den egna posten försöktes inte igen");
+  if (pushed.some((x) => x.endsWith(":theirs"))) problems.push("den nekade op:en rapporterades som pushad");
+  if (warns.filter((w) => w.includes("nekades av reglerna")).length !== 2) problems.push(`varningar: ${JSON.stringify(warns)}`);
+  const ok = problems.length === 0;
+  console.log(`${ok ? "OK  " : "FAIL"} nekad op i ägarskyddad samling (deterministisk)`);
+  for (const p of problems) console.log("     ·", p);
+  return ok;
+}
+
 // Varje scenario i en egen process: ett datalager lever vidare efter sitt
 // scenario (retry-timers) och skulle annars tömma nästa scenarios outbox.
 const SCENARIOS = {
@@ -252,6 +308,7 @@ const SCENARIOS = {
 };
 const only = process.argv[2];
 if (only === "backoff") process.exit((await backoffScenario()) ? 0 : 1);
+if (only === "rejected") process.exit((await rejectedScenario()) ? 0 : 1);
 if (only) {
   const [label, opts] = SCENARIOS[only];
   process.exit((await scenario(`${label} #${process.argv[3]}`, opts)) ? 0 : 1);
@@ -260,6 +317,7 @@ if (only) {
 const { spawnSync } = await import("node:child_process");
 const { fileURLToPath } = await import("node:url");
 let allOk = spawnSync(process.execPath, [fileURLToPath(import.meta.url), "backoff"], { stdio: "inherit" }).status === 0;
+allOk = spawnSync(process.execPath, [fileURLToPath(import.meta.url), "rejected"], { stdio: "inherit" }).status === 0 && allOk;
 for (let run = 1; run <= 5; run++) {
   for (const name of Object.keys(SCENARIOS)) {
     const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), name, String(run)], { stdio: "inherit" });

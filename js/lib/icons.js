@@ -64,6 +64,12 @@ const PATHS = {
   lock: `<rect x="5" y="10.5" width="14" height="10" rx="1.8"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3M12 14.5v2.5"/>`,
   file: `<path d="M14 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3.5V8h4.5"/>`,
   merge: `<path d="M6 4v5a6 6 0 0 0 6 6h0a6 6 0 0 1 6 6M18 4v5a6 6 0 0 1-3.5 5.4M4 6.5 6 4l2 2.5M16 6.5 18 4l2 2.5"/>`,
+  // Klassåtgärder (issue #34) — utfallen (bättre/ingen skillnad/sämre; osäkert = help)
+  bulb: `<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/>`,
+  "trend-up": `<path d="M4 17 10 11l4 4 6-7M15 8h5v5"/>`,
+  "trend-down": `<path d="M4 7l6 6 4-4 6 7M15 16h5v-5"/>`,
+  equal: `<path d="M5 9.5h14M5 14.5h14"/>`,
+  reply: `<path d="M9.5 7 4.5 12l5 5M5 12h9a5 5 0 0 1 5 5v1"/>`,
 };
 
 /**
