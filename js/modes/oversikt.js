@@ -17,7 +17,7 @@
 import { icon } from "../lib/icons.js";
 import { MODES } from "./registry.js";
 import { SUBJECTS } from "../lib/color.js";
-import { ACTIVE_CLASS_KEY } from "../ui/class-picker.js";
+import { setActiveClass } from "../ui/class-picker.js";
 import { loadNameDisplay, saveNameDisplay } from "./elever/shared.js";
 import {
   savePrivacy, runRetention, RETENTION_OPTIONS, DEFAULT_RETENTION_WEEKS, deleteAllClassData,
@@ -98,8 +98,7 @@ export default {
 
     // ---- Klassbyte från startvyn (persistas + speglas till elevskärm) ----
     function chooseClass(id) {
-      try { localStorage.setItem(ACTIVE_CLASS_KEY, id ?? ""); } catch { /* privat läge */ }
-      store.set({ classId: id || null });
+      setActiveClass(store, id);
       // classId-ändring remountar läget (router) → hela vyn ritas om.
     }
 
@@ -188,9 +187,10 @@ export default {
       if (typed == null) return;
       if (typed.trim() !== cls.name) { alert("Namnet stämde inte — inget raderades."); return; }
       const n = await deleteAllClassData(data, cid);
-      // classId pekar nu på en borttagen klass — klassväljaren städar upp
-      // och väljer en annan (eller ingen); routern remountar då översikten.
-      chooseClass(classes.find((c) => c.id !== cid)?.id ?? null);
+      // Ingen klass vald efteråt: "Välj klass…" (samma fallback som
+      // klassväljaren, #31). Välj ALDRIG automatiskt en annan (riktig) klass —
+      // lärarvyn börjar skriva där direkt (veckorytm, autosparning).
+      chooseClass(null);
       alert(`Klart — ${n} poster raderade för "${cls.name}".`);
     }
 

@@ -27,8 +27,12 @@ function teacherOf(merged, n) {
   return merged.teachers.find((t) => t.uid === n.createdBy) ?? { name: n.createdByName ?? "okänd lärare", color: "#888" };
 }
 
-const teacherDot = (t) => `<span class="rp-dot" style="--t-color:${esc(t.color)}" aria-hidden="true"></span>`;
-const teacherTag = (t) => `<span class="rp-teacher" style="--t-color:${esc(t.color)}">${teacherDot(t)}${esc(t.name)}</span>`;
+// Färger kan komma ur en kollegas fil: bara #hex tillåts i style-attributen
+// (annars t.ex. "red;background:url(…)" — CSS-injektion och nätverksanrop).
+const safeColor = (c) => (/^#[0-9a-f]{3,8}$/i.test(String(c ?? "")) ? c : "#888");
+
+const teacherDot = (t) => `<span class="rp-dot" style="--t-color:${safeColor(t.color)}" aria-hidden="true"></span>`;
+const teacherTag = (t) => `<span class="rp-teacher" style="--t-color:${safeColor(t.color)}">${teacherDot(t)}${esc(t.name)}</span>`;
 
 export function studentName(s) {
   return `${s.name}${s.tag ? ` ${s.tag}` : ""}`;
@@ -55,11 +59,11 @@ const tile = (n, label) => `<li class="rp-tile"><span class="rp-tile__n">${n}</s
 function noteLine(merged, n, { withText = true } = {}) {
   const t = teacherOf(merged, n);
   return `
-    <li class="rp-note${n.positive ? " rp-note--pos" : ""}${n.kind === "insats" ? " rp-note--insats" : ""}" style="--t-color:${esc(t.color)}">
+    <li class="rp-note${n.positive ? " rp-note--pos" : ""}${n.kind === "insats" ? " rp-note--insats" : ""}" style="--t-color:${safeColor(t.color)}">
       <span class="rp-note__when">${esc(dayName(n.createdAt))} ${esc(fmtDate(n.createdAt))} ${esc(fmtTime(n.createdAt))}</span>
       <span class="rp-note__kind">${esc(kindName(n))}${n.positive ? " (+)" : ""}</span>
       ${n.followUp ? `<span class="rp-flag">${icon("flag")}Uppföljning</span>` : ""}
-      ${n.label ? `<span class="rp-label" style="--l-color:${esc(n.label.color || "#888")}">${esc(n.label.name)}</span>` : ""}
+      ${n.label ? `<span class="rp-label" style="--l-color:${safeColor(n.label.color)}">${esc(n.label.name)}</span>` : ""}
       <span class="rp-note__lesson">${esc(lessonName(n))}</span>
       ${teacherTag(t)}
       ${withText && n.text ? `<span class="rp-note__text">${esc(n.text)}</span>` : ""}

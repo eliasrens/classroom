@@ -12,6 +12,16 @@ export const ACTIVE_CLASS_KEY = "classroom:activeClassId";
 
 const ADD_VALUE = "__add__";
 
+/**
+ * Sätt (eller rensa, id = null) vald klass: store + localStorage (som
+ * elevskärmen följer). null → "Välj klass…". Används av klassväljaren och
+ * av Översikten — ALDRIG för att tyst hoppa till en annan riktig klass (#31).
+ */
+export function setActiveClass(store, id) {
+  try { localStorage.setItem(ACTIVE_CLASS_KEY, id ?? ""); } catch { /* privat läge etc. */ }
+  store.set({ classId: id || null });
+}
+
 export function initClassPicker({ el, store, data }) {
   el.innerHTML = `
     <label class="sr-only" for="class-select">Klass</label>
@@ -42,10 +52,7 @@ export function initClassPicker({ el, store, data }) {
     selectClass(id);
   }
 
-  function selectClass(id) {
-    try { localStorage.setItem(ACTIVE_CLASS_KEY, id ?? ""); } catch { /* privat läge etc. */ }
-    store.set({ classId: id || null });
-  }
+  const selectClass = (id) => setActiveClass(store, id);
 
   select.addEventListener("change", () => {
     if (select.value === ADD_VALUE) void addClass();

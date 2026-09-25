@@ -435,13 +435,15 @@ function targetOptions(api, selected, { sepLabel }) {
 }
 
 function fileHtml(api, entry, ws) {
+  // META kommer ur filens klartexthuvud — oautentiserat tills filen öppnats
+  // med rätt lösenord. Allt härifrån escapas; tal kontrolleras.
   const meta = entry.meta ?? {};
   const head = `
     <div class="rap-file__head">
       ${icon("file")}
       <div class="rap-file__title">
         <strong>${esc(entry.status === "error" ? entry.name : fileTitle(meta))}</strong>
-        <span class="rap__sub">${esc(entry.name)}${meta.studentCount != null ? ` · ${meta.studentCount} ${meta.studentCount === 1 ? "elev" : "elever"}` : ""}${
+        <span class="rap__sub">${esc(entry.name)}${Number.isInteger(meta.studentCount) ? ` · ${meta.studentCount} ${meta.studentCount === 1 ? "elev" : "elever"}` : ""}${
           meta.exportedAt ? ` · exporterad ${esc(fmtDate(meta.exportedAt))}` : ""}${meta.kind === "merged" ? ` · sammanställning (${esc((meta.teachers ?? []).join(", "))})` : ""}</span>
       </div>
       <button class="btn btn--ghost btn--icon" data-rap-remove="${entry.key}" title="Ta bort filen ur sammanställningen" aria-label="Ta bort filen">${icon("x")}</button>
