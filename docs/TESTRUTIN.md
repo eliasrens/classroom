@@ -45,5 +45,13 @@ i riktig klassdata. Det har hänt: under testet av #29 fick 4A:s
    också att inget dokument under `classes/{4A,4B}/…` har `updatedAt` i
    framtiden eller ändrades under testet.
    (`$API_KEY` och `$PROJECT` finns i `js/firebase-config.js`.)
-5. **Resurssnålt.** Maskinen har ungefär 8 GB RAM. Kör en webbserver och så få
+5. **Radera testklasser via REST, med alla sidor stängda.** Stäng först
+   varje Chrome-sida (lärarvy, elevskärm, förhandsvisning) och radera sedan
+   testklassen och dess subkollektioner via REST (se punkt 4 för token och
+   `$BASE`), aldrig med "Radera all data" i en öppen lärarvy mitt i ett
+   test. En öppen sida kan skriva tillbaka data i klassen (veckorytm,
+   autosparning) eller, i äldre versioner, byta till en annan riktig klass.
+   Efter "Radera all data" i appen är ingen klass vald ("Välj klass…"),
+   men det skyddet ska inte vara det enda som står mellan testet och 4A.
+6. **Resurssnålt.** Maskinen har ungefär 8 GB RAM. Kör en webbserver och så få
    Chrome-sidor som möjligt, och stäng allt efteråt.

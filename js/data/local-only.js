@@ -22,12 +22,16 @@
  *   classes/{cid}/praise         — Bra jobbat-listan (doc "board": praise, weekOf)
  *   classes/{cid}/praiseArchive  — veckoarkivet av Bra jobbat (innehåller namn)
  *   classes/{cid}/privacy        — lokal gallringsinställning (noteRetentionWeeks)
+ *   classes/{cid}/reports        — rapporter (issue #33): vilka perioder som
+ *                                  exporterats, avvisade påminnelser och
+ *                                  bekräftade namnpar för sammanslagning.
+ *                                  ALDRIG dekrypterad notisdata.
  */
 
 const PREFIX = "classroom:local:";
 
 /** Samlings-suffix (sista path-segmentet under classes/{cid}/) som är lokala. */
-const LOCAL_ONLY = new Set(["students", "notes", "praise", "praiseArchive", "privacy"]);
+const LOCAL_ONLY = new Set(["students", "notes", "praise", "praiseArchive", "privacy", "reports"]);
 
 /** Är detta en samling som bara får finnas lokalt? */
 export function isLocalOnlyPath(path) {

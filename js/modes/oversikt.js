@@ -17,20 +17,21 @@
 import { icon } from "../lib/icons.js";
 import { MODES } from "./registry.js";
 import { SUBJECTS } from "../lib/color.js";
-import { ACTIVE_CLASS_KEY } from "../ui/class-picker.js";
+import { setActiveClass } from "../ui/class-picker.js";
 import { loadNameDisplay, saveNameDisplay } from "./elever/shared.js";
 import {
   savePrivacy, runRetention, RETENTION_OPTIONS, DEFAULT_RETENTION_WEEKS, deleteAllClassData,
 } from "../lib/privacy.js";
 import { plansPath as plansPathFor } from "../data/plans.js";
 import { createClass } from "../data/classes.js";
-import { startOfWeek, inWeek, weekLabel, weekRangeLabel } from "../lib/week.js";
+import { startOfWeek, inWeek, weekLabel, weekRangeLabel, weekKey } from "../lib/week.js";
 import { KIND_KEYS, KINDS, computeStats } from "../lib/trafikljus-stats.js";
 import { PRAISE_DOC, praisePath, normalize as normalizeMorning, currentPraise } from "../lib/morning.js";
 import { noteStatsPath } from "./elever/shared.js";
 import { moveStudentDataFromCloud } from "../data/cloud-cleanup.js";
 import { serverNow } from "../lib/clock.js";
 import { isMentorTime } from "../lib/week-recap.js";
+import { followUpsAtRisk, reportsPath, REPORTS_LOG_ID } from "./elever/report-data.js";
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -88,6 +89,8 @@ export default {
     let noteStats = [];      // klassens anonyma streck (moln, issue #32)
     let praiseBoard = null;  // lokala Bra jobbat-listan
     let sessions = [];
+    let localNotes = [];     // LOKALA noteringar — bara för påminnelsen före gallring (issue #33)
+    let reportLog = null;    // lokal exportlogg (classes/{cid}/reports → log)
     const activeId = () => store.get().classId ?? null;
 
     el.innerHTML = `<div class="oversikt"></div>`;
@@ -95,8 +98,7 @@ export default {
 
     // ---- Klassbyte från startvyn (persistas + speglas till elevskärm) ----
     function chooseClass(id) {
-      try { localStorage.setItem(ACTIVE_CLASS_KEY, id ?? ""); } catch { /* privat läge */ }
-      store.set({ classId: id || null });
+      setActiveClass(store, id);
       // classId-ändring remountar läget (router) → hela vyn ritas om.
     }
 
@@ -109,6 +111,12 @@ export default {
     }
 
     function goMode(id) { location.hash = `#/${id}`; }
+
+    /** Elevlista → fliken Rapporter (påminnelsen före gallring, issue #33). */
+    function goReports() {
+      try { sessionStorage.setItem("classroom:elever:tab", "rapporter"); } catch { /* ok */ }
+      goMode("elever");
+    }
 
     async function openPlan(planId) {
       const cid = activeId();
@@ -130,6 +138,17 @@ export default {
     async function setRetention(value) {
       const cid = activeId();
       if (!cid) return;
+      // Issue #33: raderar valet noteringar med uppföljning som aldrig laddats
+      // ned? Fråga först — det finns ingen annan kopia av dem.
+      const risk = followUpsAtRisk({ notes: localNotes, weeks: Number(value), log: reportLog, before: serverNow() });
+      if (risk.length > 0) {
+        const weeks = [...new Set(risk.map((n) => weekKey(n.createdAt).replace(/^\d{4}-W0?/, "v.")))].join(", ");
+        const ok = confirm(
+          `${risk.length} ${risk.length === 1 ? "notering" : "noteringar"} med uppföljning (${weeks}) har inte laddats ned ` +
+          "och raderas nu från den här datorn.\n\nRadera ändå?\n\n" +
+          "Välj Avbryt och ladda ned en rapport först: Elevlista → Rapporter.");
+        if (!ok) { render(); return; }
+      }
       await savePrivacy(data, cid, { noteRetentionWeeks: Number(value) });
       await runRetention(data, cid);
     }
@@ -168,9 +187,10 @@ export default {
       if (typed == null) return;
       if (typed.trim() !== cls.name) { alert("Namnet stämde inte — inget raderades."); return; }
       const n = await deleteAllClassData(data, cid);
-      // classId pekar nu på en borttagen klass — klassväljaren städar upp
-      // och väljer en annan (eller ingen); routern remountar då översikten.
-      chooseClass(classes.find((c) => c.id !== cid)?.id ?? null);
+      // Ingen klass vald efteråt: "Välj klass…" (samma fallback som
+      // klassväljaren, #31). Välj ALDRIG automatiskt en annan (riktig) klass —
+      // lärarvyn börjar skriva där direkt (veckorytm, autosparning).
+      chooseClass(null);
       alert(`Klart — ${n} poster raderade för "${cls.name}".`);
     }
 
@@ -295,6 +315,13 @@ export default {
               "Spara tills vidare", så inga noteringar raderas förrän du bekräftar
               en lagringstid ovan. Äldre noteringar än den valda tiden raderas då
               från den här datorn.</p>
+            ${(() => {
+              const risk = followUpsAtRisk({ notes: localNotes, weeks: retentionWeeks, log: reportLog, before: serverNow() });
+              return risk.length ? `
+            <p class="ov-retention-risk">${icon("flag")} <strong>${risk.length} ${risk.length === 1 ? "notering" : "noteringar"} med uppföljning
+              raderas när du bekräftar</strong> och har inte laddats ned.
+              <button class="ov-link" data-go-reports>Ladda ned en rapport först (Elevlista → Rapporter).</button></p>` : "";
+            })()}
             <button class="btn" data-confirm-retention>Bekräfta ${retentionWeeks} veckor och starta gallringen</button>
           </div>` : ""}
 
@@ -324,6 +351,7 @@ export default {
         void setRetention(e.target.value));
       rootEl.querySelector("[data-confirm-retention]")?.addEventListener("click", () =>
         void setRetention(retentionWeeks));
+      rootEl.querySelector("[data-go-reports]")?.addEventListener("click", goReports);
       rootEl.querySelector("[data-migrate]")?.addEventListener("click", () => void migrateCloud());
       rootEl.querySelector("[data-del]")?.addEventListener("click", () => void deleteClass());
     }
@@ -344,6 +372,13 @@ export default {
       this._offs.push(data.watch(`classes/${cid}/settings`, (docs) => {
         settingsDocs = docs;
         initials = docs.find((d) => d.id === "display")?.value?.nameDisplay === "initials";
+        render();
+      }));
+      // Lokala noteringar + exportlogg: bara för att varna innan gallringen
+      // raderar uppföljningar som aldrig laddats ned (issue #33).
+      this._offs.push(data.watch(`classes/${cid}/notes`, (docs) => { localNotes = docs; render(); }));
+      this._offs.push(data.watch(reportsPath(cid), (docs) => {
+        reportLog = docs.find((d) => d.id === REPORTS_LOG_ID) ?? null;
         render();
       }));
       // Gallringsinställningen är LOKAL per dator (issue #32).

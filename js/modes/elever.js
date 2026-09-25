@@ -11,6 +11,10 @@
  * (ctx.view === "student") renderar en neutral skärm utan att läsa
  * ett enda elevdokument — spärren ligger alltså här i modulen och
  * förlitar sig inte enbart på att presentationsläget filtrerar.
+ *
+ * RAPPORTER (issue #33): fliken Rapporter laddar ned krypterade
+ * elevrapporter och slår samman flera lärares filer — helt lokalt. Den
+ * dekrypterade datan släpps när fliken eller läget lämnas.
  */
 
 import { icon } from "../lib/icons.js";
@@ -24,12 +28,16 @@ import { renderRegister } from "./elever/register.js";
 import { renderRoster } from "./elever/roster.js";
 import { renderCard } from "./elever/card.js";
 import { renderPatterns } from "./elever/patterns.js";
+import { renderReports, renderReportBanner, closeReportWorkspace, REPORTS_TAB } from "./elever/reports.js";
+import { reportsPath } from "./elever/report-data.js";
+import { DEFAULT_RETENTION_WEEKS } from "../lib/privacy.js";
 
 const TABS = [
   { id: "registrera", title: "Registrera", icon: "check", render: renderRegister },
   { id: "elever", title: "Elever", icon: "users", render: renderRoster },
   { id: "elevkort", title: "Elevkort & sök", icon: "search", render: renderCard },
   { id: "monster", title: "Mönster", icon: "chart", render: renderPatterns },
+  { id: REPORTS_TAB, title: "Rapporter", icon: "lock", render: renderReports },
 ];
 
 let cleanup = []; // unsubscribe-funktioner + lyssnare för aktuell mount
@@ -79,6 +87,8 @@ export default {
       tab: sessionStorage.getItem("classroom:elever:tab") ?? "registrera",
       undoStack: [],
       cardStudentId: null, // vald elev i Elevkort-fliken (behålls vid flikbyte)
+      reportDocs: {},      // classes/{cid}/reports (lokalt): exportlogg, påminnelser, namnpar
+      privacy: null,       // { noteRetentionWeeks, awaitingChoice } — för gallringspåminnelsen
 
       /** Visningsnamn — ALLTID via studentLabel så initial-läget följs. */
       label(student) {
@@ -133,6 +143,8 @@ export default {
         api._rosterCaptureOff?.();
         api._rosterCaptureOff = null;
         api._rosterCapturing = null;
+        // Lämnar vi Rapporter: släpp all dekrypterad data (bara i minnet).
+        if (api.tab === REPORTS_TAB && id !== REPORTS_TAB) closeReportWorkspace(api);
         api.tab = id;
         try { sessionStorage.setItem("classroom:elever:tab", id); } catch { /* ok */ }
         renderTabs();
@@ -148,11 +160,13 @@ export default {
     el.innerHTML = `
       <div class="elever">
         <nav class="elever__tabs" aria-label="Elevlista — flikar"></nav>
+        <div class="elever__banner teacher-only" hidden></div>
         <div class="elever__body"></div>
         <div class="elever__toast" role="status" aria-live="polite"></div>
       </div>`;
     const tabsEl = el.querySelector(".elever__tabs");
     const bodyEl = el.querySelector(".elever__body");
+    const bannerEl = el.querySelector(".elever__banner");
 
     function renderTabs() {
       tabsEl.innerHTML = TABS.map((t) => `
@@ -174,6 +188,7 @@ export default {
         // Rör inte flikar där läraren just skriver: rendera bara om
         // fokus inte står i ett fält i flikkroppen.
         const tab = TABS.find((t) => t.id === api.tab) ?? TABS[0];
+        renderReportBanner(bannerEl, api);
         tab.render(bodyEl, api);
       });
     }
@@ -205,6 +220,23 @@ export default {
       api.initials = disp?.value?.nameDisplay === "initials";
       safeRefresh();
     }));
+
+    // Rapporter (issue #33): lokal exportlogg/påminnelser/namnpar + datorns
+    // gallringsinställning (för påminnelsen innan noteringar gallras).
+    cleanup.push(data.watch(reportsPath(cid), (docs) => {
+      api.reportDocs = Object.fromEntries(docs.map((d) => [d.id, d]));
+      safeRefresh();
+    }));
+    cleanup.push(data.watch(`classes/${cid}/privacy`, (docs) => {
+      const value = docs.find((d) => d.id === "privacy")?.value;
+      const weeks = value?.noteRetentionWeeks;
+      api.privacy = {
+        noteRetentionWeeks: Number.isFinite(weeks) && weeks > 0 ? weeks : DEFAULT_RETENTION_WEEKS,
+        awaitingChoice: Boolean(value?.awaitingChoice),
+      };
+      safeRefresh();
+    }));
+    cleanup.push(() => closeReportWorkspace(api));
 
     // ---- Elevkortkommandon: BARA i detta läge, BARA i Registrera-fliken ----
     function onKeydown(e) {

@@ -106,9 +106,9 @@ export function renderPatterns(el, api) {
   });
 }
 
-// ---- Hjälpare ----
+// ---- Hjälpare (återanvänds av rapporterna, js/modes/elever/report-data.js) ----
 
-function tally(notes, keyFn, orderedKeys) {
+export function tally(notes, keyFn, orderedKeys) {
   const counts = new Map(orderedKeys.map((k) => [k, 0]));
   for (const n of notes) {
     const k = keyFn(n);
@@ -117,12 +117,12 @@ function tally(notes, keyFn, orderedKeys) {
   return [...counts.entries()].map(([label, count]) => ({ label, count }));
 }
 
-function subjectOf(n) {
+export function subjectOf(n) {
   return n.lesson ? (n.lesson.title || n.lesson.subjectId || "Lektion utan ämne") : "Utanför lektion";
 }
 
-const subjectKeys = (notes) => [...new Set(notes.map(subjectOf))].sort((a, b) => a.localeCompare(b, "sv"));
-const hourKeys = (notes) => [...new Set(notes.map(hourOf))].sort();
+export const subjectKeys = (notes) => [...new Set(notes.map(subjectOf))].sort((a, b) => a.localeCompare(b, "sv"));
+export const hourKeys = (notes) => [...new Set(notes.map(hourOf))].sort();
 
 function barCard(title, iconHtml, rows, sub = "") {
   const max = Math.max(1, ...rows.map((r) => r.count));

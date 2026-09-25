@@ -244,3 +244,7 @@
   font-size: var(--text-s);
 }
 .ov-retention-pause p { margin: 0 0 var(--space-2); }
+
+/* Påminnelse före gallring (issue #33): uppföljningar som inte laddats ned */
+.ov-retention-risk { color: var(--color-warn); font-size: var(--text-s); }
+.ov-retention-risk strong { color: var(--color-warn); }

@@ -36,6 +36,7 @@ import { GOAL_METRICS, normalizeGoalSettings, weekGoalStatus, goalTrend, fmtSec 
 import { PRAISE_DOC, praisePath, normalize as normalizeMorning, currentPraise } from "../lib/morning.js";
 import { praiseArchivePath } from "../lib/week-rhythm.js";
 import { escapeHtml, noteTypeById, teacherLabel, noteStatsPath, NOTE_TYPES } from "./elever/shared.js";
+import { downloadBlob } from "../lib/download.js";
 
 const PASS_PAGE = 10; // pass per typ innan "Visa alla"
 
@@ -345,11 +346,8 @@ export default {
       };
       const csv = rows.map((r) => r.map(cell).join(";")).join("\r\n");
       const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `klasstatistik-${className}-${weekKey(ws)}.csv`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      // Blob-URL:en släpps först efter en stund (js/lib/download.js).
+      downloadBlob(blob, `klasstatistik-${className}-${weekKey(ws)}.csv`);
     }
 
     const tile = (n, label) =>

@@ -28,7 +28,8 @@ rules_version = '2';
 //       ALDRIG innehålla praise/weekOf (Bra jobbat är lokal elevdata)
 //   NEKAT HELT (elevdata hör inte hemma i molnet):
 //     - classes/{id}/students/**, classes/{id}/notes/**,
-//       classes/{id}/praiseArchive/**
+//       classes/{id}/praiseArchive/**, classes/{id}/reports/**
+//       (rapportloggen, issue #33 — lokal; nekas även av standardregeln)
 //   PRIVAT per lärare (bara ägaren läser+skriver):
 //     - teachers/{uid}/** (profil, klockmätning, lektionsplaneringar)
 // ============================================================
@@ -96,6 +97,9 @@ service cloud.firestore {
         allow read, write: if false;
       }
       match /praiseArchive/{document=**} {
+        allow read, write: if false;
+      }
+      match /reports/{document=**} {
         allow read, write: if false;
       }
     }
