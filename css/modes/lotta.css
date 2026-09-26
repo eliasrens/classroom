@@ -343,6 +343,7 @@
 }
 .lot-check { display: flex; align-items: center; gap: var(--space-2); padding: 2px 0; cursor: pointer; }
 .lot-check input { flex: none; width: 1.05em; height: 1.05em; margin: 0; accent-color: var(--color-accent); cursor: pointer; }
+.lot-checks .lot-check > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lot-check:has(input[data-absent]:not(:checked)) > span { color: var(--color-ink-soft); text-decoration: line-through; }
 .lot-swatch {
   display: inline-block;

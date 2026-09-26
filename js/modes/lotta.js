@@ -333,7 +333,7 @@ export default {
             <p class="lot-sub">Bocka ur den som är frånvarande. Gäller bara idag.</p>
             ${items.length ? `<ul class="lot-checks">${items.map((it) => `
               <li><label class="lot-check"><input type="checkbox" data-absent="${escapeHtml(it.key)}" ${absent.has(it.key) ? "" : "checked"}>
-                <span>${escapeHtml(it.label)}</span></label></li>`).join("")}</ul>
+                <span title="${escapeHtml(it.label)}">${escapeHtml(it.label)}</span></label></li>`).join("")}</ul>
               <button type="button" class="btn btn--ghost" data-act="all-present">${icon("check")}<span>Alla är här</span></button>`
               : `<p class="lot-sub">Elevlistan är tom.</p>`}`;
         } else if (key === LIST_COLORS) {

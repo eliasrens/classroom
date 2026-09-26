@@ -394,8 +394,9 @@ function pileLayout(count) {
 function noteFront(el, item, kind) {
   const front = el.querySelector(".lot-note__front");
   const span = front.querySelector("span");
-  span.textContent = item.label;
-  const len = [...item.label].length;
+  const text = kind === "names" ? `${item.label}!` : item.label;
+  span.textContent = text;
+  const len = [...text].length;
   front.style.setProperty("--lot-note-size", `${clamp(3.6 * 7 / Math.max(len, 7), 1.5, 3.6).toFixed(2)}cqmin`);
   if (kind === "colors" && item.color) {
     front.style.background = item.color;
