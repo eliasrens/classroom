@@ -1,0 +1,385 @@
+/* ============================================================
+   LOTTNING (issue #47) — lyckohjul, namnrulle, dra en lapp.
+
+   Scenen (.lot-stage) är en storlekscontainer: allt i den mäts i
+   cqw/cqh/cqmin, så lärarens förhandsvisning (16:9) och elevskärmen
+   (helskärm) ser likadana ut i olika storlek. Scenen har elevtemats
+   ljusa toner även i lärarvyn (.theme-student) — det ÄR förhandsvisningen.
+   Färgerna i hjulet/lapparna är innehåll för eleverna (färglistan).
+   ============================================================ */
+
+/* ---- Scenen (samma i båda vyerna) ---- */
+
+.lot-stage {
+  position: relative;
+  container-type: size;
+  overflow: hidden;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-family);
+}
+.lot-show {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.lot-msg {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 8cqmin;
+  text-align: center;
+  font-size: 4.6cqmin;
+  color: var(--color-ink-soft);
+}
+
+/* ---- Lyckohjulet ---- */
+
+.lot-wheel {
+  width: min(92cqh, 92cqw);
+  height: min(92cqh, 92cqw);
+  overflow: visible;
+  font-family: var(--font-family);
+  font-weight: 600;
+}
+.lot-slice path,
+.lot-slice circle { stroke: rgb(255 255 255 / 60%); stroke-width: 0.5; }
+.lot-wheel__rim { fill: none; stroke: rgb(0 0 0 / 22%); stroke-width: 1; }
+.lot-wheel__hub { fill: var(--color-surface); stroke: rgb(0 0 0 / 25%); stroke-width: 1; }
+.lot-wheel__pointer { fill: var(--color-ink); stroke: var(--color-surface); stroke-width: 1.6; stroke-linejoin: round; }
+
+/* ---- Namnrullen ---- */
+
+.lot-reel__window {
+  position: relative;
+  container-type: size;
+  width: min(84cqw, 140cqh);
+  height: 86cqh;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 2px solid var(--color-line);
+  border-radius: var(--radius-l);
+}
+.lot-reel__strip {
+  position: absolute;
+  inset: 0 0 auto;
+  /* fem rader syns; rad --pos står i mitten */
+  transform: translateY(calc((2 - var(--pos, 3)) * 20cqh));
+  will-change: transform;
+}
+.lot-reel__row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4cqh;
+  height: 20cqh;
+  padding: 0 5cqw;
+  font-size: 11cqh;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.lot-reel__text { overflow: hidden; text-overflow: ellipsis; }
+.lot-reel__swatch {
+  flex: none;
+  width: 12cqh;
+  height: 12cqh;
+  border: 1px solid rgb(0 0 0 / 22%);
+  border-radius: var(--radius-m);
+}
+.lot-reel__shade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 40cqh;
+  background: var(--color-surface);
+  opacity: 0.62;
+  pointer-events: none;
+}
+.lot-reel__shade--top { top: 0; }
+.lot-reel__shade--bottom { bottom: 0; }
+.lot-reel__mark {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 40cqh;
+  height: 20cqh;
+  border-block: 3px solid var(--color-accent);
+  pointer-events: none;
+}
+
+/* ---- Dra en lapp ---- */
+
+.lot-pile { position: absolute; inset: 0; }
+.lot-note {
+  position: absolute;
+  width: 22cqmin;
+  height: 16cqmin;
+  perspective: 90cqmin;
+  will-change: transform;
+}
+.lot-note.is-drawn { z-index: 5; }
+.lot-note__inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+.lot-note__back,
+.lot-note__front {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  backface-visibility: hidden;
+  border: 1px solid rgb(0 0 0 / 14%);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-s);
+}
+.lot-note__back { background: #f4ecd4; color: #b3a172; }
+.lot-note__back .icon { width: 8cqmin; height: 8cqmin; }
+.lot-note__front {
+  transform: rotateY(180deg);
+  padding: 1.4cqmin;
+  background: #fffdf6;
+  color: #1f2328;
+  font-size: var(--lot-note-size, 3.6cqmin);
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.lot-note.is-fade { animation: lot-fade 260ms ease both; }
+
+/* ---- Direkt ---- */
+
+.lot-direct {
+  display: grid;
+  place-items: center;
+  width: 50cqmin;
+  height: 36cqmin;
+  border: 2px dashed var(--color-line);
+  border-radius: var(--radius-l);
+  color: var(--color-ink-soft);
+  font-size: 20cqmin;
+  font-weight: 700;
+}
+
+/* ---- Resultatet: stort och tydligt, liten diskret effekt ---- */
+
+.lot-result {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--color-bg) 55%, transparent);
+}
+.lot-result__card {
+  position: relative;
+  min-width: 46cqmin;
+  max-width: 92cqw;
+  padding: 4cqmin 7cqmin;
+  background: var(--color-surface);
+  border: 2px solid var(--color-line);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-m);
+  text-align: center;
+}
+.lot-result__text {
+  font-size: var(--lot-result-size, 14cqmin);
+  font-weight: 700;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.lot-result__card.is-color {
+  display: grid;
+  place-items: center;
+  min-width: 70cqmin;
+  min-height: 48cqmin;
+  background: var(--lot-fill);
+  color: var(--lot-fill-ink);
+  border-color: rgb(0 0 0 / 18%);
+}
+.lot-result.is-fade { animation: lot-fade 250ms ease both; }
+.lot-result.is-pop { animation: lot-fade 160ms ease both; }
+.lot-result.is-pop .lot-result__card { animation: lot-pop 300ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+.lot-result.is-pop .lot-result__card::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border: 3px solid var(--color-accent);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: lot-ring 450ms ease-out both;
+}
+
+@keyframes lot-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes lot-pop {
+  from { transform: scale(0.84); }
+  70% { transform: scale(1.03); }
+  to { transform: scale(1); }
+}
+@keyframes lot-ring {
+  from { transform: scale(1); opacity: 0.9; }
+  to { transform: scale(1.14); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lot-result.is-pop .lot-result__card,
+  .lot-result.is-pop .lot-result__card::after { animation: none; }
+  .lot-result.is-pop .lot-result__card::after { opacity: 0; }
+}
+
+/* ---- Elevskärmen: bara scenen, helskärm ---- */
+
+.lot--student .lot-stage {
+  position: fixed;
+  inset: 0;
+}
+
+/* ---- Lärarvyn ---- */
+
+.lot--teacher {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: var(--space-4);
+  align-items: start;
+  width: 100%;
+}
+@media (max-width: 920px) {
+  .lot--teacher { grid-template-columns: minmax(0, 1fr); }
+}
+
+.lot-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.lot--teacher .lot-stage {
+  /* 16:9 som projektorn */
+  width: min(100%, calc((100dvh - var(--topbar-height) - 14rem) * 16 / 9));
+  min-width: min(100%, 420px);
+  aspect-ratio: 16 / 9;
+  margin: 0 auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-l);
+}
+
+.lot-seg,
+.lot-lists {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.lot-seg { justify-content: center; }
+.lot-segbtn[aria-pressed="true"],
+.lot-listbtn[aria-pressed="true"] {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-accent-text);
+  font-weight: 600;
+}
+
+.lot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+}
+.lot-draw {
+  padding: var(--space-2) var(--space-5);
+  font-size: var(--text-l);
+}
+.lot--teacher .btn:disabled { opacity: 0.45; cursor: default; }
+.lot-count {
+  min-width: 8rem;
+  text-align: center;
+  color: var(--color-ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.lot-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+}
+.lot-hint { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); text-align: center; }
+
+.lot-side { display: flex; flex-direction: column; gap: var(--space-3); }
+.lot-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-l);
+}
+.lot-box:empty { display: none; }
+.lot-box > .btn { align-self: flex-start; }
+.lot-h { margin: 0; font-size: var(--text-m); }
+.lot-h3 { margin: var(--space-2) 0 0; font-size: var(--text-s); font-weight: 600; color: var(--color-ink-soft); }
+.lot-sub { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); }
+
+.lot-checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 2px var(--space-2);
+  max-height: 40vh;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+.lot-check { display: flex; align-items: center; gap: var(--space-2); padding: 2px 0; cursor: pointer; }
+.lot-check input { flex: none; width: 1.05em; height: 1.05em; margin: 0; accent-color: var(--color-accent); cursor: pointer; }
+.lot-check:has(input[data-absent]:not(:checked)) > span { color: var(--color-ink-soft); text-decoration: line-through; }
+.lot-swatch {
+  display: inline-block;
+  flex: none;
+  width: 1em;
+  height: 1em;
+  margin-right: var(--space-1);
+  vertical-align: -0.15em;
+  border: 1px solid rgb(0 0 0 / 28%);
+  border-radius: var(--radius-s);
+}
+.lot-check .lot-swatch { margin-right: 0; }
+
+.lot-field { display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-s); color: var(--color-ink-soft); }
+.lot-field input,
+.lot-field textarea {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-m);
+  color: var(--color-ink);
+  background: var(--color-bg);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+}
+.lot-field textarea { min-height: 9rem; resize: vertical; }
+.lot-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.lot-confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: var(--text-s); }
+.lot-danger { border-color: var(--color-danger); color: var(--color-danger); }
+
+.lot-drawn { display: flex; flex-direction: column; gap: var(--space-2); }
+.lot-drawn > .btn { align-self: flex-start; }
+.lot-drawn__list {
+  max-height: 30vh;
+  margin: 0;
+  padding-left: 1.6em;
+  overflow: auto;
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+  opacity: 0.75;
+}
+.lot-drawn__none { margin-left: -1.6em; list-style: none; }

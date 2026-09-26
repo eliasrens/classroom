@@ -70,6 +70,11 @@ const PATHS = {
   "trend-down": `<path d="M4 7l6 6 4-4 6 7M15 16h5v-5"/>`,
   equal: `<path d="M5 9.5h14M5 14.5h14"/>`,
   reply: `<path d="M9.5 7 4.5 12l5 5M5 12h9a5 5 0 0 1 5 5v1"/>`,
+  // Lottning (issue #47) — läget + sätten att dra
+  wheel: `<circle cx="12" cy="12.5" r="8.5"/><path d="M12 4v17M3.5 12.5h17M6 6.5l12 12M18 6.5l-12 12"/><path d="M10 1.8h4L12 5z"/>`,
+  reel: `<rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M4 9h16M4 15h16M2 12h1.5M20.5 12H22"/>`,
+  note: `<path d="M5 6.5 16.5 4l2.5 13.5L7.5 20z"/><path d="M8.5 9.5l6.5-1.3M9.2 13l6.5-1.3"/>`,
+  bolt: `<path d="M13 2.5 5 13.5h6l-1 8 8-11h-6z"/>`,
 };
 
 /**
