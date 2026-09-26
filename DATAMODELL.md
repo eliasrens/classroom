@@ -246,6 +246,12 @@ classes/{classId}/settings/lektion      — OANVÄND sedan issue #39 (tidigare
 
 classes/{classId}/settings/morningScreen — Läge 1:s tillstånd (js/lib/morning.js)
   value: { greeting, tasks, showNametavla, background }
+  background: { current, extraUrls, pickedOn }
+                     — current = bild-URL som visas; extraUrls = egna
+                       bilder; pickedOn = "ÅÅÅÅ-MM-DD" då läraren själv
+                       valde bilden (Slumpa/Välj bild/egen) — då slumpas
+                       den inte om vid omladdning samma dag (issue #64).
+                       Bildkatalogen: js/lib/backgrounds.js, docs/BAKGRUNDER.md.
                      — Bra jobbat (praise/weekOf) är FLYTTAD till den
                        lokala classes/{id}/praise/board (issue #32);
                        firestore.rules nekar en morningScreen som

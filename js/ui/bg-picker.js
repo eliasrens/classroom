@@ -49,7 +49,7 @@ export function closeBgPicker() {
  * @param {string} o.current     bakgrunden som används nu
  * @param {string[]} o.extraUrls egna bilder (background.extraUrls)
  * @param {string} o.season      årstidens kategori-id (förvald flik)
- * @param {HTMLElement} o.container  där dialogen läggs (morgonvyn)
+ * @param {HTMLElement} o.container  där dialogen läggs (document.body)
  * @param {HTMLElement} [o.returnFocus]
  * @param {(url: string) => void} o.onPick
  */

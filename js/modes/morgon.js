@@ -301,7 +301,7 @@ export default {
         current: settings.background.current,
         extraUrls: settings.background.extraUrls,
         season: seasonFor(serverNow()),
-        container: stage,
+        container: document.body, // ovanför elevskärmens förhandsvisning
         returnFocus: pickBtn,
         onPick: (url) => { void setBackground(url); },
       }));
