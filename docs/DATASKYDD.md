@@ -40,6 +40,8 @@ självregistrering).
 - **Mönster och statistik per elev.**
 - **Skrivtavlans text** (de senaste sidorna) — läraren kan skriva elevnamn
   på tavlan, så texten sparas bara lokalt och går aldrig till molnet.
+  Utskriften (issue #50) görs med webbläsarens egen utskrift, utan nätverk.
+  Sidhuvudet har bara klass, datum och lärarens rubrik, inga elevnamn.
 - **Lottningen** — egna listor, dagens frånvaro, "Redan dragna" och vad som
   senast drogs. Ingen historik över dragningar sparas i molnet.
 

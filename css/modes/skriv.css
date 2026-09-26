@@ -186,3 +186,136 @@
 @media (prefers-reduced-motion: reduce) {
   .skr-paper { scroll-behavior: auto; }
 }
+
+/* ---- Utskrift (issue #50) ------------------------------------------------
+   Knappen "Skriv ut" öppnar en liten panel (rubrik + vilka sidor). Arket
+   (.skr-print) byggs av js/modes/skriv/print.js direkt i <body>: på skärmen
+   osynligt men i exakt utskriftsbredd (radbrytningarna mäts där), under
+   utskriften det enda som syns. Fast storlek — skärmens A−/A+ styr inte. */
+
+.skr-printbtn { display: inline-flex; align-items: center; gap: var(--space-2); }
+.skr-printbtn[aria-disabled="true"] { opacity: 0.4; cursor: default; }
+
+.skr-printpanel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-l);
+  background: var(--color-surface);
+}
+.skr-printpanel[hidden] { display: none; }
+.skr-printpanel__field { display: flex; flex-direction: column; gap: 2px; flex: 1 1 14rem; font-size: var(--text-s); color: var(--color-ink-soft); }
+.skr-printpanel__field input {
+  width: 100%;
+  padding: calc(var(--space-1) + 2px) var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface-alt);
+  color: var(--color-ink);
+  font-size: var(--text-m);
+}
+.skr-printpanel__pages { flex: 2 1 20rem; margin: 0; padding: 0; border: 0; min-width: 0; }
+.skr-printpanel__pages legend { padding: 0; margin-bottom: 2px; font-size: var(--text-s); color: var(--color-ink-soft); }
+.skr-printpanel__list { display: flex; flex-direction: column; gap: 2px; max-height: 12.5rem; overflow-y: auto; }
+.skr-printpanel__pages label { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; padding: 2px 0; cursor: pointer; }
+.skr-printpanel__all { font-weight: 600; }
+.skr-printpanel__meta { flex: none; font-variant-numeric: tabular-nums; }
+.skr-printpanel__snip { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--color-ink-soft); font-size: var(--text-s); }
+.skr-printpanel__foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); flex: 1 1 100%; }
+.skr-printpanel__note { margin: 0; flex: 1 1 18rem; font-size: var(--text-s); color: var(--color-ink-soft); }
+.skr-printpanel__actions { display: flex; gap: var(--space-2); }
+.skr-printpanel__actions .btn { display: inline-flex; align-items: center; gap: var(--space-2); }
+.skr-printpanel__actions .btn:disabled { opacity: 0.4; cursor: default; }
+
+/* Arket. A4 stående, 15 mm marginal (fungerar på vanliga skolskrivare)
+   → textbredd 180 mm. Skärm och utskrift MÅSTE ha samma bredd. */
+@page skriv { size: A4 portrait; margin: 15mm; }
+
+.skr-print {
+  --skr-p-font: 20px;   /* sätts av print.js */
+  --skr-p-lh: 35px;
+  --skr-p-rule-y: 26px;
+  --skr-p-rule-w: 1.5px;
+  --skr-p-ink: #1f2328;
+  --skr-p-rule: #5c6066;
+  --skr-p-soft: #5b626a;
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  width: 180mm;
+  visibility: hidden;
+  pointer-events: none;
+  color: var(--skr-p-ink);
+  background: #fff;
+  color-scheme: light;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.skr-print__table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.skr-print__table th,
+.skr-print__table td { padding: 0; text-align: left; font-weight: 400; vertical-align: top; }
+.skr-print__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6mm;
+  margin-bottom: 6mm;
+  padding-bottom: 2mm;
+  border-bottom: 0.5pt solid var(--skr-p-soft);
+  font-family: var(--font-family);
+  font-size: 10.5pt;
+  color: var(--skr-p-soft);
+}
+.skr-print__who { display: flex; align-items: baseline; gap: 4mm; min-width: 0; }
+.skr-print__class { color: var(--skr-p-ink); font-size: 12pt; }
+.skr-print__title { color: var(--skr-p-ink); font-size: 12pt; }
+.skr-print__date { flex: none; }
+
+.skr-print__text {
+  font-family: "Andika", "Andika New Basic", "Comic Neue", "Segoe UI", system-ui, sans-serif;
+  font-size: var(--skr-p-font);
+  line-height: var(--skr-p-lh);
+  font-kerning: normal;
+  letter-spacing: 0;
+  word-spacing: 0;
+  tab-size: 4;
+  color: var(--skr-p-ink);
+}
+/* Före mätningen: en div per textrad, bryts som på skärmen. */
+.skr-print__row { white-space: pre-wrap; overflow-wrap: break-word; min-height: var(--skr-p-lh); }
+/* Efter mätningen: en div per synlig rad, med sin egen linje. */
+.skr-print__line {
+  position: relative;
+  height: var(--skr-p-lh);
+  white-space: pre;
+  overflow: hidden;
+  break-inside: avoid;
+}
+.skr-print__line::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--skr-p-rule-y);
+  border-top: var(--skr-p-rule-w) solid var(--skr-p-rule);
+}
+.skr-print__probe .skr-print__line::after { content: none; }
+.skr-print__base { display: inline-block; width: 0; height: 0; vertical-align: baseline; }
+.skr-print__page + .skr-print__page { break-before: page; }
+
+@media print {
+  body.skr-printing > :not(.skr-print) { display: none !important; }
+  /* Lärarvyns mörka tema får inte färga marginalerna (color-scheme styr dem). */
+  html.skr-printing { color-scheme: light !important; }
+  html.skr-printing,
+  body.skr-printing { background: #fff !important; margin: 0 !important; }
+  body.skr-printing .skr-print {
+    page: skriv;
+    position: static;
+    width: auto;
+    visibility: visible;
+  }
+}
