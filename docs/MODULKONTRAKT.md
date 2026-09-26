@@ -50,9 +50,11 @@ export default {
 1. **Registrering**: modulen importeras i `js/modes/registry.js` och
    läggs in i `MODES` på sin plats i menyordningen med
    `group: "classroom"` (Rutiner — alltid synliga i menyraden, kan visas
-   på elevskärmen), `group: "tools"` (Verktyg ▾ — rullgardin, kan visas
-   på elevskärmen) eller `group: "teacher"` (Lärare ▾ — aldrig
-   elevskärmen), ett kort menynamn (`short`) och, för rutinerna,
+   på elevskärmen), `group: "tools"` (Verktyg — delad knapp som visar
+   senast använda verktyget + ▾ med alla, kan visas på elevskärmen) eller
+   `group: "teacher"` (Lärare ▾ — aldrig elevskärmen), ett kort
+   menynamn (`short`), valfritt `order` (ordning inom gruppen; verktygen
+   har 10, 20, 40, 50 — Tankekarta får 30) och, för rutinerna,
    `priority` (vilka som flyttas till "Mer ▾" först när menyn inte ryms).
    Kortkommandona numrerar rutinerna, sedan verktygen, sist lärarlägena. Övermenyn,
    sifferkortkommandona och hjälpen byggs ur registret — ingen menykod

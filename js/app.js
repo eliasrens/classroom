@@ -270,7 +270,7 @@ function startApp() {
     });
   }
 
-  // Övermenyn: "I klassrummet" + "Lärare ▾" (byggs ur registret, issue #45)
+  // Övermenyn: rutiner + Verktyg + "Lärare ▾" (byggs ur registret, issue #45, #52)
   // "Lärare ▾" har även "Byt lösenord" (issue #49) — aldrig på elevskärmen.
   const changePassword = initChangePassword({ store, auth });
   initModeNav({

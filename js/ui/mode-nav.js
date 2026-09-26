@@ -1,15 +1,19 @@
 /**
- * ÖVERMENYN — rutiner + två rullgardiner (issue #45, #52). Byggs helt ur
- * js/modes/registry.js.
+ * ÖVERMENYN — rutiner, Verktyg och Lärare ▾ (issue #45, #52). Byggs helt
+ * ur js/modes/registry.js.
  *
- *   ☀ Morgon  ▤ Lektion  ◉ Trafikljus  ★ Veckan  [Mer ▾] │ Verktyg ▾ │ Lärare ▾
+ *   ☀ Morgon  ▤ Lektion  [Mer ▾] │ [◉ Trafikljus][▾] │ Lärare ▾
  *
  *  - Rutiner (group: "classroom"): alltid i raden, var och en med ikon +
  *    kort namn. Aktivt läge har aria-current="page" och markeras tydligt.
- *  - "Verktyg ▾" (group: "tools"): Skrivtavla, Lottning … Står man i ett
- *    verktyg visar knappen det: "Verktyg: Lottning ▾". Ett nytt verktyg
- *    behöver bara `group: "tools"` i registret.
- *  - "Lärare ▾" (group: "teacher"): samma komponent. "Lärare: Elevlista ▾".
+ *  - Verktyg (group: "tools"): en DELAD knapp. Vänstra delen är en länk
+ *    till det senast använda verktyget (ikon + namn, "Öppna Trafikljus");
+ *    ▾ öppnar listan med alla verktyg ("Visa alla verktyg"). Senast
+ *    använda sparas per dator (localStorage), första gången det första
+ *    verktyget i registret. Står man i ett verktyg är knappen markerad.
+ *    Ett nytt verktyg behöver bara `group: "tools"` (+ `order`) i registret.
+ *  - "Lärare ▾" (group: "teacher"): rullgardin. Står man i ett lärarläge
+ *    visar knappen det: "Lärare: Elevlista ▾".
  *
  * RESPONSIVT. Menyn får den plats som blir över i topbaren (klassväljare,
  * elevskärmsknapp, synkstatus m.m. trängs aldrig ut). Ryms den inte
@@ -17,9 +21,10 @@
  *   0  gruppetikett + ikon + namn
  *   1  utan gruppetikett
  *   2  rutinerna bara som ikoner (tooltip + aria-label)
- *   3  rullgardinsknapparna kortade ("Lottning ▾" i stället för
- *      "Verktyg: Lottning ▾")
- *   4… de minst prioriterade rutinerna (högst `priority`) flyttas,
+ *   3  lärarknappen kortad ("Elevlista ▾" i stället för "Lärare: Elevlista ▾")
+ *   4  verktygsknappen bara ikon + ▾, lärarknappen i ett lärarläge likaså
+ *      (namnen står kvar i tooltip + aria-label)
+ *   5… de minst prioriterade rutinerna (högst `priority`) flyttas,
  *      ett i taget, till "Mer ▾". Fler än MAX_INLINE lägen flyttas alltid.
  * Skulle färre än MIN_INLINE rutiner stå kvar (mycket smalt fönster)
  * får menyn i stället en egen rad under topbaren (data-wrap) och
@@ -28,13 +33,17 @@
  */
 
 import { icon } from "../lib/icons.js";
-import { NAV_GROUPS, NAV_GROUP_ORDER, modesInGroup, shortTitle } from "../modes/registry.js";
+import { NAV_GROUPS, modesInGroup, shortTitle } from "../modes/registry.js";
 import { createMenuButton } from "./menu-button.js";
 
 /** Så många rutiner får stå i raden innan resten alltid går till "Mer ▾". */
 export const MAX_INLINE = 8;
-/** Ryms inte så här många i topbaren får menyn en egen rad. */
+/** Nivåerna 0–STYLE_LEVELS komprimerar utseendet; högre flyttar till "Mer ▾". */
+const STYLE_LEVELS = 4;
+/** Ryms inte så här många rutiner i topbaren får menyn en egen rad. */
 const MIN_INLINE = 3;
+/** Senast använda verktyget, per dator. */
+export const LAST_TOOL_KEY = "classroom:ui:lastTool";
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -51,8 +60,8 @@ const actionItem = (a) => `
     ${icon(a.icon)}<span>${esc(a.title)}</span></button>`;
 
 /**
- * En grupps rullgardin ("Verktyg ▾", "Lärare ▾"). Knappens etikett
- * sätts i renderActive(). `end` = menyn öppnas åt vänster (sist i raden).
+ * En grupps rullgardin ("Lärare ▾"). Knappens etikett sätts i
+ * renderActive(). `end` = menyn öppnas åt vänster (sist i raden).
  */
 const groupMenu = (group, modes, { end = false, extra = "" } = {}) => `
   <span class="mode-nav__divider" aria-hidden="true"></span>
@@ -67,8 +76,24 @@ const groupMenu = (group, modes, { end = false, extra = "" } = {}) => `
     </div>
   </div>`;
 
-/** Vad knappen säger om gruppen, t.ex. "lärarlägen" i aria-label. */
-const GROUP_NOUN = { tools: "verktyg", teacher: "lärarlägen" };
+/** Verktygens delade knapp: länk till senast använda + ▾ med alla verktyg. */
+const toolsMenu = (modes) => `
+  <span class="mode-nav__divider" aria-hidden="true"></span>
+  <div class="mode-nav__menu mode-nav__split mode-nav__tools" data-group="tools">
+    <a class="mode-nav__btn mode-nav__split-main" href="#/${modes[0].id}">
+      <span class="mode-nav__btn-icon"></span><span class="mode-nav__btn-label"></span></a>
+    <button type="button" class="mode-nav__btn mode-nav__split-toggle" id="mode-nav-tools-btn"
+      aria-controls="mode-nav-tools-menu" aria-label="Visa alla verktyg" title="Visa alla verktyg">${chevron()}</button>
+    <div class="mode-nav__popup" id="mode-nav-tools-menu" aria-labelledby="mode-nav-tools-btn">
+      ${modes.map(menuItem).join("")}
+    </div>
+  </div>`;
+
+function readLastTool(tools) {
+  let id = null;
+  try { id = localStorage.getItem(LAST_TOOL_KEY); } catch { /* ok */ }
+  return tools.find((m) => m.id === id) ?? tools[0];
+}
 
 /**
  * @param actions  [{id, title, icon, run}] — lärarens åtgärder, efter en
@@ -76,12 +101,9 @@ const GROUP_NOUN = { tools: "verktyg", teacher: "lärarlägen" };
  */
 export function initModeNav({ el, store, actions = [] }) {
   const classroom = modesInGroup("classroom");
-  // Rullgardinerna efter rutinerna, i menyordning. Tomma grupper visas inte
-  // (Lärare ▾ visas alltid — där står även lärarens åtgärder).
-  const dropdowns = NAV_GROUP_ORDER
-    .filter((g) => g !== "classroom")
-    .map((group) => ({ group, modes: modesInGroup(group) }))
-    .filter((d) => d.modes.length || (d.group === "teacher" && actions.length));
+  const tools = modesInGroup("tools");
+  const teacher = modesInGroup("teacher");
+  let lastTool = tools.length ? readLastTool(tools) : null;
 
   // Överflödsordning: minst prioriterade först (högst priority; lika → sist i menyn först).
   const overflowOrder = classroom
@@ -106,11 +128,12 @@ export function initModeNav({ el, store, actions = [] }) {
           </div>
         </div>
       </div>
-      ${dropdowns.map(({ group, modes }, i) => groupMenu(group, modes, {
-        end: i === dropdowns.length - 1,
-        extra: group === "teacher" && actions.length
+      ${tools.length ? toolsMenu(tools) : ""}
+      ${groupMenu("teacher", teacher, {
+        end: true,
+        extra: actions.length
           ? `<div class="mode-nav__sep" role="separator"></div>${actions.map(actionItem).join("")}` : "",
-      })).join("")}
+      })}
     </div>`;
 
   const rowEl = el.querySelector(".mode-nav__row");
@@ -118,11 +141,18 @@ export function initModeNav({ el, store, actions = [] }) {
   const moreBtn = moreEl.querySelector("button");
   createMenuButton({ root: moreEl, button: moreBtn, menu: moreEl.querySelector(".mode-nav__popup") });
 
-  for (const d of dropdowns) {
-    d.el = el.querySelector(`.mode-nav__dropdown[data-group="${d.group}"]`);
-    d.btn = d.el.querySelector("button");
-    d.label = d.el.querySelector(".mode-nav__btn-label");
-    createMenuButton({ root: d.el, button: d.btn, menu: d.el.querySelector(".mode-nav__popup") });
+  const teacherEl = el.querySelector(".mode-nav__teacher");
+  const teacherBtn = teacherEl.querySelector("button");
+  createMenuButton({ root: teacherEl, button: teacherBtn, menu: teacherEl.querySelector(".mode-nav__popup") });
+
+  const toolsEl = el.querySelector(".mode-nav__tools");
+  const toolsMain = toolsEl?.querySelector(".mode-nav__split-main");
+  if (toolsEl) {
+    const toolsMenuBtn = createMenuButton({
+      root: toolsEl, button: toolsEl.querySelector(".mode-nav__split-toggle"),
+      menu: toolsEl.querySelector(".mode-nav__popup"),
+    });
+    toolsMain.addEventListener("click", () => toolsMenuBtn.close());
   }
 
   // Åtgärderna: lyssna på el (bubblar EFTER menyns egen stängning, som
@@ -141,20 +171,35 @@ export function initModeNav({ el, store, actions = [] }) {
       else a.removeAttribute("aria-current");
     }
 
-    // Rullgardinsknapparna: "Verktyg ▾" — eller "Verktyg: Lottning ▾" när
-    // man står i ett av gruppens lägen (likadant "Lärare: Elevlista ▾").
-    for (const d of dropdowns) {
-      const name = NAV_GROUPS[d.group].label;
-      const noun = GROUP_NOUN[d.group] ?? "lägen";
-      const cur = d.modes.find((m) => m.id === modeId);
-      d.el.dataset.current = String(!!cur);
-      d.el.querySelector(".mode-nav__btn-icon").innerHTML = cur ? icon(cur.icon) : "";
-      d.label.innerHTML = cur
-        ? `<span class="mode-nav__btn-prefix">${esc(name)}: </span>${esc(shortTitle(cur))}`
-        : esc(name);
-      d.btn.setAttribute("aria-label", cur ? `${name}: ${cur.title} — fler ${noun}` : `${name} — ${noun}`);
-      d.btn.title = d.btn.getAttribute("aria-label");
+    // Verktyg: senast använda verktyget (= det aktiva, om man står i ett).
+    // Bara lärarvyn räknas — elevskärmen (och dess förhandsvisning) kör
+    // samma app men får inte ändra lärarens "senast använda".
+    if (toolsEl) {
+      const cur = tools.find((m) => m.id === modeId);
+      if (cur && cur !== lastTool && store.get().view === "teacher") {
+        lastTool = cur;
+        try { localStorage.setItem(LAST_TOOL_KEY, cur.id); } catch { /* ok */ }
+      }
+      toolsEl.dataset.current = String(!!cur);
+      toolsMain.href = `#/${lastTool.id}`;
+      toolsMain.querySelector(".mode-nav__btn-icon").innerHTML = icon(lastTool.icon);
+      toolsMain.querySelector(".mode-nav__btn-label").textContent = shortTitle(lastTool);
+      toolsMain.setAttribute("aria-label", `Öppna ${shortTitle(lastTool)}`);
+      toolsMain.title = toolsMain.getAttribute("aria-label");
+      if (cur) toolsMain.setAttribute("aria-current", "page");
+      else toolsMain.removeAttribute("aria-current");
     }
+
+    // Lärarknappen: "Lärare ▾" — eller "Lärare: Elevlista ▾" i ett lärarläge.
+    const name = NAV_GROUPS.teacher.label;
+    const t = teacher.find((m) => m.id === modeId);
+    teacherEl.dataset.current = String(!!t);
+    teacherEl.querySelector(".mode-nav__btn-icon").innerHTML = t ? icon(t.icon) : "";
+    teacherEl.querySelector(".mode-nav__btn-label").innerHTML = t
+      ? `<span class="mode-nav__btn-prefix">${esc(name)}: </span>${esc(shortTitle(t))}`
+      : esc(name);
+    teacherBtn.setAttribute("aria-label", t ? `${name}: ${t.title} — fler lärarlägen` : `${name} — lärarlägen`);
+    teacherBtn.title = teacherBtn.getAttribute("aria-label");
     renderMoreButton();
   }
 
@@ -173,8 +218,8 @@ export function initModeNav({ el, store, actions = [] }) {
   }
 
   function apply(level) {
-    el.dataset.level = String(Math.min(level, 3));
-    const n = Math.max(level - 3, 0, classroom.length - MAX_INLINE);
+    el.dataset.level = String(Math.min(level, STYLE_LEVELS));
+    const n = Math.max(level - STYLE_LEVELS, 0, classroom.length - MAX_INLINE);
     overflow = new Set(overflowOrder.slice(0, Math.min(n, classroom.length)));
     for (const a of el.querySelectorAll(".mode-nav__link")) a.hidden = overflow.has(a.dataset.mode);
     for (const a of moreEl.querySelectorAll(".mode-nav__item")) a.hidden = !overflow.has(a.dataset.mode);
@@ -196,14 +241,14 @@ export function initModeNav({ el, store, actions = [] }) {
     if (!el.isConnected || !el.getClientRects().length) return; // dold (t.ex. elevvy)
     const minInline = Math.min(MIN_INLINE, classroom.length);
     delete el.dataset.wrap;
-    if (!fitLevel(3 + classroom.length - minInline)) {
+    if (!fitLevel(STYLE_LEVELS + classroom.length - minInline)) {
       el.dataset.wrap = "true"; // egen rad under topbaren
-      fitLevel(3 + classroom.length);
+      fitLevel(STYLE_LEVELS + classroom.length);
     }
     lastWidth = el.clientWidth;
   }
 
-  store.subscribe(["modeId"], () => { renderActive(); layout(); }); // ritar även direkt
+  store.subscribe(["modeId", "view"], () => { renderActive(); layout(); }); // ritar även direkt
 
   // Menyns bredd styrs av topbaren (resten av raden) — räkna om när den ändras.
   if ("ResizeObserver" in window) {

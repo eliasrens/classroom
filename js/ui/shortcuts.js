@@ -5,7 +5,7 @@
  * (timer i trafikljus.js, snabbanteckning i quick-note.js, elevtangenter
  * i elever.js). Genvägslistan visas under "?" (js/ui/help.js).
  *
- *   1–N   byt läge i menyordning (rutinerna först, sedan Verktyg ▾ och
+ *   1–N   byt läge i menyordning (rutinerna först, sedan Verktyg och
  *         sist Lärare ▾ — navOrder() i js/modes/registry.js, max 9)
  *   E     öppna/fokusera elevskärmen
  *   ?     visa genvägslistan

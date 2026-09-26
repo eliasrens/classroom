@@ -65,10 +65,10 @@ html[data-theme="student"] .teacher-only { display: none !important; }
 }
 #open-student-view[data-open="true"]::after { background: var(--color-ok); opacity: 1; }
 
-/* ---- Övermenyn: rutiner + Verktyg ▾ + Lärare ▾ (issue #45, #52, js/ui/mode-nav.js) ----
+/* ---- Övermenyn: rutiner + Verktyg + Lärare ▾ (issue #45, #52, js/ui/mode-nav.js) ----
    Menyn får platsen som blir över i topbaren (flex-basis 0) — resten av
    raden (klassval, elevskärm, synkstatus …) trängs aldrig ut. Ryms den
-   inte komprimerar mode-nav.js den stegvis via data-level (0–3) och
+   inte komprimerar mode-nav.js den stegvis via data-level (0–4) och
    flyttar till slut lägen till "Mer ▾". */
 
 .mode-nav { flex: 1 1 0; min-width: 0; }
@@ -135,16 +135,36 @@ html[data-theme="student"] .teacher-only { display: none !important; }
 .mode-nav[data-level="1"] .mode-nav__caption,
 .mode-nav[data-level="2"] .mode-nav__caption,
 .mode-nav[data-level="3"] .mode-nav__caption,
+.mode-nav[data-level="4"] .mode-nav__caption,
 .mode-nav[data-level="2"] .mode-nav__label,
 .mode-nav[data-level="3"] .mode-nav__label,
-.mode-nav[data-level="3"] .mode-nav__btn-prefix { display: none; }
+.mode-nav[data-level="4"] .mode-nav__label,
+.mode-nav[data-level="3"] .mode-nav__btn-prefix,
+.mode-nav[data-level="4"] .mode-nav__dropdown[data-current="true"] .mode-nav__btn-label,
+.mode-nav[data-level="4"] .mode-nav__split-main .mode-nav__btn-label { display: none; }
 .mode-nav[data-level="2"] .mode-nav__link,
-.mode-nav[data-level="3"] .mode-nav__link { padding-inline: var(--space-2); }
+.mode-nav[data-level="3"] .mode-nav__link,
+.mode-nav[data-level="4"] .mode-nav__link { padding-inline: var(--space-2); }
 .mode-nav[data-level="2"] .mode-nav__link svg,
-.mode-nav[data-level="3"] .mode-nav__link svg { width: 1.35em; height: 1.35em; }
+.mode-nav[data-level="3"] .mode-nav__link svg,
+.mode-nav[data-level="4"] .mode-nav__link svg { width: 1.35em; height: 1.35em; }
 
-/* Rullgardinerna (Verktyg ▾, Lärare ▾, Mer ▾) */
+/* Rullgardinerna (Verktyg, Lärare ▾, Mer ▾) */
 .mode-nav__menu { position: relative; }
+
+/* Verktyg: delad knapp — länk till senast använda verktyget + ▾ (issue #52). */
+.mode-nav__split { display: inline-flex; align-items: stretch; }
+.mode-nav__split-main { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.mode-nav__split-toggle {
+  padding-inline: var(--space-1);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.mode-nav__split-toggle .mode-nav__chevron { margin-left: 0; }
+.mode-nav__split:not([data-current="true"]) .mode-nav__split-toggle { border-left-color: var(--color-line); }
+.mode-nav__menu[data-current="true"] > .mode-nav__split-toggle { border-left-color: transparent; }
+.mode-nav__split-main:focus-visible,
+.mode-nav__split-toggle:focus-visible { position: relative; z-index: 1; }
 
 .mode-nav__popup {
   position: absolute;
