@@ -27,6 +27,7 @@ import elever from "./elever.js";
 import oversikt from "./oversikt.js";
 import vecka from "./vecka.js";
 import skriv from "./skriv.js";
+import lotta from "./lotta.js";
 
 export const NAV_GROUPS = {
   classroom: { label: "I klassrummet" },
@@ -41,6 +42,7 @@ export const MODES = [
   entry(lektion, { group: "classroom", short: "Lektion", priority: 2 }),
   entry(trafikljus, { group: "classroom", short: "Trafikljus", priority: 3 }),
   entry(skriv, { group: "classroom", short: "Skrivtavla", priority: 4 }),
+  entry(lotta, { group: "classroom", short: "Lottning", priority: 5 }),
   entry(vecka, { group: "classroom", short: "Veckan", priority: 9 }),
   // ---- Lärare ▾ (aldrig på elevskärmen) ----
   entry(elever, { group: "teacher", short: "Elevlista" }),
@@ -79,6 +81,8 @@ export const MODE_ALIASES = {
  * "vecka" (Veckans övergångar) visar bara passens tider och färger — inga
  * lärarnamn, noteringar eller elevdata (se js/lib/week-recap.js).
  * "skriv" (Skrivtavla) visar bara texten läraren själv skriver, på papperet.
+ * "lotta" (Lottning) visar bara hjulet/rullen/lappen och resultatet — aldrig
+ * listorna, frånvaron eller "Redan dragna".
  */
 export const STUDENT_MODE_IDS = Object.freeze(modesInGroup("classroom").map((m) => m.id));
 

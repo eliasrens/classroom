@@ -75,7 +75,9 @@ js/
                         oversikt.js = Översikt med flikar (oversikt/: idag, veckor = veckoarkivet,
                         atgarder = klassåtgärder, installningar = dataskydd),
                         vecka.js = Veckans övergångar — elevvänlig veckosammanfattning för mentorstiden,
-                        skriv.js = Skrivtavla — läraren skriver live på linjerat papper (Andika)
+                        skriv.js = Skrivtavla — läraren skriver live på linjerat papper (Andika),
+                        lotta.js = Lottning — lyckohjul/namnrulle/dra en lapp (lotta/stage.js = scenen)
+  lib/lotta.js          lottningens logik: rättvis slump, listor, "inga upprepningar", animationsmål
   lib/week.js           veckologik (måndag 00:00) · lib/week-rhythm.js  rent varje måndag
   lib/week-goal.js      trafikljusets veckomål · lib/week-recap.js  veckosammanfattningen (Veckans övergångar)
   ui/login.js           login-vy + elevskärmens väntevy

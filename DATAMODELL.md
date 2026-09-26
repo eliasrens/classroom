@@ -5,7 +5,7 @@ så modellen gäller oavsett om Firebase är anslutet eller ej.
 
 **ELEVDATA ÄR ENDAST LOKAL (issue #32).** Ingenting om enskilda elever
 lämnar lärardatorn: samlingarna `students`, `notes`, `praise`,
-`praiseArchive`, `privacy`, `reports` och `skriv` under en klass routas av datalagret till
+`praiseArchive`, `privacy`, `reports`, `skriv` och `lotta` under en klass routas av datalagret till
 en egen lokal lagring (`js/data/local-only.js`, prefix
 `classroom:local:`) som aldrig går via outboxen eller Firestore.
 Molnet innehåller bara klasstatistik: `sessions` (trafikljuspass) och
@@ -189,6 +189,25 @@ classes/{classId}/skriv/board           — Skrivtavlan (issue #46) — ENDAST L
                        Live via sync-bussen (`skriv:state`, samma form),
                        sparas med debounce så att en omladdad elevskärm
                        visar samma text.
+
+classes/{classId}/lotta/{docId}         — Lottningen (issue #47) — ENDAST LOKALT
+  settings:  { list, method, colors, removeDrawn }
+    list:        "klassen" | "farger" | "list-<id>"  — listan man drar ur
+    method:      "hjul" | "rulle" | "lapp" | "direkt"
+    colors:      [färg-id]                        — valda färger (js/lib/lotta.js → COLORS)
+    removeDrawn: { [lista]: bool }                 — "Ta bort den som dragits"
+                                                     (saknas: på för klassen, av för övriga)
+  absent:    { date: "YYYY-MM-DD", ids: [elev-id] } — frånvarande IDAG; gäller
+                                                     bara det datumet (nollställs nästa dag)
+  drawn:     { lists: { [lista]: [nyckel] } }      — "Redan dragna" i dragordning
+                                                     (elev-id, färg-id eller textrad)
+  stage:     { rev, seq, method, listKey, kind, items: [{ label, color? }],
+               result, angle, reelIndex }          — det som visas på scenen, så att en
+                                                     omladdad elevskärm visar samma sak
+  list-<id>: { name, text }                        — egen lista, en rad per alternativ
+                     — innehåller elevnamn → lämnar aldrig datorn. Ingen
+                       historik över dragningar sparas i molnet. Live via
+                       sync-bussen (`lotta:stage`, `lotta:draw`, docs/SYNC.md).
 
 classes/{classId}/settings/{key}        — inställningar per klass
                                           (dokument-id = inställningens namn,
@@ -379,8 +398,8 @@ outboxen som `js/data/datalayer.js` tömmer mot Firestore. Semantik:
   klassåtgärder — men aldrig något om enskilda elever.
 - **ENDAST LOKALT per lärardator** (aldrig via outboxen/Firestore, se
   `js/data/local-only.js`): elevlistan, noteringarna, Bra jobbat med
-  arkiv, gallringsinställningen, rapportloggen (issue #33) och Skrivtavlans
-  text (issue #46). Elevskärmen i samma webbläsare
+  arkiv, gallringsinställningen, rapportloggen (issue #33), Skrivtavlans
+  text (issue #46) och Lottningens listor och dragningar (issue #47). Elevskärmen i samma webbläsare
   läser samma lokala lagring (livespegling via storage-eventet).
   Varje notering skapar samtidigt ett anonymt `noteStats`-streck i
   molnet (`js/modes/elever/shared.js` → `createNote`).
