@@ -68,7 +68,19 @@
   --space-5: 32px;
 
   --topbar-height: 48px;
+
+  /* ---- Sidram för lärarsidorna (issue #61) ----
+     EN ram för alla lägen: samma maxbredd, sidomarginal och avstånd till
+     topbaren, så att flikrad och innehåll ligger exakt stilla vid lägesbyte.
+     Gäller .view (css/app.css); fullbleed-lägen bryter den medvetet. */
+  --page-max-width: 1400px;      /* hela ramen inkl. sidomarginal */
+  --page-gutter: var(--space-4); /* sidomarginal — krymper på smala skärmar */
+  --page-top: var(--space-3);    /* topbar → första raden (flikrad/verktygsrad) */
+  --page-gap: var(--space-4);    /* flikrad → innehåll, och mellan sidans block */
 }
+
+@media (max-width: 900px) { :root { --page-gutter: var(--space-3); } }
+@media (max-width: 560px) { :root { --page-gutter: var(--space-2); } }
 
 /* ============ LÄRARVY — MÖRK (standard) ============
    Djupa neutrala gråtoner, inte rent svart. Kompakt informationstäthet. */

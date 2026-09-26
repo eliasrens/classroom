@@ -63,10 +63,10 @@ export default {
 
     const { store } = ctx;
     el.innerHTML = `
-      <div class="oversikt">
-        <div class="ov-tabs" role="tablist" aria-label="Översikt">
+      <div class="oversikt page">
+        <div class="ov-tabs page-tabs" role="tablist" aria-label="Översikt">
           ${OVERSIKT_TABS.map((t) => `
-            <a class="ov-tab" role="tab" id="ov-tab-${t.id}" href="${tabHref(t.id)}" data-tab="${t.id}"
+            <a class="ov-tab page-tab" role="tab" id="ov-tab-${t.id}" href="${tabHref(t.id)}" data-tab="${t.id}"
               aria-controls="ov-panel" title="${t.long}">${icon(t.icon)}<span>${t.long}</span></a>`).join("")}
         </div>
         <div class="ov-panel" id="ov-panel" role="tabpanel"></div>

@@ -4,8 +4,11 @@
    infällbar kontrollpanel (lärarvy) och valfri namntavla.
    ============================================================ */
 
-/* Morgonskärmen är fullbleed — bryt vy-ytans padding/maxbredd. */
-.view:has(.morgon) { padding: 0; max-width: none; }
+/* Morgonskärmen är MEDVETET fullbleed — bryt sidramen (padding/maxbredd,
+   css/app.css, issue #61). html[data-theme] behövs för att väga tyngre än
+   lärarvyns ramregel; rullistens reserverade plats släpps också. */
+html[data-theme] .view:has(.morgon) { padding: 0; max-width: none; }
+html[data-theme="teacher"]:has(.morgon) { scrollbar-gutter: auto; }
 
 .morgon {
   /* STORLEKSRATT för hela morgonskärmen (issue #38): hälsning, uppgifter,

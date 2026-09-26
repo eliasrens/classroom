@@ -10,9 +10,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  max-width: 72rem;
-  margin: 0 auto;
-  padding-block: var(--space-3);
+  /* Bredd och sidomarginal: sidramen (.view, issue #61). */
 }
 
 /* ---- Huvud: rubrik + veckoväljare + lärarfilter ---- */

@@ -96,6 +96,16 @@ export default {
      skuggor — avgränsa med kantlinjer (`--color-line`) och måttliga
      radier (`--radius-s/m/l`). EN accentfärg: `--color-accent`
      (ytor) / `--color-accent-text` (färgad text).
+   - **Sidram (issue #61)**: `.view` är ramen för alla lärarsidor —
+     maxbredd, sidomarginal och avstånd till topbaren styrs av
+     `--page-*` i `css/tokens.css`. Lägg ALDRIG egen `max-width`,
+     `margin: 0 auto` eller sidopadding på lägets rot. En sida med
+     flikar använder `.page` på roten, `.page-tabs` på flikraden och
+     `.page-tab` på varje flik (`aria-selected="true"` eller
+     `aria-current="page"` för aktiv flik). Medvetet fullbleed (bara
+     morgonskärmen) bryter ramen med `html[data-theme] .view:has(…)`.
+     Undantag: trafikljusets lärarvy är ett centrerat instrument
+     (960 px) INOM ramen — samma avstånd till topbaren, egen centrering.
 7. **Ingen global state utanför store**: det ett läge vill dela med
    andra lägen går via datalagret (persistent) — inte via egna
    globala variabler.
