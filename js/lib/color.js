@@ -48,22 +48,58 @@ export function readableTextColor(bgHex, { dark = "#1f2430", light = "#ffffff" }
  * Färgfamiljerna följer skolans veckoschema (Sv röd, So gul, Ma blå,
  * No/Tk mörkgrön, En lila, Idh rosa, Bd brun, Sl ljusgrön, Mu gråbrun,
  * Mentorstid grå, rast neutral) men i mjukare, mattare toner.
+ *
+ * SO- och NO-delämnena (issue #81) ligger i SAMMA färgfamilj som sitt
+ * huvudämne — eleverna känner igen "SO gul" och "NO mörkgrön" från
+ * schemat — men i nyanser som går att skilja åt sida vid sida i
+ * planeringslistan. `group` binder delämnet till huvudämnet så att
+ * listor kan gruppera dem (SUBJECT_GROUPS). Huvudämnena SO och NO
+ * finns kvar för ämnesövergripande arbete.
+ *
  * `rast` måste ligga sist — den är fallback i subjectStyle m.fl.
  */
-export const SUBJECTS = [
-  { id: "ma",     name: "Matematik",      color: "#3a63a6" },
-  { id: "sv",     name: "Svenska/SVA",    color: "#ad3a30" },
-  { id: "en",     name: "Engelska",       color: "#7463ad" },
-  { id: "no",     name: "NO",             color: "#2f6b4f" },
-  { id: "so",     name: "SO",             color: "#e2bc3f" },
-  { id: "idh",    name: "Idrott & hälsa", color: "#eb9d8e" },
-  { id: "bl",     name: "Bild",           color: "#84573f" },
-  { id: "mu",     name: "Musik",          color: "#7d6e5f" },
-  { id: "sl",     name: "Slöjd",          color: "#a9c8a4" },
-  { id: "tk",     name: "Teknik",         color: "#2f6b4f" },
-  { id: "mentor", name: "Mentorstid",     color: "#9aa0a8" },
-  { id: "rast",   name: "Rast/övrigt",    color: "#d7d3cb" },
+export const SUBJECT_GROUPS = [
+  { id: "so", name: "SO-ämnen" },
+  { id: "no", name: "NO-ämnen" },
 ];
+
+export const SUBJECTS = [
+  { id: "sv",     name: "Svenska/SVA",      color: "#ad3a30" },
+  { id: "en",     name: "Engelska",         color: "#7463ad" },
+  { id: "ma",     name: "Matematik",        color: "#3a63a6" },
+  { id: "so",     name: "SO",               color: "#e2bc3f", group: "so" },
+  { id: "re",     name: "Religionskunskap", color: "#ecd06e", group: "so" },
+  { id: "hi",     name: "Historia",         color: "#c1922c", group: "so" },
+  { id: "ge",     name: "Geografi",         color: "#b8c454", group: "so" },
+  { id: "sh",     name: "Samhällskunskap",  color: "#e39434", group: "so" },
+  { id: "no",     name: "NO",               color: "#2f6b4f", group: "no" },
+  { id: "bi",     name: "Biologi",          color: "#4c7d3f", group: "no" },
+  { id: "ke",     name: "Kemi",             color: "#237571", group: "no" },
+  { id: "fy",     name: "Fysik",            color: "#5e6b2a", group: "no" },
+  { id: "tk",     name: "Teknik",           color: "#2f6b4f" },
+  { id: "idh",    name: "Idrott & hälsa",   color: "#eb9d8e" },
+  { id: "bl",     name: "Bild",             color: "#84573f" },
+  { id: "mu",     name: "Musik",            color: "#7d6e5f" },
+  { id: "sl",     name: "Slöjd",            color: "#a9c8a4" },
+  { id: "mentor", name: "Mentorstid",       color: "#9aa0a8" },
+  { id: "rast",   name: "Rast/övrigt",      color: "#d7d3cb" },
+];
+
+/**
+ * Grupperar en ämneslista för visning: [{ group: {id,name}|null, subjects }]
+ * i listans ordning. Delämnen med samma `group` samlas under sin rubrik
+ * (SUBJECT_GROUPS); övriga ämnen ligger ogrupperade där de står.
+ */
+export function groupedSubjects(subjects) {
+  const out = [];
+  for (const s of subjects) {
+    const group = SUBJECT_GROUPS.find((g) => g.id === s.group) ?? null;
+    const last = out.at(-1);
+    if (last && (last.group?.id ?? null) === (group?.id ?? null)) last.subjects.push(s);
+    else out.push({ group, subjects: [s] });
+  }
+  return out;
+}
 
 /**
  * Mörkare variant av en ämnesfärg för TEXT på ljus botten (t.ex. tavlans

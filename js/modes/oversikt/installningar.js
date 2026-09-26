@@ -10,6 +10,9 @@
 
 import { icon } from "../../lib/icons.js";
 import { setActiveClass } from "../../ui/class-picker.js";
+import { mergedSubjects } from "../../lib/trafikljus-stats.js";
+import { MY_SUBJECTS_DOC, mySubjectsPath, myIds } from "../../lib/my-subjects.js";
+import { openMySubjectsDialog } from "../../ui/my-subjects-dialog.js";
 import {
   savePrivacy, runRetention, parsePrivacy, RETENTION_OPTIONS, DEFAULT_RETENTION_WEEKS, deleteAllClassData,
 } from "../../lib/privacy.js";
@@ -27,6 +30,8 @@ export function mountInstallningar(el, { data, store }) {
   let retentionAwaiting = false; // uppgraderingsskydd: gallring pausad tills läraren valt
   let localNotes = [];     // LOKALA noteringar — bara för påminnelsen före gallring (issue #33)
   let reportLog = null;    // lokal exportlogg (classes/{cid}/reports → log)
+  let myDoc = null;        // Mina ämnen — lärarens privata val (issue #81)
+  let settingsDocs = [];   // klassens delade settings (egna ämnen)
   const activeId = () => store.get().classId ?? null;
 
   /** Elevlista → fliken Rapporter (påminnelsen före gallring, issue #33). */
@@ -115,7 +120,27 @@ export function mountInstallningar(el, { data, store }) {
       ? followUpsAtRisk({ notes: localNotes, weeks: retentionWeeks, log: reportLog, before: serverNow() })
       : [];
 
+    // Mina ämnen (issue #81): privat per lärare, styr ämnesväljaren och
+    // ämnesfiltret i lektionsplaneringen. Inget val = alla ämnen visas.
+    const mine = myIds(myDoc);
+    const subjects = mergedSubjects(settingsDocs);
+    const mineNames = (mine ?? [])
+      .map((id) => subjects.find((s) => s.id === id)?.name)
+      .filter(Boolean);
+    const mineSummary = !mine
+      ? "Inget val — alla ämnen visas i ämnesväljaren."
+      : `${mineNames.length} valda: ${mineNames.join(", ")}.`;
+
     el.innerHTML = `
+      <section class="ov-section card" aria-label="Mina ämnen">
+        <h2 class="ov-section__title">${icon("book")} Mina ämnen</h2>
+        <p class="ov-field__hint">Välj ämnena du undervisar i, så visar ämnesväljaren i
+          lektionsplaneringen bara dem. Valet är ditt eget och följer dig mellan datorer.
+          Statistik och Veckor visar alltid alla ämnen.</p>
+        <p class="ov-mine-summary">${esc(mineSummary)}</p>
+        <button class="btn" data-my-subjects>${icon("check")} Välj mina ämnen…</button>
+      </section>
+
       <section class="ov-section ov-privacy card" aria-label="Integritet och data">
         <h2 class="ov-section__title">${icon("shield")} Integritet &amp; data</h2>
         <p class="ov-privacy__note"><strong>Elevdata stannar på den här datorn.</strong>
@@ -165,7 +190,10 @@ export function mountInstallningar(el, { data, store }) {
     if (e.target.matches("[data-retention]")) void setRetention(e.target.value);
   });
   el.addEventListener("click", (e) => {
-    if (e.target.closest("[data-confirm-retention]")) void setRetention(retentionWeeks);
+    if (e.target.closest("[data-my-subjects]")) {
+      void openMySubjectsDialog({ data, subjects: mergedSubjects(settingsDocs), mine: myIds(myDoc) });
+    }
+    else if (e.target.closest("[data-confirm-retention]")) void setRetention(retentionWeeks);
     else if (e.target.closest("[data-go-reports]")) goReports();
     else if (e.target.closest("[data-migrate]")) void migrateCloud();
     else if (e.target.closest("[data-del]")) void deleteClass();
@@ -174,8 +202,17 @@ export function mountInstallningar(el, { data, store }) {
   // ---- Datakällor (live) ----
   offs.push(data.watch("classes", (docs) => { classes = docs; render(); }));
 
+  // Mina ämnen — privat per lärare, kan ändras här, i lektionsplaneringen
+  // eller på en annan enhet (issue #81).
+  offs.push(data.watch(mySubjectsPath(), (docs) => {
+    myDoc = docs.find((d) => d.id === MY_SUBJECTS_DOC) ?? null;
+    render();
+  }));
+
   const cid = activeId();
   if (cid) {
+    // Klassens delade settings — bara för att kunna namnge egna ämnen.
+    offs.push(data.watch(`classes/${cid}/settings`, (docs) => { settingsDocs = docs; render(); }));
     // Lokala noteringar + exportlogg: bara för att varna innan gallringen
     // raderar uppföljningar som aldrig laddats ned (issue #33).
     offs.push(data.watch(`classes/${cid}/notes`, (docs) => { localNotes = docs; render(); }));

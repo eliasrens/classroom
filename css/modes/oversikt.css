@@ -133,6 +133,10 @@
 .ov-field select { max-width: 20rem; }
 .ov-field__hint { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); }
 
+/* Mina ämnen (issue #81): sammanfattning + knapp i Inställningar. */
+.ov-mine-summary { margin: 0; font-size: var(--text-s); }
+section[aria-label="Mina ämnen"] .btn { align-self: flex-start; }
+
 .ov-danger {
   display: flex;
   flex-wrap: wrap;
