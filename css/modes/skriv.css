@@ -36,9 +36,9 @@
 
 .skr-paper {
   /* Papperets färger är desamma i lärarvyns mörka tema: det ÄR en förhandsvisning. */
-  --skr-bg: #fbf8f1;        /* svagt varm vit */
+  --skr-bg: #f6f0e1;        /* gräddigt, matt skrivpapper */
   --skr-ink: #1f2328;
-  --skr-rule: #5c6066;      /* mörkgrå linjer som i skrivhäftet */
+  --skr-rule: #7d8187;      /* mellangrå linjer som i skrivhäftet */
   --skr-font: 48px;         /* sätts av layout() */
   --skr-lh: 84px;
   --skr-pad-x: 40px;
@@ -248,7 +248,7 @@
   --skr-p-rule-y: 26px;
   --skr-p-rule-w: 1.5px;
   --skr-p-ink: #1f2328;
-  --skr-p-rule: #5c6066;
+  --skr-p-rule: #7d8187;  /* samma som skärmen; papperet är vitt */
   --skr-p-soft: #5b626a;
   position: fixed;
   top: 0;

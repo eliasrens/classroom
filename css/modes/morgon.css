@@ -153,7 +153,7 @@ html[data-theme="teacher"]:has(.morgon) { scrollbar-gutter: auto; }
   line-height: 1;
   font-size: 0.72em;
   font-weight: 700;
-  color: var(--color-accent-ink, #17130a);
+  color: #17130a; /* fast mörk i båda vyerna (accent-ink är vit i ljust tema) */
   background: var(--hue-accent);
   border-radius: var(--radius-round);
   box-shadow: 0 1px 6px rgb(0 0 0 / 35%);
@@ -197,6 +197,16 @@ html[data-theme="teacher"]:has(.morgon) { scrollbar-gutter: auto; }
      namnens faktiska storlek (sätts av js/modes/morgon.js efter anpassningen). */
   font-size: calc(1.25 * var(--nt-names, var(--praise-font-max)));
   font-weight: 600;
+}
+/* Guldstjärnan före "Bra jobbat" (#75): samma guld och skugga som siffercirklarna. */
+.morgon__nametavla .praise-board__title { display: inline-flex; align-items: center; gap: 0.3em; }
+.morgon__star {
+  width: 0.95em;
+  height: 0.95em;
+  flex: none;
+  fill: var(--hue-accent);
+  stroke: var(--hue-accent);
+  filter: drop-shadow(0 1px 3px rgb(0 0 0 / 35%));
 }
 .morgon__nametavla .praise-board__head:has(.praise-board__clear) { padding-inline: 2.4rem; }
 .morgon__nametavla .praise-board__clear { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
