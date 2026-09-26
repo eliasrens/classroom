@@ -106,8 +106,16 @@ assert.equal(menuSettingsPath("uidA"), "teachers/uidA/settings");
     key: (i) => [...mem.keys()][i] ?? null,
   };
   globalThis.window ??= new EventTarget();
+  Object.defineProperty(globalThis, "navigator", { value: {}, configurable: true, writable: true });
+  const pushed = [];
+  const factory = ({ onStatus }) => ({
+    async start() { onStatus?.("online"); return true; },
+    watch() {},
+    reset() {},
+    async push(op) { pushed.push(`${op.path}/${op.id}`); },
+  });
   const { createDataLayer } = await import("../js/data/datalayer.js");
-  const data = createDataLayer();
+  const data = createDataLayer({ createSync: factory });
   const read = async (uid) => pinnedIds(await data.get(menuSettingsPath(uid), MENU_SETTINGS_DOC));
 
   assert.deepEqual(await read("uidA"), ["morgon", "lektion", "trafikljus"]);
@@ -116,6 +124,9 @@ assert.equal(menuSettingsPath("uidA"), "teachers/uidA/settings");
   assert.deepEqual(await read("uidA"), ["morgon", "lektion", "trafikljus", "lotta"], "lärare A:s meny");
   assert.deepEqual(await read("uidB"), ["skriv"], "lärare B:s meny påverkas inte av A");
   assert.deepEqual(await read("uidC"), ["morgon", "lektion", "trafikljus"], "en ny lärare får standardvalet");
+  await new Promise((r) => setTimeout(r, 300));
+  assert.ok(pushed.includes("teachers/uidA/settings/menu"), `valet synkas (följer läraren): ${pushed.join(", ")}`);
+  assert.ok(pushed.includes("teachers/uidB/settings/menu"));
 }
 
 console.log("ok — menygrupper, ordning, elevspärr och fästa lägen per lärare");

@@ -81,7 +81,8 @@ js/
   lib/week.js           veckologik (måndag 00:00) · lib/week-rhythm.js  rent varje måndag
   lib/week-goal.js      trafikljusets veckomål · lib/week-recap.js  veckosammanfattningen (Veckans övergångar)
   ui/login.js           login-vy + elevskärmens väntevy
-  ui/mode-nav.js        övermenyn: rutinerna + Verktyg (delad knapp, minns senaste) + "Lärare ▾", byggs ur registret
+  ui/mode-nav.js        övermenyn: lärarens fästa lägen + "Verktyg ▾" (startlista med nålar) + "Lärare ▾", byggs ur registret
+  lib/menu-pins.js      fästa lägen per lärare (teachers/{uid}/settings/menu)
   ui/menu-button.js     tillgänglig rullgardin (tangentbord, ARIA)
   ui/class-picker.js    klassval i topbaren
   ui/class-actions.js   klassåtgärder: dialoger (ny/ändra, "Testade också") + listan
