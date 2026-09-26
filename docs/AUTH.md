@@ -37,6 +37,35 @@ event). Utloggning i ett fönster loggar ut alla fönster.
    laddad; sessionsmarkören i localStorage är bara offline-reserv och
    delning mellan fönster.
 
+## Byt lösenord
+
+Inloggad lärare: **Lärare ▾ → Byt lösenord** (`js/ui/change-password.js`,
+issue #49). Dialogen har tre fält: **Nuvarande lösenord**, **Nytt
+lösenord** och **Upprepa nytt lösenord**
+(`autocomplete="current-password"`/`"new-password"`, så att
+webbläsarens lösenordshanterare fungerar).
+
+- **Regler** (`js/lib/password-change.js`, testas med
+  `node docs/test-password-change.mjs`): det nuvarande måste fyllas i,
+  det nya måste ha minst **8 tecken**, båda nya fälten måste stämma
+  överens och det nya får inte vara samma som det nuvarande.
+- **Firebase-läge:** `reauthenticateWithCredential` med det nuvarande
+  lösenordet körs **alltid** först, så att en elev vid en inloggad dator
+  inte kan byta det. Därefter körs `updatePassword`. Samma SDK-instans som
+  inloggningen används. Felen (fel lösenord, för svagt, offline, för många
+  försök, `requires-recent-login`) visas på svenska. Bytet kräver nät.
+- **Lokalt läge:** det nuvarande kontrolleras mot hashen och sedan
+  ersätts hashen (`classroom:auth:localHash`, samma SHA-256 med salt).
+- Läraren förblir inloggad och sessionsmarkören rörs inte, så andra
+  fönster, som elevskärmen, påverkas inte. Lösenorden loggas aldrig,
+  skickas aldrig på sync-bussen och sparas aldrig i klartext.
+- Posten syns bara i lärarvyn. Menyn finns inte på elevskärmen, och
+  dialogen är `.teacher-only` och stängs om fönstret växlar till elevvy.
+
+**Glömt lösenord** går inte att återställa via e-post, eftersom adresserna
+`@klassrum.local` är fiktiva. Kontot tas då bort och skapas om i
+Firebase-konsolen (se [DRIFTSATTNING.md](DRIFTSATTNING.md)).
+
 ## Säkerhetsregler
 
 De skarpa reglerna ligger i **[`firestore.rules`](../firestore.rules)** (rotmappen)
