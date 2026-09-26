@@ -27,6 +27,8 @@ const PRINT_FONT_PX = 20;
 const LINE_HEIGHT = 1.75;
 const PRINT_LH = Math.round(PRINT_FONT_PX * LINE_HEIGHT); // 35 px ≈ 9,3 mm
 const RULE_W = 1.5;
+/** Textytans höjd på ett A4: 297 mm − 2 × 15 mm (@page skriv i css/modes/skriv.css). */
+const PAGE_CONTENT_PX = ((297 - 2 * 15) * 96) / 25.4;
 
 let current = null; // { root, onAfter, prevTitle }
 
@@ -143,6 +145,17 @@ export function buildSkrivPrint({ pages, className, title }) {
   rows.forEach((row, i) => {
     row.replaceWith(...split[i].map((t) => el("div", "skr-print__line", t)));
   });
+
+  // Linjerat ända ner, som ett riktigt skrivpapper: fyll varje utskriven
+  // sidas sista A4 med tomma linjer. Varje A4 rymmer sidhuvudet (<thead>
+  // upprepas) + ett helt antal rader.
+  for (const section of root.querySelectorAll(".skr-print__page")) {
+    const headH = section.querySelector("thead").getBoundingClientRect().height;
+    const perSheet = Math.max(1, Math.floor((PAGE_CONTENT_PX - headH - 1) / PRINT_LH));
+    const text = section.querySelector(".skr-print__text");
+    const pad = (perSheet - (text.children.length % perSheet)) % perSheet;
+    for (let i = 0; i < pad; i++) text.append(el("div", "skr-print__line skr-print__line--blank"));
+  }
 
   // Dokumenttiteln = PDF:ens förslag på filnamn. Utan elevnamn.
   document.title = `Skrivtavla ${head.className} ${isoDate(new Date())}`.replace(/\s+/g, " ").trim();
