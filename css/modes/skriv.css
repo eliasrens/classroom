@@ -230,9 +230,15 @@
 .skr-printpanel__actions .btn { display: inline-flex; align-items: center; gap: var(--space-2); }
 .skr-printpanel__actions .btn:disabled { opacity: 0.4; cursor: default; }
 
-/* Arket. A4 stående, 15 mm marginal (fungerar på vanliga skolskrivare)
-   → textbredd 180 mm. Skärm och utskrift MÅSTE ha samma bredd. */
-@page skriv { size: A4 portrait; margin: 15mm; }
+/* Arken. A4 stående. @page har marginal 0 och varje ark är en egen box på
+   210 × 296,5 mm (en halv mm under A4: avrundning får aldrig ge en tom
+   extrasida) med 15 mm VIT padding → textbredd 180 mm. Vitt runt om blir
+   det alltså oavsett "Marginaler" i utskriftsdialogen: "Standard" (= 0
+   här), "Inga" och "Minimum" — med skrivarens minimimarginal krymper
+   Chrome arket till sidbredden, så det får ändå plats på ett A4 (issue
+   #55). Skärm och utskrift MÅSTE ha samma bredd; print.js räknar raderna
+   per ark med samma mått. */
+@page skriv { size: A4 portrait; margin: 0; }
 
 .skr-print {
   --skr-p-font: 20px;   /* sätts av print.js */
@@ -245,7 +251,7 @@
   position: fixed;
   top: 0;
   left: -10000px;
-  width: 180mm;
+  width: 210mm;
   visibility: hidden;
   pointer-events: none;
   color: var(--skr-p-ink);
@@ -254,9 +260,16 @@
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
-.skr-print__table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.skr-print__table th,
-.skr-print__table td { padding: 0; text-align: left; font-weight: 400; vertical-align: top; }
+.skr-print__sheet {
+  box-sizing: border-box;
+  width: 210mm;
+  height: 296.5mm;
+  padding: 15mm;
+  overflow: hidden;
+  background: #fff;
+  break-after: page;
+}
+.skr-print__sheet:last-child { break-after: auto; }
 .skr-print__head {
   display: flex;
   justify-content: space-between;
@@ -304,7 +317,6 @@
 }
 .skr-print__probe .skr-print__line::after { content: none; }
 .skr-print__base { display: inline-block; width: 0; height: 0; vertical-align: baseline; }
-.skr-print__page + .skr-print__page { break-before: page; }
 
 @media print {
   body.skr-printing > :not(.skr-print) { display: none !important; }
@@ -315,7 +327,6 @@
   body.skr-printing .skr-print {
     page: skriv;
     position: static;
-    width: auto;
     visibility: visible;
   }
 }
