@@ -1,7 +1,7 @@
 /**
  * KLASSÅTGÄRDER — dialoger och lista (issue #34). ENDAST LÄRARVY.
  *
- * Används av Översikt, Statistik, Trafikljusur (direkt efter ett sparat
+ * Används av Översikt (Idag + Klassåtgärder), Trafikljusur (direkt efter ett sparat
  * pass) och Lektionsplanering (den pågående/öppna lektionen förväljs).
  *
  *  - openClassActionDialog(): ny/ändra klassåtgärd

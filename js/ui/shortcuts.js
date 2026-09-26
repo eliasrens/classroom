@@ -5,7 +5,8 @@
  * (timer i trafikljus.js, snabbanteckning i quick-note.js, elevtangenter
  * i elever.js). Genvägslistan visas under "?" (js/ui/help.js).
  *
- *   1–7   byt läge (i menyordning)
+ *   1–N   byt läge i menyordning (klassrumslägena först, sedan
+ *         lärarlägena — navOrder() i js/modes/registry.js, max 9)
  *   E     öppna/fokusera elevskärmen
  *   ?     visa genvägslistan
  *
@@ -16,12 +17,15 @@
  *    se typingInField.)
  *  - Inte medan snabbanteckningen eller hjälprutan är öppen (de äger
  *    tangenterna då).
- *  - 1–7 och E är AVSTÄNGDA i Elevlistans Registrera-flik: där är
+ *  - Sifferbyten och E är AVSTÄNGDA i Elevlistans Registrera-flik: där är
  *    enskilda bokstäver/siffror elevernas egna snabbtangenter, så vi
  *    krockar aldrig med dem.
  */
 
-import { MODES } from "../modes/registry.js";
+import { navOrder } from "../modes/registry.js";
+
+/** Lägena som når en siffertangent (1–9), i menyordning. */
+export const shortcutModes = () => navOrder().slice(0, 9);
 
 /** Står Elevlistan i Registrera-fliken? Då äger elevtangenterna tecknen. */
 function inRegisterTab(store) {
@@ -68,12 +72,12 @@ export function initShortcuts({ store, openStudentWindow, openHelp }) {
     if (dialogOpen()) return;
 
     // I Elevlistans Registrera-flik äger elevernas snabbtangenter
-    // enskilda tecken — lämna 1–7 och E därhän så inget krockar.
+    // enskilda tecken — lämna siffrorna och E därhän så inget krockar.
     if (inRegisterTab(store)) return;
 
-    // 1–7: byt läge i menyordning.
-    if (/^[1-7]$/.test(e.key)) {
-      const mode = MODES[Number(e.key) - 1];
+    // 1–9: byt läge i menyordning (samma ordning som övermenyn).
+    if (/^[1-9]$/.test(e.key)) {
+      const mode = shortcutModes()[Number(e.key) - 1];
       if (mode) {
         e.preventDefault();
         location.hash = `#/${mode.id}`;

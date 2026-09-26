@@ -1,73 +1,46 @@
 /**
- * LÄGE 5 — ÖVERSIKT / START. ENDAST LÄRARVY.
+ * ÖVERSIKT — lärarläge med flikar (issue #45: Översikt + Statistik ihop).
+ * ENDAST LÄRARVY.
  *
- * Den lugna startvyn efter inloggning: välj klass, välj läge, se dagens
- * sparade lektionsplaneringar — en rofylld ingång till hela appen, med
- * veckans siffror (rena varje måndag, tidigare veckor i Statistik). Här
- * bor även de tvärgående integritetsinställningarna (Läge 5): namn­visning
- * (förnamn/initialer), auto-radering av noteringar och "radera all data
- * för klassen". Klassåtgärderna (issue #34) — lärarnas delade logg över
- * arbetssätt de testat — visas här med de senaste först.
+ *   Idag / denna vecka   #/oversikt/idag           startvyn (js/modes/oversikt/idag.js)
+ *   Veckor / arkiv       #/oversikt/veckor         veckoarkiv, veckomål, trender (veckor.js)
+ *   Klassåtgärder        #/oversikt/atgarder       lärarnas delade logg (#34, atgarder.js)
+ *   Inställningar och    #/oversikt/installningar  namnvisning, gallring (#32),
+ *   dataskydd                                      "Radera all data" (installningar.js)
+ *
+ * Fliken står i adressen (routern lägger den i store.modeSub), så den går
+ * att länka till, bakåtknappen fungerar och gamla #/statistik-länkar leder
+ * rätt (MODE_ALIASES i registry.js). Flikbyte remountar inte läget — bara
+ * fliken byts. Utan flik i adressen visas den senast använda.
  *
  * INTEGRITETSSPÄRR: översikten (klassdata, noteringsinställningar) får
- * ALDRIG nå elevskärmen. Läget står inte i STUDENT_MODE_IDS, så routern
- * monterar det aldrig i elevvyn — och skulle det ändå ske renderas en
- * neutral skärm utan att läsa ett enda elev- eller noteringsdokument.
+ * ALDRIG nå elevskärmen. Läget står i lärargruppen och därmed inte i
+ * STUDENT_MODE_IDS, så routern monterar det aldrig i elevvyn — och skulle
+ * det ändå ske renderas en neutral skärm utan att någon flik monteras.
  */
 
 import { icon } from "../lib/icons.js";
-import { MODES } from "./registry.js";
-import { SUBJECTS } from "../lib/color.js";
-import { setActiveClass } from "../ui/class-picker.js";
-import { loadNameDisplay, saveNameDisplay } from "./elever/shared.js";
-import {
-  savePrivacy, runRetention, RETENTION_OPTIONS, DEFAULT_RETENTION_WEEKS, deleteAllClassData,
-} from "../lib/privacy.js";
-import { plansPath as plansPathFor, setEditingPlanId } from "../data/plans.js";
-import { createClass } from "../data/classes.js";
-import { startOfWeek, inWeek, weekLabel, weekRangeLabel, weekKey } from "../lib/week.js";
-import { KIND_KEYS, KINDS, computeStats } from "../lib/trafikljus-stats.js";
-import { PRAISE_DOC, praisePath, normalize as normalizeMorning, currentPraise } from "../lib/morning.js";
-import { noteStatsPath } from "./elever/shared.js";
-import { moveStudentDataFromCloud } from "../data/cloud-cleanup.js";
-import { serverNow } from "../lib/clock.js";
-import { isMentorTime } from "../lib/week-recap.js";
-import { followUpsAtRisk, reportsPath, REPORTS_LOG_ID } from "./elever/report-data.js";
-import {
-  classActionsPath, classActionRepliesPath, categoryKey, categoryOptions, lessonIndex,
-} from "../lib/class-actions.js";
-import { renderClassActionList, handleClassActionClick, addButton } from "../ui/class-actions.js";
-import { teacherOptions, teacherFilterFn, validTeacherFilter } from "../lib/teacher-filter.js";
-import { mergedSubjects } from "../lib/trafikljus-stats.js";
+import { mountIdag } from "./oversikt/idag.js";
+import { mountVeckor } from "./oversikt/veckor.js";
+import { mountAtgarder } from "./oversikt/atgarder.js";
+import { mountInstallningar } from "./oversikt/installningar.js";
 
-const OV_ACTIONS = 5; // senaste klassåtgärderna i översikten (resten i Statistik)
+export const OVERSIKT_TABS = [
+  { id: "idag", long: "Idag / denna vecka", icon: "calendar", mount: mountIdag },
+  { id: "veckor", long: "Veckor / arkiv", icon: "chart", mount: mountVeckor },
+  { id: "atgarder", long: "Klassåtgärder", icon: "bulb", mount: mountAtgarder },
+  { id: "installningar", long: "Inställningar och dataskydd", icon: "shield", mount: mountInstallningar },
+];
 
-const esc = (s) =>
-  String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const TAB_KEY = "classroom:oversikt:tab";
+const tabHref = (id) => `#/oversikt/${id}`;
+const validTab = (id) => OVERSIKT_TABS.some((t) => t.id === id);
 
-const todayISO = (d = new Date(serverNow())) => {
-  const p = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-};
-
-/** Lugn hälsning efter tid på dygnet (saklig, ingen emoji). */
-function greeting(d = new Date(serverNow())) {
-  const h = d.getHours();
-  if (h < 10) return "God morgon";
-  if (h < 13) return "God förmiddag";
-  if (h < 17) return "God eftermiddag";
-  return "God kväll";
-}
-
-const fmtLongDate = (d = new Date(serverNow())) =>
-  d.toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long" });
-
-/** Ämnesfärg (inbyggda + lärarens egna) för en planeringsprick. */
-function subjectColor(subjectId, settingsDocs) {
-  const custom = settingsDocs.find((d) => d.id === "subjects")?.value?.list ?? [];
-  const all = [...SUBJECTS, ...custom.filter((s) => s?.id && s?.color)];
-  const s = all.find((x) => x.id === subjectId);
-  return s?.color ?? "var(--color-ink-soft)";
+function rememberedTab() {
+  try {
+    const t = sessionStorage.getItem(TAB_KEY);
+    return validTab(t) ? t : "idag";
+  } catch { return "idag"; }
 }
 
 export default {
@@ -88,375 +61,82 @@ export default {
       return;
     }
 
-    const { data, store } = ctx;
-    let classes = [];
-    let plans = [];
-    let settingsDocs = [];
-    let initials = false;
-    let retentionWeeks = DEFAULT_RETENTION_WEEKS;
-    let retentionAwaiting = false; // uppgraderingsskydd: gallring pausad tills läraren valt
-    let noteStats = [];      // klassens anonyma streck (moln, issue #32)
-    let praiseBoard = null;  // lokala Bra jobbat-listan
-    let sessions = [];
-    let localNotes = [];     // LOKALA noteringar — bara för påminnelsen före gallring (issue #33)
-    let reportLog = null;    // lokal exportlogg (classes/{cid}/reports → log)
-    let actions = [];        // klassåtgärder (moln, delade — issue #34)
-    let replies = [];
-    const caFilter = { teacher: "all", category: "all" };
-    const activeId = () => store.get().classId ?? null;
+    const { store } = ctx;
+    el.innerHTML = `
+      <div class="oversikt">
+        <div class="ov-tabs" role="tablist" aria-label="Översikt">
+          ${OVERSIKT_TABS.map((t) => `
+            <a class="ov-tab" role="tab" id="ov-tab-${t.id}" href="${tabHref(t.id)}" data-tab="${t.id}"
+              aria-controls="ov-panel" title="${t.long}">${icon(t.icon)}<span>${t.long}</span></a>`).join("")}
+        </div>
+        <div class="ov-panel" id="ov-panel" role="tabpanel"></div>
+      </div>`;
+    const tabsEl = el.querySelector(".ov-tabs");
+    const panelEl = el.querySelector(".ov-panel");
 
-    el.innerHTML = `<div class="oversikt"></div>`;
-    const rootEl = el.querySelector(".oversikt");
+    let current = null;      // aktiv flik-id
+    let panelOffs = [];      // städning för aktiv flik
 
-    // ---- Klassbyte från startvyn (persistas + speglas till elevskärm) ----
-    function chooseClass(id) {
-      setActiveClass(store, id);
-      // classId-ändring remountar läget (router) → hela vyn ritas om.
+    function unmountPanel() {
+      for (const off of panelOffs) { try { off(); } catch { /* noop */ } }
+      panelOffs = [];
     }
 
-    async function addClass() {
-      const name = prompt("Klassens namn (t.ex. 4A):")?.trim();
-      if (!name) return;
-      // Dubblettsäkert: samma namn återanvänder befintlig klass (data/classes.js).
-      const id = await createClass(data, name);
-      chooseClass(id);
-    }
+    function show(id) {
+      if (!validTab(id)) id = rememberedTab();
+      // Adressen visar alltid fliken (utan ny historikpost).
+      if (location.hash !== tabHref(id)) history.replaceState(null, "", tabHref(id));
+      if (id === current) return;
+      current = id;
+      try { sessionStorage.setItem(TAB_KEY, id); } catch { /* ok */ }
 
-    function goMode(id) { location.hash = `#/${id}`; }
-
-    /** Elevlista → fliken Rapporter (påminnelsen före gallring, issue #33). */
-    function goReports() {
-      try { sessionStorage.setItem("classroom:elever:tab", "rapporter"); } catch { /* ok */ }
-      goMode("elever");
-    }
-
-    // Öppnar planeringen i redigeraren — ändrar INTE vad elevskärmen
-    // visar (det gör bara "Visa för eleverna", issue #39).
-    function openPlan(planId) {
-      const cid = activeId();
-      if (!cid) return;
-      setEditingPlanId(cid, planId);
-      goMode("lektion");
-    }
-
-    // ---- Integritet: namnvisning ----
-    function toggleInitials(on) {
-      const cid = activeId();
-      if (!cid) return;
-      void saveNameDisplay(data, cid, on);
-    }
-
-    // ---- Integritet: lokal gallring av noteringar (per dator) ----
-    // Ett aktivt val häver uppgraderingsskyddet; kör gallringen direkt
-    // så att "starta gallringen" i bekräftelsen stämmer.
-    async function setRetention(value) {
-      const cid = activeId();
-      if (!cid) return;
-      // Issue #33: raderar valet noteringar med uppföljning som aldrig laddats
-      // ned? Fråga först — det finns ingen annan kopia av dem.
-      const risk = followUpsAtRisk({ notes: localNotes, weeks: Number(value), log: reportLog, before: serverNow() });
-      if (risk.length > 0) {
-        const weeks = [...new Set(risk.map((n) => weekKey(n.createdAt).replace(/^\d{4}-W0?/, "v.")))].join(", ");
-        const ok = confirm(
-          `${risk.length} ${risk.length === 1 ? "notering" : "noteringar"} med uppföljning (${weeks}) har inte laddats ned ` +
-          "och raderas nu från den här datorn.\n\nRadera ändå?\n\n" +
-          "Välj Avbryt och ladda ned en rapport först: Elevlista → Rapporter.");
-        if (!ok) { render(); return; }
+      for (const a of tabsEl.querySelectorAll("[data-tab]")) {
+        const on = a.dataset.tab === id;
+        a.setAttribute("aria-selected", String(on));
+        a.tabIndex = on ? 0 : -1;
       }
-      await savePrivacy(data, cid, { noteRetentionWeeks: Number(value) });
-      await runRetention(data, cid);
-    }
+      panelEl.setAttribute("aria-labelledby", `ov-tab-${id}`);
 
-    // ---- Integritet: flytta elevdata från molnet (engångs, issue #32) ----
-    async function migrateCloud() {
-      const ok = confirm(
-        "Flytta elevdata från molnet?\n\n" +
-        "Detta gäller ALLA klasser i molnet:\n" +
-        "• Gamla noteringar räknas om till anonym klasstatistik (utan elever och texter).\n" +
-        "• Elevlistor, noteringar och Bra jobbat-arkiv RADERAS ur molnet.\n\n" +
-        "Varje lärardator behåller sin egen lokala kopia. Datorer som inte har " +
-        "öppnat appen med den nya versionen ännu behåller sin cache och migrerar " +
-        "den lokalt vid nästa start.");
-      if (!ok) return;
+      unmountPanel();
+      // Ny behållare per flik: flikarnas delegerade lyssnare följer med ut.
+      panelEl.innerHTML = "";
+      const slot = document.createElement("div");
+      slot.className = `ov-panel__slot ov-panel__slot--${id}`;
+      panelEl.append(slot);
+      const tab = OVERSIKT_TABS.find((t) => t.id === id);
       try {
-        const report = await moveStudentDataFromCloud();
-        const lines = report.map((r) => `${r.name}: ${r.notes} noteringar → anonym statistik, ${r.deleted} dokument raderade`);
-        alert(`Klart — elevdata är flyttad från molnet.\n\n${lines.join("\n")}`);
+        panelOffs = tab.mount(slot, ctx, { tabHref }) ?? [];
       } catch (err) {
-        console.warn("[oversikt] flytt av elevdata från molnet misslyckades:", err);
-        alert(`Kunde inte slutföra flytten: ${err?.message ?? err}\n\nInget lokalt har gått förlorat — försök igen.`);
+        console.error(`[oversikt] fliken "${id}" kunde inte laddas:`, err);
+        slot.innerHTML = `<div class="mode-placeholder"><h2>Hoppsan!</h2>
+          <p>Fliken kunde inte laddas. Prova att byta flik och tillbaka.</p></div>`;
       }
     }
 
-    // ---- Integritet: radera all data för klassen ----
-    async function deleteClass() {
-      const cid = activeId();
-      const cls = classes.find((c) => c.id === cid);
-      if (!cid || !cls) return;
-      const typed = prompt(
-        `Detta raderar ALLT för klassen "${cls.name}" — elever, planeringar, ` +
-        `noteringar, pass och inställningar. Det går inte att ångra.\n\n` +
-        `Skriv klassens namn (${cls.name}) för att bekräfta:`
-      );
-      if (typed == null) return;
-      if (typed.trim() !== cls.name) { alert("Namnet stämde inte — inget raderades."); return; }
-      const n = await deleteAllClassData(data, cid);
-      // Ingen klass vald efteråt: "Välj klass…" (samma fallback som
-      // klassväljaren, #31). Välj ALDRIG automatiskt en annan (riktig) klass —
-      // lärarvyn börjar skriva där direkt (veckorytm, autosparning).
-      chooseClass(null);
-      alert(`Klart — ${n} poster raderade för "${cls.name}".`);
-    }
-
-    // ---- Veckans siffror (veckorytm: bara innevarande vecka) ----
-    // Klassnivå ur molnets anonyma streck (noteStats) — Bra jobbat ur
-    // den lokala listan (issue #32).
-    function weekSection(cls) {
-      if (!cls) return "";
-      const ws = startOfWeek();
-      const weekStats = noteStats.filter((n) => inWeek(n.createdAt ?? 0, ws));
-      const typ = weekStats.filter((n) => (n.kind ?? "typ") === "typ");
-      const neg = typ.filter((n) => !n.positive).length;
-      const praise = currentPraise(normalizeMorning({ praise: praiseBoard?.praise, weekOf: praiseBoard?.weekOf }));
-      const tile = (n, label) =>
-        `<li class="stat-tile"><span class="stat-tile__n">${n}</span><span class="stat-tile__l">${esc(label)}</span></li>`;
-      return `
-        <section class="ov-section ov-week" aria-label="Den här veckan">
-          <h2 class="ov-section__title">${icon("chart")} Den här veckan · ${esc(weekLabel(ws))} · ${esc(weekRangeLabel(ws))}</h2>
-          <ul class="stat-tiles">
-            ${tile(neg, "noteringar")}
-            ${tile(typ.length - neg, "positiva")}
-            ${KIND_KEYS.map((k) => {
-              const { weekTotal, counts } = computeStats(sessions, k, { weekStart: ws });
-              return tile(weekTotal, `pass ${KINDS[k].label.toLowerCase()} (${counts.green} gröna)`);
-            }).join("")}
-            ${tile(praise.length, "Bra jobbat")}
-          </ul>
-          <p class="ov-week__foot">Siffrorna börjar om varje måndag.
-            <button class="ov-link" data-mode="statistik">Tidigare veckor finns i Statistik.</button></p>
-        </section>`;
-    }
-
-    // ---- Klassåtgärder (issue #34): de senaste, delade mellan lärarna ----
-    function actionSection(cls) {
-      if (!cls) return "";
-      const others = teacherOptions(actions);
-      caFilter.teacher = validTeacherFilter(caFilter.teacher, others);
-      const tf = teacherFilterFn(caFilter.teacher);
-      const byTeacher = tf ? actions.filter(tf) : actions;
-      const cats = categoryOptions(byTeacher);
-      if (caFilter.category !== "all" && !cats.some((c) => c.value === caFilter.category)) caFilter.category = "all";
-      const shown = caFilter.category === "all" ? byTeacher : byTeacher.filter((a) => categoryKey(a.category) === caFilter.category);
-      const opt = (key, value, name) =>
-        `<option value="${esc(value)}"${caFilter[key] === value ? " selected" : ""}>${esc(name)}</option>`;
-      return `
-        <section class="ov-section ca-section teacher-only" aria-label="Klassåtgärder">
-          <div class="ca-section__head">
-            <h2 class="ov-section__title">${icon("bulb")} Klassåtgärder</h2>
-            ${actions.length ? `
-            <select data-ca-teacher aria-label="Lärare">
-              ${opt("teacher", "all", "Alla lärare")}${opt("teacher", "mine", "Mina")}
-              ${others.map((o) => opt("teacher", o.value, o.name)).join("")}
-            </select>
-            ${cats.length ? `<select data-ca-cat aria-label="Kategori">
-              ${opt("category", "all", "Alla kategorier")}${cats.map((c) => opt("category", c.value, c.name)).join("")}
-            </select>` : ""}` : ""}
-            ${addButton()}
-          </div>
-          ${renderClassActionList(shown, {
-            replies, index: lessonIndex(noteStats, sessions), subjects: mergedSubjects(settingsDocs), limit: OV_ACTIONS,
-            empty: actions.length
-              ? "Inga klassåtgärder för det här urvalet."
-              : "Inga klassåtgärder ännu. Testade ni ett nytt arbetssätt? Dela hur det gick med de andra lärarna.",
-          })}
-          <p class="ov-week__foot">Delas med alla lärare — om klassen, aldrig om enskilda elever.
-            <button class="ov-link" data-mode="statistik">Alla veckor finns i Statistik.</button></p>
-        </section>`;
-    }
-
-    // ---- Rendering ----
-    function render() {
-      const cid = activeId();
-      const cls = classes.find((c) => c.id === cid) ?? null;
-      const todaysPlans = plans
-        .filter((p) => (p.date ?? "") === todayISO())
-        .sort((a, b) => (a.start ?? "").localeCompare(b.start ?? "") ||
-          (a.name ?? "").localeCompare(b.name ?? "", "sv"));
-
-      rootEl.innerHTML = `
-        <header class="ov-hero">
-          <p class="ov-hero__kicker">${esc(fmtLongDate())}</p>
-          <h1 class="ov-hero__title">${greeting()}.</h1>
-          <p class="ov-hero__sub">${cls
-            ? `Vald klass: <strong>${esc(cls.name)}</strong>. Välj ett läge nedan.`
-            : `Välj en klass för att komma igång.`}</p>
-          ${cls && isMentorTime() ? `
-          <button class="btn btn--ghost ov-mentor" data-mode="vecka">${icon("star")}
-            <span>Mentorstid? Visa veckans övergångar</span></button>` : ""}
-        </header>
-
-        <section class="ov-section" aria-label="Klass">
-          <h2 class="ov-section__title">Klass</h2>
-          <div class="ov-classes">
-            ${[...classes].sort((a, b) => a.name.localeCompare(b.name, "sv")).map((c) => `
-              <button class="ov-chip${c.id === cid ? " is-active" : ""}" data-class="${esc(c.id)}"
-                aria-pressed="${c.id === cid}">${esc(c.name)}</button>`).join("")}
-            <button class="ov-chip ov-chip--add" data-add>${icon("plus")} Ny klass</button>
-          </div>
-        </section>
-
-        <section class="ov-section" aria-label="Lägen">
-          <h2 class="ov-section__title">Lägen</h2>
-          <div class="ov-modes">
-            ${MODES.filter((m) => m.id !== "oversikt").map((m) => `
-              <button class="ov-mode" data-mode="${m.id}">
-                <span class="ov-mode__icon">${icon(m.icon, { size: 26, strokeWidth: 1.5 })}</span>
-                <span class="ov-mode__title">${esc(m.title)}</span>
-              </button>`).join("")}
-          </div>
-        </section>
-
-        ${weekSection(cls)}
-
-        ${actionSection(cls)}
-
-        <section class="ov-section" aria-label="Dagens planeringar">
-          <h2 class="ov-section__title">${icon("calendar")} Dagens lektionsplaneringar</h2>
-          ${!cls ? `<p class="ov-empty">Välj en klass för att se dagens planeringar.</p>`
-            : todaysPlans.length === 0
-              ? `<p class="ov-empty">Inga planeringar för idag.
-                 <button class="ov-link" data-mode="lektion">Skapa en i Lektionsplanering.</button></p>`
-              : `<ul class="ov-plans">
-                  ${todaysPlans.map((p) => {
-                    const t = p.start ? `${esc(p.start)}${p.end ? "–" + esc(p.end) : ""}` : "";
-                    return `<li>
-                      <button class="ov-plan" data-plan="${esc(p.id)}">
-                        <span class="ov-plan__dot" style="background:${subjectColor(p.subjectId, settingsDocs)}"></span>
-                        <span class="ov-plan__name">${esc(p.name ?? "Namnlös planering")}</span>
-                        ${t ? `<span class="ov-plan__time">${t}</span>` : ""}
-                      </button>
-                    </li>`;
-                  }).join("")}
-                </ul>`}
-        </section>
-
-        <section class="ov-section ov-privacy card" aria-label="Integritet och data">
-          <h2 class="ov-section__title">${icon("shield")} Integritet &amp; data</h2>
-          <p class="ov-privacy__note"><strong>Elevnoteringar sparas bara på den här datorn.</strong>
-            Elevlistan, noteringarna och Bra jobbat lämnar aldrig datorn — molnet får enbart
-            klasstatistik (trafikljus och anonyma räkningar). Det som ska sparas långsiktigt
-            dokumenteras i skolans system. Endast elevernas förnamn lagras, och noteringar
-            visas aldrig på elevskärmen.</p>
-          ${!cls ? `<p class="ov-empty">Välj en klass för att ändra inställningarna.</p>` : `
-          <label class="ov-toggle">
-            <input type="checkbox" data-initials ${initials ? "checked" : ""}>
-            <span>Visa initialer i stället för förnamn (gäller hela lärarvyn)</span>
-          </label>
-
-          <label class="ov-field">
-            <span class="ov-field__label">Radera noteringar automatiskt efter</span>
-            <select data-retention>
-              ${RETENTION_OPTIONS.map((o) => `
-                <option value="${o.weeks}" ${o.weeks === retentionWeeks ? "selected" : ""}>${esc(o.label)}</option>`).join("")}
-            </select>
-          </label>
-          <p class="ov-field__hint">Lokal gallring på den här datorn (standard 12 veckor — en termin).
-            Rensningen körs automatiskt när klassen öppnas. Klassens anonyma statistik i molnet påverkas inte.</p>
-          ${retentionAwaiting ? `
-          <div class="ov-retention-pause">
-            <p><strong>Gallringen är pausad.</strong> Den här datorn hade tidigare
-              "Spara tills vidare", så inga noteringar raderas förrän du bekräftar
-              en lagringstid ovan. Äldre noteringar än den valda tiden raderas då
-              från den här datorn.</p>
-            ${(() => {
-              const risk = followUpsAtRisk({ notes: localNotes, weeks: retentionWeeks, log: reportLog, before: serverNow() });
-              return risk.length ? `
-            <p class="ov-retention-risk">${icon("flag")} <strong>${risk.length} ${risk.length === 1 ? "notering" : "noteringar"} med uppföljning
-              raderas när du bekräftar</strong> och har inte laddats ned.
-              <button class="ov-link" data-go-reports>Ladda ned en rapport först (Elevlista → Rapporter).</button></p>` : "";
-            })()}
-            <button class="btn" data-confirm-retention>Bekräfta ${retentionWeeks} veckor och starta gallringen</button>
-          </div>` : ""}
-
-          <div class="ov-danger">
-            <button class="btn" data-migrate>${icon("upload")} Flytta elevdata från molnet</button>
-            <span class="ov-danger__hint">Engångsflytt (alla klasser): räknar om molnets gamla noteringar till
-              anonym klasstatistik och raderar elevlistor, noteringar och Bra jobbat-arkiv ur molnet.</span>
-          </div>
-
-          <div class="ov-danger">
-            <button class="btn ov-danger__btn" data-del>${icon("trash")} Radera all data för ${esc(cls.name)}</button>
-            <span class="ov-danger__hint">Elever, planeringar, noteringar, pass — allt, både på datorn och i molnet. Kan inte ångras.</span>
-          </div>`}
-        </section>`;
-
-      // ---- Händelser (delegation) ----
-      rootEl.querySelectorAll("[data-class]").forEach((b) =>
-        b.addEventListener("click", () => chooseClass(b.dataset.class)));
-      rootEl.querySelector("[data-add]")?.addEventListener("click", () => void addClass());
-      rootEl.querySelectorAll("[data-mode]").forEach((b) =>
-        b.addEventListener("click", () => goMode(b.dataset.mode)));
-      rootEl.querySelectorAll("[data-plan]").forEach((b) =>
-        b.addEventListener("click", () => void openPlan(b.dataset.plan)));
-      rootEl.querySelector("[data-initials]")?.addEventListener("change", (e) =>
-        toggleInitials(e.target.checked));
-      rootEl.querySelector("[data-retention]")?.addEventListener("change", (e) =>
-        void setRetention(e.target.value));
-      rootEl.querySelector("[data-confirm-retention]")?.addEventListener("click", () =>
-        void setRetention(retentionWeeks));
-      rootEl.querySelector("[data-go-reports]")?.addEventListener("click", goReports);
-      rootEl.querySelector("[data-migrate]")?.addEventListener("click", () => void migrateCloud());
-      rootEl.querySelector("[data-del]")?.addEventListener("click", () => void deleteClass());
-    }
-
-    // Klassåtgärder: delegerat (markupen ritas om vid varje ändring).
-    rootEl.addEventListener("click", (e) => {
-      const cid = activeId();
-      if (cid) handleClassActionClick(e, { data, cid, actions, replies });
-    });
-    rootEl.addEventListener("change", (e) => {
-      if (e.target.matches("[data-ca-teacher]")) { caFilter.teacher = e.target.value; render(); }
-      else if (e.target.matches("[data-ca-cat]")) { caFilter.category = e.target.value; render(); }
+    // Piltangenter mellan flikarna (WAI-ARIA Tabs, automatisk aktivering).
+    tabsEl.addEventListener("keydown", (e) => {
+      const tabs = [...tabsEl.querySelectorAll("[data-tab]")];
+      const i = tabs.indexOf(document.activeElement);
+      if (i < 0) return;
+      let next = null;
+      if (e.key === "ArrowRight") next = tabs[(i + 1) % tabs.length];
+      else if (e.key === "ArrowLeft") next = tabs[(i - 1 + tabs.length) % tabs.length];
+      else if (e.key === "Home") next = tabs[0];
+      else if (e.key === "End") next = tabs[tabs.length - 1];
+      else if (e.key === " ") { e.preventDefault(); tabs[i].click(); return; }
+      if (!next) return;
+      e.preventDefault();
+      next.focus();
+      next.click();
     });
 
-    // ---- Datakällor (live) ----
-    this._offs.push(data.watch("classes", (docs) => { classes = docs; render(); }));
-
-    const cid = activeId();
-    if (cid) {
-      // Planeringar är privata per lärare — visa bara den inloggades egna.
-      this._offs.push(data.watch(plansPathFor(cid), (docs) => { plans = docs; render(); }));
-      this._offs.push(data.watch(noteStatsPath(cid), (docs) => { noteStats = docs; render(); }));
-      this._offs.push(data.watch(praisePath(cid), (docs) => {
-        praiseBoard = docs.find((d) => d.id === PRAISE_DOC) ?? null;
-        render();
-      }));
-      this._offs.push(data.watch(`classes/${cid}/sessions`, (docs) => { sessions = docs; render(); }));
-      this._offs.push(data.watch(classActionsPath(cid), (docs) => { actions = docs; render(); }));
-      this._offs.push(data.watch(classActionRepliesPath(cid), (docs) => { replies = docs; render(); }));
-      this._offs.push(data.watch(`classes/${cid}/settings`, (docs) => {
-        settingsDocs = docs;
-        initials = docs.find((d) => d.id === "display")?.value?.nameDisplay === "initials";
-        render();
-      }));
-      // Lokala noteringar + exportlogg: bara för att varna innan gallringen
-      // raderar uppföljningar som aldrig laddats ned (issue #33).
-      this._offs.push(data.watch(`classes/${cid}/notes`, (docs) => { localNotes = docs; render(); }));
-      this._offs.push(data.watch(reportsPath(cid), (docs) => {
-        reportLog = docs.find((d) => d.id === REPORTS_LOG_ID) ?? null;
-        render();
-      }));
-      // Gallringsinställningen är LOKAL per dator (issue #32).
-      this._offs.push(data.watch(`classes/${cid}/privacy`, (docs) => {
-        const value = docs.find((d) => d.id === "privacy")?.value;
-        const weeks = value?.noteRetentionWeeks;
-        retentionWeeks = Number.isFinite(weeks) && weeks > 0 ? weeks : DEFAULT_RETENTION_WEEKS;
-        retentionAwaiting = Boolean(value?.awaitingChoice);
-        render();
-      }));
-    }
-
-    render();
+    // Fliken följer adressen: #/oversikt/<flik> → store.modeSub (routern).
+    // På väg till ett annat läge ändras modeSub innan routern hunnit
+    // unmounta oss — rör då varken flik eller adress.
+    this._offs.push(store.subscribe(["modeSub"], ({ modeSub, modeId }) => {
+      if (modeId === "oversikt") show(modeSub);
+    }));
+    this._offs.push(unmountPanel);
   },
 
   async unmount() {

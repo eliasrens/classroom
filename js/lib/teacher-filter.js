@@ -1,7 +1,7 @@
 /**
  * LÄRARFILTER — "Alla / Mina / en viss lärare" över attribuerade
  * dokument (pass, noteringar: createdBy/createdByName, se DATAMODELL.md).
- * Delas av Läge 3:s statistik och veckoarkivet under Statistik.
+ * Delas av Läge 3:s statistik, veckoarkivet och klassåtgärderna (Översikt).
  *
  * Filtervärden: "all" | "mine" | "t:<uid>" | "unknown" (gamla dokument
  * utan attribution).

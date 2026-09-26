@@ -62,7 +62,7 @@ export function renderPatterns(el, api) {
           </select>
         </label>
         <span class="pat__sum">${negNotes.length} noteringar, ${posCount} positiva${student ? "" : " — mönster per moment, inte per elev"}</span>
-        <a class="pat__archive" href="#/statistik">Tidigare veckor i Statistik</a>
+        <a class="pat__archive" href="#/oversikt/veckor">Tidigare veckor under Översikt › Veckor</a>
       </div>
 
       ${negNotes.length === 0 && posCount === 0 ? `
