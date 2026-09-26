@@ -431,7 +431,6 @@ export default {
     // listan innehåller elevdata och lagras bara på den här datorn.
     let praiseItems = [];
     let students = [];
-    let initials = false;
 
     const settingDoc = (id) => this._settings?.find((d) => d.id === id) ?? null;
 
@@ -468,7 +467,7 @@ export default {
       return praiseItems.map((p) => {
         if (p.kind === "free") return p.text;
         const s = students.find((x) => x.id === p.studentId);
-        return s ? studentLabel(s, { initials }) : null;
+        return s ? studentLabel(s) : null;
       }).filter(Boolean);
     }
     const praise = () => ({
@@ -481,7 +480,6 @@ export default {
     function applySharedSettings(docs) {
       this._settings = docs;
       subjects = mergedSubjects(docs);
-      initials = docs.find((d) => d.id === "display")?.value?.nameDisplay === "initials";
     }
 
     // Bra jobbat läses ur den lokala lagringen (aldrig molnet).

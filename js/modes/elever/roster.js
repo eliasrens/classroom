@@ -8,10 +8,8 @@
  */
 
 import { icon } from "../../lib/icons.js";
-import { initialsFor } from "../../lib/names.js";
 import {
   studentsPath, activeStudents, escapeHtml, isAssignableKey,
-  saveNameDisplay,
 } from "./shared.js";
 
 export function renderRoster(el, api) {
@@ -43,10 +41,6 @@ export function renderRoster(el, api) {
           <input id="roster-name" type="text" placeholder="Elevens förnamn" autocomplete="off" required>
           <button class="btn btn--primary" type="submit">${icon("plus")}Lägg till</button>
         </form>
-        <label class="roster__initials">
-          <input type="checkbox" data-initials ${api.initials ? "checked" : ""}>
-          Visa initialer i stället för förnamn (gäller hela lärarvyn)
-        </label>
         <p class="roster__local-note">Elevlistan och noteringarna sparas <strong>bara på den här
           datorn</strong> — ingenting om enskilda elever lämnar den. Det som ska sparas
           långsiktigt dokumenteras i skolans system.</p>
@@ -109,11 +103,6 @@ export function renderRoster(el, api) {
     ta.value = "";
     api.toast(`${names.length} elever tillagda (endast förnamn).`);
     api.refresh();
-  });
-
-  // ---- Initial-toggle ----
-  el.querySelector("[data-initials]").addEventListener("change", (e) => {
-    void saveNameDisplay(api.data, api.cid, e.target.checked);
   });
 
   // ---- Radåtgärder ----
@@ -207,7 +196,6 @@ function rowHtml(s, api, { editingId, capturingId }) {
   return `
     <li class="roster__row" data-id="${s.id}">
       <span class="roster__name">${api.label(s)}</span>
-      <span class="roster__initials-preview" title="Initialer (reservläget)">${escapeHtml(initialsFor(s.firstName))}${s.tag ? ` ${escapeHtml(s.tag)}` : ""}</span>
       <span class="roster__spacer"></span>
       ${s.id === capturingId
         ? `<span class="roster__capture">Tryck en tangent… (Esc avbryter, Backspace tar bort)</span>`

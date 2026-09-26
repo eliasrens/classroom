@@ -77,10 +77,9 @@ export default {
    renderas i elevvyn.
    Nedräkningar/klockor: använd `js/lib/timer.js` (tidsstämpelbaserad,
    bakgrundssäker) — aldrig egna tick-räknare.
-5. **Elevnamn**: visa ALLTID namn via `studentLabel()`/`initialsFor()`
-   i `js/lib/names.js` (endast förnamn + valfri tag; initial-läget
-   styrs av klassinställningen `settings/display`, se DATAMODELL.md).
-   Rendera aldrig `firstName` rått — då bryts initial-reservläget.
+5. **Elevnamn**: visa ALLTID namn via `studentLabel()` i
+   `js/lib/names.js` (endast förnamn + valfri tag, se DATAMODELL.md).
+   Rendera aldrig `firstName` rått — då tappas särskiljaren (`tag`).
 6. **Styling & designspråk**: använd designtokens (`css/tokens.css`).
    Lägesspecifik CSS läggs i `css/modes/<id>.css` och länkas från
    `index.html`. Ämnesfärger + läsbar textfärg: `subjectStyle()` i

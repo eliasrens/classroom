@@ -8,8 +8,9 @@
  *  1. LOKAL GALLRING: noteringar auto-raderas efter valbart antal
  *     veckor. Inställningen är numera LOKAL per dator
  *     (classes/{cid}/privacy → value.noteRetentionWeeks, routas till
- *     lokal lagring av datalagret). Standard: 12 veckor (en termin),
- *     med val ner till 1 vecka. Gallringen tar bara bort de LOKALA
+ *     lokal lagring av datalagret). Standard: 20 veckor (ca en termin,
+ *     issue #60), med val ner till 1 vecka. Ett aktivt sparat val
+ *     behålls alltid. Gallringen tar bara bort de LOKALA
  *     noteringarna — de anonyma noteStats-strecken i molnet är
  *     klasstatistik utan elevkoppling och behålls som klassens
  *     historik (arkivet i Statistik).
@@ -21,7 +22,7 @@
  *     propagerar till Firestore.
  *
  *  3. Endast förnamn lagras om elever (se DATAMODELL.md /
- *     js/lib/names.js); namnvisningen hanteras av namnhjälparna.
+ *     js/lib/names.js).
  *
  * INGET av detta kan nå elevskärmen: noteringar renderas bara i
  * lärarlägen (se registry STUDENT_MODE_IDS) och all data-radering sker
@@ -36,8 +37,9 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const PRIVACY_SETTING_ID = "privacy";
 
-/** Standard: 12 veckor (en termin). */
-export const DEFAULT_RETENTION_WEEKS = 12;
+/** Standard: 20 veckor (ca en termin, issue #60). Gäller datorer/klasser
+ *  där läraren inte gjort ett aktivt val — ett sparat val ändras aldrig. */
+export const DEFAULT_RETENTION_WEEKS = 20;
 
 /** Giltiga val för hur länge noteringar sparas lokalt (veckor). */
 export const RETENTION_OPTIONS = [
@@ -45,13 +47,30 @@ export const RETENTION_OPTIONS = [
   { weeks: 2, label: "2 veckor" },
   { weeks: 4, label: "4 veckor" },
   { weeks: 8, label: "8 veckor" },
-  { weeks: 12, label: "12 veckor (en termin)" },
-  { weeks: 20, label: "20 veckor" },
+  { weeks: 12, label: "12 veckor" },
+  { weeks: 20, label: "20 veckor (ca en termin)" },
 ];
 
 // LOKAL samling (routas av datalagret till js/data/local-only.js).
 const privacyPath = (cid) => `classes/${cid}/privacy`;
 const notesPath = (cid) => `classes/${cid}/notes`;
+
+/**
+ * Tolka ett privacy-dokuments värde → { noteRetentionWeeks, awaitingChoice }.
+ *
+ *  - Inget dokument / ogiltigt värde → standard (20 veckor).
+ *  - Ett sparat aktivt val (utan awaitingChoice) behålls som det är.
+ *  - awaitingChoice: det lagrade veckovärdet var bara migreringens
+ *    platshållare (inget aktivt val) — förvalet blir standard.
+ */
+export function parsePrivacy(value) {
+  const awaitingChoice = Boolean(value?.awaitingChoice);
+  const weeks = value?.noteRetentionWeeks;
+  return {
+    noteRetentionWeeks: !awaitingChoice && Number.isFinite(weeks) && weeks > 0 ? weeks : DEFAULT_RETENTION_WEEKS,
+    awaitingChoice,
+  };
+}
 
 /**
  * Läs datorns gallringsinställning.
@@ -62,16 +81,12 @@ const notesPath = (cid) => `classes/${cid}/notes`;
  * inställning alls — det gamla standardvalet) sätter migreringen
  * flaggan, och gallringen körs INTE förrän läraren aktivt bekräftat
  * en lagringstid i Översikten. Utan skyddet hade de lokala
- * noteringarna äldre än 12 veckor raderats tyst vid första öppningen
+ * noteringarna äldre än standardtiden raderats tyst vid första öppningen
  * — och lokala noteringar finns ingen annanstans.
  */
 export async function loadPrivacy(data, cid) {
   const doc = await data.get(privacyPath(cid), PRIVACY_SETTING_ID);
-  const weeks = doc?.value?.noteRetentionWeeks;
-  return {
-    noteRetentionWeeks: Number.isFinite(weeks) && weeks > 0 ? weeks : DEFAULT_RETENTION_WEEKS,
-    awaitingChoice: Boolean(doc?.value?.awaitingChoice),
-  };
+  return parsePrivacy(doc?.value);
 }
 
 /** Spara datorns gallringsinställning. Ett aktivt val häver alltid

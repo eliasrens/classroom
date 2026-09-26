@@ -30,7 +30,7 @@ import { renderCard } from "./elever/card.js";
 import { renderPatterns } from "./elever/patterns.js";
 import { renderReports, renderReportBanner, closeReportWorkspace, REPORTS_TAB } from "./elever/reports.js";
 import { reportsPath } from "./elever/report-data.js";
-import { DEFAULT_RETENTION_WEEKS } from "../lib/privacy.js";
+import { parsePrivacy } from "../lib/privacy.js";
 
 const TABS = [
   { id: "registrera", title: "Registrera", icon: "check", render: renderRegister },
@@ -83,16 +83,15 @@ export default {
       students: [],
       notes: [],
       settings: { ...DEFAULT_SETTINGS },
-      initials: false,
       tab: sessionStorage.getItem("classroom:elever:tab") ?? "registrera",
       undoStack: [],
       cardStudentId: null, // vald elev i Elevkort-fliken (behålls vid flikbyte)
       reportDocs: {},      // classes/{cid}/reports (lokalt): exportlogg, påminnelser, namnpar
       privacy: null,       // { noteRetentionWeeks, awaitingChoice } — för gallringspåminnelsen
 
-      /** Visningsnamn — ALLTID via studentLabel så initial-läget följs. */
+      /** Visningsnamn — ALLTID via studentLabel (förnamn + ev. särskiljare). */
       label(student) {
-        return escapeHtml(studentLabel(student, { initials: api.initials }));
+        return escapeHtml(studentLabel(student));
       },
       studentById(id) {
         return api.students.find((s) => s.id === id) ?? null;
@@ -114,7 +113,7 @@ export default {
         });
         api.undoStack.push(id);
         const s = api.studentById(studentId);
-        api.toast(`Noterat: ${s ? studentLabel(s, { initials: api.initials }) : "?"} — ${noteTypeById(typeId)?.name ?? typeId}`);
+        api.toast(`Noterat: ${s ? studentLabel(s) : "?"} — ${noteTypeById(typeId)?.name ?? typeId}`);
       },
 
       async undoLast() {
@@ -216,8 +215,6 @@ export default {
     cleanup.push(data.watch(settingsPath(cid), (docs) => {
       const s = docs.find((d) => d.id === "elevlista");
       if (s?.value) api.settings = { ...DEFAULT_SETTINGS, ...s.value };
-      const disp = docs.find((d) => d.id === "display");
-      api.initials = disp?.value?.nameDisplay === "initials";
       safeRefresh();
     }));
 
@@ -228,12 +225,7 @@ export default {
       safeRefresh();
     }));
     cleanup.push(data.watch(`classes/${cid}/privacy`, (docs) => {
-      const value = docs.find((d) => d.id === "privacy")?.value;
-      const weeks = value?.noteRetentionWeeks;
-      api.privacy = {
-        noteRetentionWeeks: Number.isFinite(weeks) && weeks > 0 ? weeks : DEFAULT_RETENTION_WEEKS,
-        awaitingChoice: Boolean(value?.awaitingChoice),
-      };
+      api.privacy = parsePrivacy(docs.find((d) => d.id === "privacy")?.value);
       safeRefresh();
     }));
     cleanup.push(() => closeReportWorkspace(api));

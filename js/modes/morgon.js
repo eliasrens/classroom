@@ -39,7 +39,6 @@ export default {
 
     let settings = normalize(null);
     let students = [];
-    let initials = false;
     let currentBgUrl = null;
 
     el.innerHTML = renderShell(isTeacher);
@@ -112,7 +111,7 @@ export default {
     function praiseName(p) {
       if (p.kind === "free") return p.text;
       const s = students.find((x) => x.id === p.studentId);
-      return s ? studentLabel(s, { initials }) : null;
+      return s ? studentLabel(s) : null;
     }
 
     function renderNametavla() {
@@ -363,7 +362,7 @@ export default {
         ntStudents.innerHTML = students.map((s) => `
           <label class="morgon__ntstudent">
             <input type="checkbox" data-student="${escapeAttr(s.id)}">
-            <span>${escapeHtml(studentLabel(s, { initials }))}</span>
+            <span>${escapeHtml(studentLabel(s))}</span>
           </label>`).join("");
         syncNtStudents();
       }
@@ -385,13 +384,8 @@ export default {
       ? watchMorning(data, classId, (value) => applyExternal(value))
       : () => {});
 
-    // Namnvisning (initialer) + elevlista (för namntavlan)
+    // Elevlista (för namntavlan)
     if (classId) {
-      stops.push(data.watch(`classes/${classId}/settings`, (docs) => {
-        const disp = docs.find((d) => d.id === "display");
-        const next = disp?.value?.nameDisplay === "initials";
-        if (next !== initials) { initials = next; renderNametavla(); this._renderNtStudents?.(); }
-      }));
       stops.push(data.watch(`classes/${classId}/students`, (docs) => {
         students = docs.filter((s) => s.active !== false)
           .sort((a, b) => String(a.firstName).localeCompare(String(b.firstName), "sv"));

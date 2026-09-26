@@ -20,6 +20,7 @@ import { initStudentPanel } from "./ui/student-panel.js";
 import { createSyncBus, isPreviewWindow, announceStudentScreen, watchStudentScreen } from "./sync.js";
 import { icon } from "./lib/icons.js";
 import { runRetention } from "./lib/privacy.js";
+import { removeLegacyNameDisplay } from "./lib/names.js";
 import { startWeekRhythm } from "./lib/week-rhythm.js";
 import { clockState, clockCalibrated, onClockChange, CLOCK_WARN_MS } from "./lib/clock.js";
 import { getProjectorScreen, screenOpenFeatures } from "./lib/screens.js";
@@ -158,6 +159,21 @@ function startApp() {
   };
   store.subscribe(["classId", "view"], maybePurge);
   onClockChange(maybePurge);
+
+  // STÄDNING (issue #60): initial-läget är borttaget. Ett kvarglömt
+  // settings/display i molnet ignoreras överallt och tas bort här när
+  // klassen öppnas i lärarvyn (idempotent). Aldrig från ett elevfönster.
+  let stopDisplayCleanup = null;
+  const cleanupLegacyDisplay = () => {
+    stopDisplayCleanup?.();
+    stopDisplayCleanup = null;
+    const { classId, view } = store.get();
+    if (view !== "teacher" || !classId) return;
+    stopDisplayCleanup = data.watch(`classes/${classId}/settings`, (docs) => {
+      void removeLegacyNameDisplay(data, classId, docs);
+    });
+  };
+  store.subscribe(["classId", "view"], cleanupLegacyDisplay);
 
   // KLOCKVARNING (lärarvyn): går datorns klocka mer än ~2 min fel mot
   // servern visas en diskret varning i topbaren. Skrivningarna stämplas

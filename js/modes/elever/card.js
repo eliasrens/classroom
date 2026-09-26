@@ -296,7 +296,7 @@ function buildExport(student, api) {
   const rows = api.notes
     .filter((n) => n.studentId === student.id && n.createdAt >= from && n.createdAt <= to)
     .sort((a, b) => a.createdAt - b.createdAt);
-  const name = studentLabel(student, { initials: api.initials });
+  const name = studentLabel(student);
   const lines = [
     `Uttag: ${name} — ${api._cardFrom} till ${api._cardTo}`,
     `${rows.length} noteringar`,

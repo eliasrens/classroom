@@ -73,7 +73,6 @@ export function mountVeckor(el, ctx, { tabHref }) {
   let archive = [];
   let settingsDocs = [];
   let subjects = mergedSubjects([]);
-  let initials = false;
   let morning = normalizeMorning(null); // praise/weekOf ur den LOKALA listan
   let goalCfg = normalizeGoalSettings(null);
   let actions = [];    // klassåtgärder (moln, delade, issue #34) — bara antalet visas här
@@ -115,7 +114,7 @@ export function mountVeckor(el, ctx, { tabHref }) {
   const praiseName = (p) => {
     if (p.kind === "free") return p.text;
     const s = students.find((x) => x.id === p.studentId);
-    return s ? studentLabel(s, { initials }) : null;
+    return s ? studentLabel(s) : null;
   };
 
   // ---- Rendering ----
@@ -468,7 +467,7 @@ export function mountVeckor(el, ctx, { tabHref }) {
                 <th scope="row">
                   <button type="button" class="stat-student" data-student="${escapeHtml(student.id)}"
                     data-focus="s-${escapeHtml(student.id)}" aria-expanded="${open}">
-                    ${icon(open ? "chevron-down" : "chevron-right")}${escapeHtml(studentLabel(student, { initials }))}
+                    ${icon(open ? "chevron-down" : "chevron-right")}${escapeHtml(studentLabel(student))}
                   </button>
                 </th>
                 <td>${count(list, (n) => n.kind === "typ" && !n.positive)}</td>
@@ -589,7 +588,6 @@ export function mountVeckor(el, ctx, { tabHref }) {
   offs.push(data.watch(`classes/${cid}/settings`, (docs) => {
     settingsDocs = docs;
     subjects = mergedSubjects(settingsDocs);
-    initials = docs.find((d) => d.id === "display")?.value?.nameDisplay === "initials";
     goalCfg = normalizeGoalSettings(docs.find((d) => d.id === "trafikljus")?.value);
     scheduleRender();
   }));

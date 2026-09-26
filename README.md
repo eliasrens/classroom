@@ -65,7 +65,7 @@ js/
   lib/class-actions.js  klassåtgärder (#34): modell, namnspärr, koppling till klasstatistiken
   lib/color.js          ämnespalett + automatisk luminans/kontrast-uträkning
   lib/icons.js          linje-ikoner (inline-SVG) — inga emoji i gränssnittet
-  lib/names.js          elevnamn: endast förnamn, valfri tag, initial-läge
+  lib/names.js          elevnamn: endast förnamn, valfri tag
   lib/privacy.js        integritet: auto-radering av noteringar + radera all klassdata
   lib/report-crypto.js  krypterade rapportfiler (.klassrum): WebCrypto AES-GCM + PBKDF2
   modes/elever/report-*.js, reports.js

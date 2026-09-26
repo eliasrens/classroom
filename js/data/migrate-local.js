@@ -26,7 +26,7 @@
  * (t.ex. två fönster som startar samtidigt) blir resultatet detsamma.
  * Gallringsinställningen (settings/privacy → noteRetentionWeeks)
  * kopieras också till den lokala privacy-samlingen (nu en lokal
- * inställning, standard 12 veckor — se js/lib/privacy.js).
+ * inställning, standard 20 veckor — se js/lib/privacy.js).
  */
 
 import { readCollection, writeCollection, storageKeyFor, pathFromStorageKey } from "./local.js";
@@ -98,7 +98,7 @@ function migrateClass(cid) {
   // Gallringsinställningen blir lokal (dokumentet i molnet lämnas orört).
   // SKYDD: hade datorn "Spara tills vidare" (null) eller ingen inställning
   // alls — det gamla standardvalet — får den INTE tyst börja gallra med
-  // nya standardvärdet 12 veckor: lokala noteringar finns bara här och
+  // nya standardvärdet: lokala noteringar finns bara här och
   // hade raderats oåterkalleligt vid första öppningen. awaitingChoice
   // pausar gallringen (js/lib/privacy.js) tills läraren aktivt bekräftar
   // en lagringstid i Översikten.
@@ -108,7 +108,7 @@ function migrateClass(cid) {
   if (!local.privacy) {
     local.privacy = Number.isFinite(weeks) && weeks > 0
       ? { id: "privacy", value: { noteRetentionWeeks: weeks }, updatedAt: Date.now() }
-      : { id: "privacy", value: { noteRetentionWeeks: 12, awaitingChoice: true }, updatedAt: Date.now() };
+      : { id: "privacy", value: { noteRetentionWeeks: 20, awaitingChoice: true }, updatedAt: Date.now() };
     writeLocalCollection(privacyPath, local);
   }
 
