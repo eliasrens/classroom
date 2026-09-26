@@ -3,28 +3,8 @@
 
 /* ---- Skal & flikar ---- */
 
-.elever { display: flex; flex-direction: column; gap: var(--space-3); }
-
-.elever__tabs { display: flex; gap: var(--space-1); flex-wrap: wrap; }
-
-.elever__tab {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid transparent;
-  border-radius: var(--radius-m);
-  background: none;
-  color: var(--color-ink-soft);
-  cursor: pointer;
-}
-.elever__tab:hover { background: var(--color-surface-alt); color: var(--color-ink); }
-.elever__tab[aria-current="page"] {
-  background: var(--color-accent-soft);
-  border-color: var(--color-line);
-  color: var(--color-accent-text);
-  font-weight: 600;
-}
+/* Sidram, rytm och flikrad kommer från .page / .page-tabs / .page-tab
+   (css/app.css, issue #61) — samma som Översikten. */
 
 .elever__toast {
   position: fixed;

@@ -228,6 +228,69 @@ html[data-theme="student"] .teacher-only { display: none !important; }
    lägets innehåll beter sig som om det låg direkt i <main>. */
 .view__slot { display: contents; }
 
+/* ---- Sidram för lärarsidorna (issue #61) ----
+   .view ÄR ramen: samma maxbredd, sidomarginal och avstånd till topbaren i
+   alla lägen (tokens i css/tokens.css), så inget hoppar i sidled vid
+   lägesbyte. Lägena lägger ingen egen max-width/padding på sin rot.
+   Medvetet fullbleed: morgonskärmen (css/modes/morgon.css). Elevvyn
+   (data-theme="student") har egen .view-regel ovan och påverkas inte. */
+html[data-theme="teacher"] {
+  /* Rullisten får alltid plats → centrerad ram flyttar sig inte när en
+     sida blir lång nog att rulla. */
+  scrollbar-gutter: stable;
+}
+html[data-theme="teacher"] .view {
+  max-width: var(--page-max-width);
+  padding: var(--page-top) var(--page-gutter);
+}
+
+/* Standardsida: rubrik/flikrad överst, block under med samma rytm. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--page-gap);
+  min-width: 0;
+}
+
+/* Gemensam flikrad — EN stil för alla lärarsidor med flikar.
+   Fungerar både för <a role="tab"> (Översikt) och <button> (Elevlista). */
+.page-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0 0 var(--space-2);
+  border-bottom: 1px solid var(--color-line);
+}
+.page-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-m);
+  background: none;
+  font: inherit;
+  line-height: 1.5;
+  color: var(--color-ink-soft);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.page-tab:hover { background: var(--color-surface-alt); color: var(--color-ink); }
+.page-tab[aria-selected="true"],
+.page-tab[aria-current="page"] {
+  background: var(--color-accent-soft);
+  border-color: var(--color-line);
+  color: var(--color-accent-text);
+  font-weight: 600;
+}
+
+@media print {
+  .page-tabs { display: none !important; }
+}
+
 html[data-theme="student"] .view {
   display: flex;
   flex-direction: column;

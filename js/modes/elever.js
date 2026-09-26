@@ -157,8 +157,8 @@ export default {
 
     // ---- Skal ----
     el.innerHTML = `
-      <div class="elever">
-        <nav class="elever__tabs" aria-label="Elevlista — flikar"></nav>
+      <div class="elever page">
+        <nav class="elever__tabs page-tabs" aria-label="Elevlista — flikar"></nav>
         <div class="elever__banner teacher-only" hidden></div>
         <div class="elever__body"></div>
         <div class="elever__toast" role="status" aria-live="polite"></div>
@@ -169,7 +169,7 @@ export default {
 
     function renderTabs() {
       tabsEl.innerHTML = TABS.map((t) => `
-        <button class="elever__tab" data-tab="${t.id}"
+        <button class="elever__tab page-tab" data-tab="${t.id}"
           ${t.id === api.tab ? 'aria-current="page"' : ""}>${icon(t.icon)}<span>${t.title}</span></button>`).join("");
     }
     tabsEl.addEventListener("click", (e) => {
