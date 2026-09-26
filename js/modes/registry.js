@@ -8,25 +8,23 @@
  * (js/ui/help.js) och spärren för elevskärmen läses härifrån.
  *
  * Varje post i MODES anger:
- *   group     "classroom" — Rutiner: alltid i menyraden med ikon + kort
- *                           namn. Kan visas för eleverna.
- *             "tools"     — Verktyg (issue #52): delad knapp i menyraden
- *                           som visar senast använda verktyget + ▾ med
- *                           alla verktyg. Kan också visas för eleverna —
- *                           gruppen påverkar BARA menyn.
+ *   group     "classroom" — Rutiner (Morgon, Lektion). Kan visas för eleverna.
+ *             "tools"     — Verktyg (issue #52). Kan också visas för eleverna.
  *             "teacher"   — Lärare ▾: rullgardinen, ALDRIG elevskärmen.
- *   short     kort namn i menyn (valfritt; annars modulens title).
+ *             Rutiner och verktyg listas under "Verktyg ▾" (två rubriker);
+ *             varje lärare fäster själv vilka av dem som står direkt i
+ *             övermenyn (js/lib/menu-pins.js). Gruppen påverkar BARA menyn.
+ *   short     kort namn i övermenyn (valfritt; annars modulens title).
  *   order     ordning inom gruppen (valfritt; lägre först, annars
  *             ordningen i MODES). Verktygen har luckor (10, 20, 40 …) så
  *             att ett nytt verktyg kan läggas mellan två andra.
- *   priority  (classroom) lägre = viktigare. När inte ens ikonerna ryms
- *             flyttas de med HÖGST värde först till "Mer ▾".
  *
  * Kortkommandona numrerar rutinerna först, sedan verktygen och sist
- * lärarlägena (1, 2, 3 …), var grupp i sin ordning. Ett nytt läge läggs
- * alltså bara in här med sin grupp och ordning — menykoden, siffrorna och
- * hjälpen följer med av sig själva. Tankekarta (#53) får
- * `group: "tools", order: 30` och hamnar mellan Skrivtavla och Lottning.
+ * lärarlägena (1, 2, 3 …), var grupp i sin ordning — oberoende av vad som
+ * är fäst. Ett nytt läge läggs alltså bara in här med sin grupp och
+ * ordning — menyn, siffrorna och hjälpen följer med av sig själva.
+ * Tankekarta (#53) får `group: "tools", order: 30` och hamnar mellan
+ * Skrivtavla och Lottning. Ett nytt verktyg är inte fäst från början.
  */
 import morgon from "./morgon.js";
 import lektion from "./lektion.js";
@@ -46,9 +44,9 @@ export const NAV_GROUPS = {
 const entry = (mod, meta) => Object.assign(mod, meta);
 
 export const MODES = [
-  // ---- Rutiner (menyraden; kan visas på elevskärmen) ----
-  entry(morgon, { group: "classroom", short: "Morgon", priority: 1 }),
-  entry(lektion, { group: "classroom", short: "Lektion", priority: 2 }),
+  // ---- Rutiner (kan visas på elevskärmen) ----
+  entry(morgon, { group: "classroom", short: "Morgon" }),
+  entry(lektion, { group: "classroom", short: "Lektion" }),
   // ---- Verktyg (kan visas på elevskärmen). order 30 = Tankekarta (#53). ----
   entry(trafikljus, { group: "tools", short: "Trafikljus", order: 10 }),
   entry(skriv, { group: "tools", short: "Skrivtavla", order: 20 }),
