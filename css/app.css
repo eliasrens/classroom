@@ -302,6 +302,9 @@ html[data-theme="teacher"] .view {
 .collapsible__inner { grid-template-columns: minmax(0, 1fr); min-width: 0; }
 .collapsible { display: grid; }
 .collapsible__heading { margin: 0; font: inherit; }
+/* Rubrikrad med egna kontroller före/efter knappen (lead/trail). */
+.collapsible__heading--row { display: flex; align-items: center; gap: var(--space-2); }
+.collapsible__heading--row > .collapsible__head { flex: 1; min-width: 0; }
 .collapsible__head {
   display: flex;
   align-items: center;

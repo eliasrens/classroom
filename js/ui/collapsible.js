@@ -29,17 +29,20 @@ const esc = (s) =>
 /**
  * Markup för en sektion. `title` och `icon` är färdig HTML (ikon-SVG ok),
  * `body` sektionens innehåll. `persist: false` = spara inte läget.
+ * `lead`/`trail` (valfria, färdig HTML) hamnar i rubrikraden före resp. efter
+ * knappen — för kontroller som inte får ligga inuti knappen (en kryssruta,
+ * en egen knapp). Rubrikraden blir då en flexrad (.collapsible__heading--row).
  */
-export function collapsibleHTML({ key, title, icon = "", body = "", className = "", persist = true, level = 3 }) {
+export function collapsibleHTML({ key, title, icon = "", body = "", className = "", persist = true, level = 3, lead = "", trail = "" }) {
   const id = `cl-${++uid}`;
   const h = `h${Math.min(Math.max(level, 2), 6)}`;
   return `<section class="collapsible ${className}" data-collapsible="${esc(key)}" data-open="false"${persist ? "" : ' data-persist="false"'}>
-    <${h} class="collapsible__heading">
+    <${h} class="collapsible__heading${lead || trail ? " collapsible__heading--row" : ""}">${lead}
       <button type="button" class="collapsible__head" id="${id}-head" aria-expanded="false" aria-controls="${id}-body">
         <span class="collapsible__arrow" aria-hidden="true"></span>
         <span class="collapsible__title">${icon}<span>${title}</span></span>
         <span class="collapsible__summary" data-summary></span>
-      </button>
+      </button>${trail}
     </${h}>
     <div class="collapsible__body" id="${id}-body" role="region" aria-labelledby="${id}-head">
       <div class="collapsible__inner">${body}</div>
@@ -60,8 +63,9 @@ function writeStored(scope, key, open) {
 /**
  * Kopplar alla `[data-collapsible]` under `root` (även sådana som läggs till
  * senare — klick hanteras via delegering). `defaults` = { key: öppen? } när
- * inget sparat läge finns. `onToggle(key, open)` anropas efter varje växling
- * som läraren gör.
+ * inget sparat läge finns — eller en funktion `(key) => öppen?` för nycklar
+ * som inte är kända i förväg (t.ex. en per vecka). `onToggle(key, open)`
+ * anropas efter varje växling som läraren gör.
  */
 export function mountCollapsibles(root, { scope, defaults = {}, onToggle } = {}) {
   const find = (key) => root.querySelector(`[data-collapsible="${CSS.escape(key)}"]`);
@@ -79,7 +83,8 @@ export function mountCollapsibles(root, { scope, defaults = {}, onToggle } = {})
       sec.dataset.clReady = "";
       const key = sec.dataset.collapsible;
       const stored = persists(sec) ? readStored(scope, key) : null;
-      apply(sec, stored ?? !!defaults[key]);
+      const fallback = typeof defaults === "function" ? defaults(key) : defaults[key];
+      apply(sec, stored ?? !!fallback);
     }
   }
 

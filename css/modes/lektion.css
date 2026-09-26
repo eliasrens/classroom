@@ -90,6 +90,11 @@
   color: var(--color-ink-soft);
   margin: 0 0 var(--space-1);
 }
+/* "Om lektionen" och "Fält" som fällbara block (issue #72). */
+.lesson-fold .collapsible__heading--row .ca-add { flex: none; }
+/* Klassåtgärd syns på rubrikraden när "Om lektionen" är öppet (som förut);
+   infällt får sammanfattningen hela raden. */
+.lesson-fold[data-open="false"] .ca-add { display: none; }
 .lesson-panel .btn-row { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .lesson-panel label.field-label {
   font-size: 0.8rem;
@@ -150,22 +155,27 @@
 /* Sparade planeringar-lista — grupperad per vecka */
 .plan-list { display: flex; flex-direction: column; gap: var(--space-3); max-height: 22rem; overflow: auto; }
 .plan-week { display: flex; flex-direction: column; gap: 2px; }
-.plan-week__head {
+/* Veckogruppen är ett fällbart block (issue #72, .collapsible i app.css):
+   rubriken ligger kvar överst när listan scrollar. Infälld vecka visar
+   antalet planeringar; en lång veckoetikett kortas med … i stället. */
+.plan-week-fold > .collapsible__heading {
   position: sticky;
   top: 0;
   z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 2px 0;
   background: var(--color-bg);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-ink-soft);
 }
-.plan-week__head input { accent-color: var(--color-accent); }
+.plan-week-fold .collapsible__head {
+  min-height: 0;
+  padding-block: 2px;
+  font-size: 0.72rem;
+}
+.plan-week-fold .collapsible__title { flex: 0 1 auto; min-width: 0; letter-spacing: 0.04em; }
+.plan-week-fold .collapsible__title > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-week-fold[data-open="false"] .plan-week__range { display: none; }
+.plan-week-fold .collapsible__summary { flex: none; margin-left: auto; }
+.plan-week-fold[data-open="true"] .collapsible__summary { display: none; }
+.plan-week-fold > .collapsible__body > .collapsible__inner { gap: 2px; }
+.plan-week__check { flex: none; margin: 0; accent-color: var(--color-accent); }
 .plan-list__row { display: flex; align-items: stretch; gap: 2px; }
 .plan-list__act { flex: none; color: var(--color-ink-soft); }
 .plan-list__check { flex: none; margin: 0; accent-color: var(--color-accent); pointer-events: none; }

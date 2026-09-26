@@ -4,6 +4,7 @@
  *   node docs/test-collapsible.mjs
  *
  * Rena delar av js/ui/collapsible.js utan webbläsare:
+ *   - lead/trail (issue #72): kontroller i rubrikraden före/efter knappen
  *   - collapsibleHTML: knapp med aria-expanded/aria-controls som pekar på
  *     innehållets id, rubrik och sammanfattningsplats, persist-flaggan
  *   - firstWords: "tomt" för tomt fält, hela texten när den är kort,
@@ -43,6 +44,12 @@ const ok = (cond, msg) => eq(!!cond, true, msg);
   ok(noPersist.includes('data-persist="false"'), "persist:false markeras");
   ok(/<h2 class="collapsible__heading">/.test(noPersist), "rubriknivå kan väljas");
   ok(collapsibleHTML({ key: 'a"b', title: "t" }).includes('data-collapsible="a&quot;b"'), "nyckeln escapas");
+  ok(!html.includes("collapsible__heading--row"), "vanlig rubrik utan extra kontroller");
+  // lead/trail (issue #72): kontroller i rubrikraden, UTANFÖR knappen
+  const row = collapsibleHTML({ key: "week:2026-09-21", title: "Vecka 39", lead: '<input type="checkbox" data-week>', trail: '<button class="ca-add">x</button>' });
+  ok(row.includes("collapsible__heading--row"), "rubrikraden blir flexrad med lead/trail");
+  ok(/<input type="checkbox" data-week>\s*<button type="button" class="collapsible__head"/.test(row), "lead ligger före knappen");
+  ok(/<\/button><button class="ca-add">x<\/button>/.test(row), "trail ligger efter knappen");
 }
 
 // ---- firstWords ----
