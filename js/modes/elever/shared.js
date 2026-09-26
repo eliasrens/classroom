@@ -10,7 +10,6 @@
  *   classes/{cid}/students/{id}   — firstName, tag, active, hotkey
  *   classes/{cid}/notes/{id}      — se noteFields nedan
  *   classes/{cid}/settings/elevlista — value: { defaultTypeId, labels, sessionStart }
- *   classes/{cid}/settings/display   — value: { nameDisplay }
  */
 
 import { plansPath as plansPathFor, attribution } from "../../data/plans.js";
@@ -56,18 +55,6 @@ export async function loadModeSettings(data, cid) {
 
 export async function saveModeSettings(data, cid, value) {
   await data.put(settingsPath(cid), { id: "elevlista", value });
-}
-
-export async function loadNameDisplay(data, cid) {
-  const doc = await data.get(settingsPath(cid), "display");
-  return doc?.value?.nameDisplay === "initials";
-}
-
-export async function saveNameDisplay(data, cid, initials) {
-  await data.put(settingsPath(cid), {
-    id: "display",
-    value: { nameDisplay: initials ? "initials" : "first" },
-  });
 }
 
 // ---- Pågående lektion (läses ur Läge 2:s lessonPlans) ----

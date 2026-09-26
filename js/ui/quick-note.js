@@ -18,7 +18,7 @@ import { icon } from "../lib/icons.js";
 import { studentLabel } from "../lib/names.js";
 import {
   studentsPath, activeStudents, escapeHtml, createNote,
-  loadModeSettings, saveModeSettings, loadNameDisplay, LABEL_COLORS,
+  loadModeSettings, saveModeSettings, LABEL_COLORS,
 } from "../modes/elever/shared.js";
 
 export const QUICK_NOTE_KEY = "F9";
@@ -27,7 +27,6 @@ export function initQuickNote({ store, data }) {
   let root = null;        // DOM-roten när rutan är öppen
   let students = [];
   let settings = null;
-  let initials = false;
   let selected = null;    // valt elevdokument
   let labelId = null;
 
@@ -65,10 +64,9 @@ export function initQuickNote({ store, data }) {
       return;
     }
 
-    [students, settings, initials] = await Promise.all([
+    [students, settings] = await Promise.all([
       data.list(studentsPath(classId)).then(activeStudents),
       loadModeSettings(data, classId),
-      loadNameDisplay(data, classId),
     ]);
     if (!root) return; // hann stängas
     render();
@@ -79,7 +77,7 @@ export function initQuickNote({ store, data }) {
     root = null;
   }
 
-  const label = (s) => escapeHtml(studentLabel(s, { initials }));
+  const label = (s) => escapeHtml(studentLabel(s));
 
   function render(filter = "") {
     if (!root) return;

@@ -201,7 +201,6 @@ kbd {
   color: var(--color-ink);
   min-width: 14em;
 }
-.roster__initials { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-s); color: var(--color-ink-soft); }
 
 .roster__paste summary { cursor: pointer; color: var(--color-ink-soft); }
 .roster__paste-hint { font-size: var(--text-s); color: var(--color-ink-soft); margin-top: var(--space-2); }
@@ -230,7 +229,6 @@ kbd {
 .roster__row:first-child { border-top: none; }
 .roster__row--archived { color: var(--color-ink-soft); }
 .roster__name { font-weight: 600; min-width: 10em; }
-.roster__initials-preview { font-size: var(--text-s); color: var(--color-ink-soft); }
 .roster__spacer { flex: 1; }
 .roster__keybtn--none { color: var(--color-ink-soft); opacity: 0.6; }
 .roster__capture { font-size: var(--text-s); color: var(--color-accent-text); }

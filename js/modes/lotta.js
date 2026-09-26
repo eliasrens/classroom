@@ -152,7 +152,6 @@ export default {
       let drawn = normalizeDrawn(null);
       let custom = [];      // [{ id, name, text, createdAt }]
       let students = [];
-      let initials = false;
       let stage = null;
       let drawing = false;
       let loaded = false;
@@ -175,7 +174,7 @@ export default {
       const absentIds = () => absentToday(absentDoc);
 
       function itemsFor(key) {
-        if (key === LIST_CLASS) return studentItems(students, (s) => studentLabel(s, { initials }));
+        if (key === LIST_CLASS) return studentItems(students, (s) => studentLabel(s));
         if (key === LIST_COLORS) return colorItems(settings.colors);
         return customItems(customList(key)?.text);
       }
@@ -583,14 +582,6 @@ export default {
         students = docs;
         if (!loaded) return;
         if (listKey() === LIST_CLASS) renderListBox();
-        refresh();
-      }));
-      offs.push(data.watch(`classes/${cid}/settings`, (docs) => {
-        const next = docs.find((d) => d.id === "display")?.value?.nameDisplay === "initials";
-        if (next === initials) return;
-        initials = next;
-        if (!loaded || listKey() !== LIST_CLASS) return;
-        renderListBox();
         refresh();
       }));
     }
