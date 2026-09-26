@@ -8,16 +8,18 @@
  * eller 1280×720 — scenen skalas bara som helhet (js/modes/karta/scene.js).
  *
  * Gången (layoutMap):
- *   1. Bubblorna fördelas på en, två eller tre elliptiska ringar runt
- *      molnet (högst 9 → en ring; den inre ringen får ~45 %), förskjutna
- *      en halv plats mot varandra. Ringarna anpassas efter de faktiska
- *      bubblornas bredd/höjd: närmast molnet utan att röra det, längst ut
- *      utan att gå utanför scenen.
+ *   1. Bubblorna står i skapandeordning, medurs från toppen, med jämna
+ *      vinklar på en, två eller tre elliptiska ringar runt molnet (högst
+ *      9 → en ring). Grannar i vinkel står på olika ringar, så en yttre
+ *      bubblas kurva går mellan två inre. Ringarna anpassas efter de
+ *      faktiska bubblornas bredd/höjd: närmast molnet utan att röra det,
+ *      längst ut utan att gå utanför scenen.
  *   2. En avslappning knuffar isär det som fortfarande överlappar (längs
  *      den axel där överlappet är minst), ut ur molnets ellips och in i
  *      scenen. Fästa bubblor (dragna av läraren) står still.
  *   3. Går det inte utan överlapp krymps texten stegvis (och molnet lite
- *      grann) tills allt ryms.
+ *      grann) tills allt ryms. Med många bubblor är molnet redan från
+ *      början något mindre.
  *
  * Deterministiskt: ingen slump — elevskärmen och läraren får samma bild.
  */
@@ -54,8 +56,11 @@ const SCALES = [1, 0.93, 0.86, 0.8, 0.74, 0.68, 0.62, 0.57, 0.52, 0.47, 0.42, 0.
  */
 export function layoutMap({ w, h, cloud, bubbles, margin = 22, gap = 16 }) {
   let last = null;
+  // Trångt (många bubblor): molnet ger plats — högst 22 % mindre vid 30.
+  const n = bubbles.length;
+  const crowd = n <= 12 ? 1 : Math.max(0.78, 1 - (n - 12) * 0.012);
   for (const scale of SCALES) {
-    const cloudScale = Math.max(0.62, Math.sqrt(scale));
+    const cloudScale = Math.max(0.55, Math.min(crowd, Math.sqrt(scale)));
     const c = { rx: cloud.rx * cloudScale, ry: cloud.ry * cloudScale };
     const sized = bubbles.map((b) => ({ w: b.w * scale, h: b.h * scale, pin: b.pin ?? null }));
     for (const rings of ringOptions(sized.length)) {
@@ -73,21 +78,15 @@ export function layoutMap({ w, h, cloud, bubbles, margin = 22, gap = 16 }) {
 function ringOptions(n) {
   if (n <= 1) return [1];
   if (n <= 9) return [1, 2];
-  if (n <= 20) return [2, 3];
-  return [2, 3];
+  if (n <= 18) return [2, 3];
+  return [3, 2];
 }
 
-/** Hur bubblorna delas på ringarna (index i ordning, innerst först). */
-function splitRings(n, rings) {
-  if (rings === 1) return [n];
-  if (rings === 2) {
-    const inner = Math.round(n * 0.45);
-    return [inner, n - inner];
-  }
-  const a = Math.round(n * 0.26);
-  const b = Math.round(n * 0.34);
-  return [a, b, n - a - b];
-}
+/**
+ * Ringen för bubbla nr i (i vinkelordning). Grannar i vinkel står alltid
+ * på OLIKA ringar — en yttre bubblas kurva går då mellan två inre.
+ */
+const RING_PATTERN = { 1: [0], 2: [0, 1], 3: [0, 2, 1] };
 
 /** Steg 1: bubblorna på elliptiska ringar. */
 function placeRings({ w, h, cloud, bubbles, rings, margin, gap }) {
@@ -106,46 +105,40 @@ function placeRings({ w, h, cloud, bubbles, rings, margin, gap }) {
       free.push(it);
     }
   }
-  if (free.length === 0) return items;
+  const n = free.length;
+  if (n === 0) return items;
 
-  const counts = splitRings(free.length, rings).filter((k) => k > 0);
-  const R = counts.length;
-  // Varannan bubbla (i skapandeordning) till var ring → nya bubblor sprids runt om.
-  const perRing = counts.map(() => []);
-  {
-    const quota = [...counts];
-    let r = 0;
-    for (const it of free) {
-      let guard = 0;
-      while (quota[r] === 0 && guard++ < R) r = (r + 1) % R;
-      perRing[r].push(it);
-      quota[r]--;
-      r = (r + 1) % R;
-    }
-  }
+  const R = Math.min(rings, n);
+  const pattern = RING_PATTERN[R] ?? RING_PATTERN[1];
+  const ringOf = free.map((_, i) => pattern[i % pattern.length]);
 
   const maxW = Math.max(...free.map((b) => b.w));
   const maxH = Math.max(...free.map((b) => b.h));
   const rxOut = Math.max(0, w / 2 - margin - maxW / 2);
   const ryOut = Math.max(0, h / 2 - margin - maxH / 2);
+  // Hur långt ut den yttersta ringen går: få bubblor → närmare molnet.
+  const reach = R === 1 ? Math.min(1, 0.35 + n * 0.08) : Math.min(1, 0.5 + n * 0.025);
 
-  perRing.forEach((ring, r) => {
-    const n = ring.length;
+  const radii = [];
+  for (let r = 0; r < R; r++) {
+    const ring = free.filter((_, i) => ringOf[i] === r);
     const rw = Math.max(...ring.map((b) => b.w));
     const rh = Math.max(...ring.map((b) => b.h));
     const rxIn = cloud.rx + gap + rw / 2;
     const ryIn = cloud.ry + gap + rh / 2;
-    // Innerst → närmast molnet; ytterst → nära kanten. En ensam ring växer med antalet.
-    const t = R === 1 ? Math.min(1, 0.35 + n * 0.08) : r / (R - 1);
-    const rx = Math.min(rxOut, rxIn) + Math.max(0, rxOut - rxIn) * t;
-    const ry = Math.min(ryOut, ryIn) + Math.max(0, ryOut - ryIn) * t;
-    // Ringarna förskjuts mot varandra; första bubblan i den enda ringen står överst.
-    const start = -Math.PI / 2 + (R === 1 ? 0 : ((r % 2) * Math.PI) / Math.max(1, n) + r * 0.21);
-    ring.forEach((it, i) => {
-      const a = start + (i * 2 * Math.PI) / n;
-      it.x = w / 2 + rx * Math.cos(a);
-      it.y = h / 2 + ry * Math.sin(a);
+    const t = R === 1 ? reach : (r / (R - 1)) * reach;
+    radii.push({
+      rx: Math.min(rxOut, rxIn) + Math.max(0, rxOut - rxIn) * t,
+      ry: Math.min(ryOut, ryIn) + Math.max(0, ryOut - ryIn) * t,
     });
+  }
+
+  // Jämna vinklar i skapandeordning, medurs från toppen.
+  free.forEach((it, i) => {
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+    const { rx, ry } = radii[ringOf[i]];
+    it.x = cx + rx * Math.cos(a);
+    it.y = cy + ry * Math.sin(a);
   });
   return items;
 }

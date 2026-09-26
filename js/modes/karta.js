@@ -272,6 +272,8 @@ export default {
         saveMap(m);
         drawScene({ animate });
         drawControls();
+        const n = listEl.querySelector(`[data-map="${CSS.escape(m.id)}"] .kt-mapbtn__n`);
+        if (n) n.textContent = String(m.bubbles.length);
       }
 
       let relayoutFrame = 0;

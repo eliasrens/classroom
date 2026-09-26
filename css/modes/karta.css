@@ -76,6 +76,7 @@
   line-height: 1.12;
   letter-spacing: -0.01em;
   text-align: center;
+  text-wrap: balance;
   overflow-wrap: anywhere;
   color: var(--kt-ink);
   border-radius: 10px;
@@ -111,6 +112,7 @@
   font-weight: 600;
   line-height: 1.22;
   text-align: center;
+  text-wrap: balance;
   overflow-wrap: anywhere;
   color: var(--kt-ink);
   background: var(--kt-bg);

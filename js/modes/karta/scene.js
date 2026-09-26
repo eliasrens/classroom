@@ -190,7 +190,9 @@ export function createScene(host, opts = {}) {
     // Mät (grundstorlek, utan transform).
     for (const node of nodes.values()) {
       node.el.style.transform = "none";
+      shrinkWrap(node.el, node.text);
     }
+    shrinkWrap(title, title);
     // Tom rubrik: lärarens grå platshållare räknas inte — molnet blir
     // lika stort som på elevskärmen.
     const hasTitle = title.textContent.trim() !== "";
@@ -244,6 +246,28 @@ export function createScene(host, opts = {}) {
   }
 
   let lastLayout = null;
+
+  /**
+   * Balanserad radbrytning (text-wrap: balance) krymper inte rutan — den
+   * står kvar i max-bredd med luft på sidorna. Mät de brutna radernas
+   * verkliga bredd och sätt rutans bredd efter den längsta.
+   */
+  function shrinkWrap(box, textEl) {
+    box.style.width = "";
+    const node = textEl.firstChild;
+    if (!node || node.nodeType !== Node.TEXT_NODE || !node.length) return;
+    const range = document.createRange();
+    range.selectNodeContents(textEl);
+    const rects = [...range.getClientRects()].filter((r) => r.width > 0);
+    const tops = new Set(rects.map((r) => Math.round(r.top)));
+    if (tops.size < 2) return; // en rad — max-content är redan rätt
+    const k = textEl.getBoundingClientRect().width / (textEl.offsetWidth || 1) || 1; // scenens skala
+    const longest = Math.max(...rects.map((r) => r.width)) / k;
+    const chrome = box === textEl
+      ? box.offsetWidth - box.clientWidth + parseFloat(getComputedStyle(box).paddingLeft) + parseFloat(getComputedStyle(box).paddingRight)
+      : box.offsetWidth - textEl.offsetWidth;
+    box.style.width = `${Math.ceil(longest + chrome + 1)}px`;
+  }
 
   function tick(now) {
     if (destroyed) return;
