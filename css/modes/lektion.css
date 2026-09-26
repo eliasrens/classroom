@@ -24,53 +24,14 @@
   flex-direction: column;
   min-height: 0;
 }
-/* Tre kolumner: planeringslistan | redigeraren | förhandsvisningen.
-   Listan kan fällas ihop till en smal remsa (issue #66) så att redigerare
-   och förhandsvisning får mer plats. */
 .lesson {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(220px, 250px) minmax(280px, 330px) 1fr;
-  gap: var(--space-3);
+  grid-template-columns: minmax(300px, 360px) 1fr;
+  gap: var(--space-4);
   align-items: stretch;
-  transition: grid-template-columns 0.22s ease;
 }
-.lesson[data-plans-open="false"] { grid-template-columns: 2.75rem minmax(300px, 360px) 1fr; }
-@media (prefers-reduced-motion: reduce) { .lesson { transition: none; } }
-
-/* Remsan: en knapp över hela höjden med pil, ämnesprick och planeringens
-   namn på högkant. */
-.lesson-plans__strip {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  height: 100%;
-  min-height: 12rem;
-  padding: var(--space-2) 0;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-m);
-  background: var(--color-surface);
-  color: var(--color-ink-soft);
-  font: inherit;
-  cursor: pointer;
-}
-.lesson-plans__strip:hover { background: var(--color-surface-alt); color: var(--color-ink); }
-.lesson-plans__strip-dot { flex: none; width: 10px; height: 10px; border-radius: var(--radius-round); }
-.lesson-plans__strip-name {
-  writing-mode: vertical-rl;
-  font-weight: 600;
-  color: var(--color-ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-height: 100%;
-  min-height: 0;
-}
-.lesson-plans__strip[hidden], .lesson-plans__body[hidden] { display: none; }
-.lesson-plans .plan-filter { grid-template-columns: 1fr; }
 /* Högerdelen: "Visa för eleverna"-raden över förhandsvisningen. */
 .lesson__main {
   min-width: 0;
@@ -104,9 +65,7 @@
 @media (max-width: 860px) {
   .app:has(.lesson) { height: auto; }
   .view:has(.lesson) { display: block; }
-  .lesson, .lesson[data-plans-open="false"] { grid-template-columns: 1fr; }
-  .lesson-plans__strip { min-height: 0; flex-direction: row; writing-mode: horizontal-tb; padding: var(--space-2); }
-  .lesson-plans__strip-name { writing-mode: horizontal-tb; }
+  .lesson { grid-template-columns: 1fr; }
   .lesson-panel { overflow: visible; }
   .lesson__main { display: block; }
   .lesson__main > .present-bar { margin-bottom: var(--space-2); }
@@ -285,25 +244,22 @@
 .present-bar__jump { padding-block: 0; }
 
 /* Fältredigerare — en rad per fält, med kryssruta */
-/* Redigerarens fält — utfällbara var för sig (issue #66, .collapsible i
-   css/app.css). Fält som inte visas för eleverna tonas ned på rubrikraden. */
-.lesson-fields { display: flex; flex-direction: column; gap: var(--space-1); }
 .field-edit {
   border: 1px solid var(--color-line);
   border-radius: var(--radius-m);
-  padding: 2px var(--space-2) 2px var(--space-1);
+  padding: var(--space-2);
   background: var(--color-surface);
 }
-.field-edit[data-open="true"] { padding-bottom: 0; }
-.field-edit--off > .collapsible__heading { opacity: 0.6; }
-.field-edit__hint { font-size: 0.72rem; color: var(--color-ink-soft); margin: 0; }
-
-/* Visning: vad eleverna ser — samlat i en egen (stängd) sektion. */
-.lesson-display .collapsible__head { font-size: 0.8rem; }
-.display-opts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1) var(--space-3); }
-.display-opt { display: inline-flex; align-items: center; gap: var(--space-2); cursor: pointer; }
-.display-opt input { width: 1.05em; height: 1.05em; accent-color: var(--color-accent); cursor: pointer; }
-.display-opt--praise { font-weight: 600; }
+.field-edit--off { opacity: 0.55; }
+.field-edit__head { display: flex; align-items: center; gap: var(--space-2); }
+.field-edit__head label {
+  display: flex; align-items: center; gap: var(--space-2);
+  font-weight: 600; font-size: 0.85rem; letter-spacing: 0.04em; text-transform: uppercase;
+  cursor: pointer;
+}
+.field-edit input[type="checkbox"] { width: 1.05em; height: 1.05em; accent-color: var(--color-accent); cursor: pointer; }
+.field-edit textarea, .field-edit input[type="text"] { margin-top: var(--space-2); }
+.field-edit__hint { font-size: 0.72rem; color: var(--color-ink-soft); margin-top: 2px; }
 
 /* ============================================================
    TAVLAN — 6-fältslayout. Delas av lärarförhandsvisning och elevvy.

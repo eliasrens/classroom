@@ -506,14 +506,23 @@ function renderShell(isTeacher) {
     </div>`;
 }
 
-// Panelens delar är utfällbara (issue #66). Ordning: det som används
-// varje morgon först och öppet; hälsning och bakgrund stängda med en
-// sammanfattning på rubrikraden.
+// Panelens delar är utfällbara (issue #66). Hälsningen ligger överst
+// (issue #69) men stängd; det som används varje morgon är öppet;
+// hälsning och bakgrund visar en sammanfattning på rubrikraden.
 const PANEL_DEFAULTS = { tasks: true, praise: true, greeting: false, background: false };
 
 function renderPanel() {
   return `
     <div class="morgon__panel-scroll">
+      ${collapsibleHTML({ key: "greeting", className: "morgon__section", icon: icon("sunrise"), title: "Hälsning", body: `
+        <div class="morgon__variant">
+          <label><input type="radio" name="mg-variant" value="godmorgon"> Godmorgon</label>
+          <label><input type="radio" name="mg-variant" value="valkommen"> Välkommen</label>
+        </div>
+        <input class="morgon__greet-input" type="text" autocomplete="off"
+          aria-label="Redigera hälsning" placeholder="Godmorgon 4A!">
+        <p class="morgon__hint">Följer klassvalet — skriv här för att åsidosätta.</p>` })}
+
       ${collapsibleHTML({ key: "tasks", className: "morgon__section", icon: icon("check"), title: "Att göra", body: `
         <div class="morgon__tasklist" role="group" aria-label="Dagens uppgifter"></div>
         <div class="morgon__addtask">
@@ -530,15 +539,6 @@ function renderPanel() {
           <button class="btn btn--icon morgon__ntfree-btn" title="Lägg till" aria-label="Lägg till fritext">${icon("plus")}</button>
         </div>
         <button class="btn btn--ghost morgon__ntclear">${icon("trash")}<span>Töm Bra jobbat</span></button>` })}
-
-      ${collapsibleHTML({ key: "greeting", className: "morgon__section", icon: icon("sunrise"), title: "Hälsning", body: `
-        <div class="morgon__variant">
-          <label><input type="radio" name="mg-variant" value="godmorgon"> Godmorgon</label>
-          <label><input type="radio" name="mg-variant" value="valkommen"> Välkommen</label>
-        </div>
-        <input class="morgon__greet-input" type="text" autocomplete="off"
-          aria-label="Redigera hälsning" placeholder="Godmorgon 4A!">
-        <p class="morgon__hint">Följer klassvalet — skriv här för att åsidosätta.</p>` })}
 
       ${collapsibleHTML({ key: "background", className: "morgon__section", icon: icon("image"), title: "Bakgrund", body: `
         <div class="morgon__bg-buttons">
