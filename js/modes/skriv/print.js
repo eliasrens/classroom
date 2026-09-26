@@ -19,7 +19,7 @@
  * uppmätta baslinjen. En rad kan då aldrig klippas mellan två A4-sidor.
  *
  * Marginalerna (issue #55): @page har marginal 0, och varje A4-ark är en
- * EGEN box (.skr-print__sheet, 210 × 296,5 mm) med 15 mm vit padding runt
+ * EGEN box (.skr-print__sheet, 209 × 296,5 mm) med ~15 mm vit padding runt
  * om. Därför blir det alltid vitt runt linjerna, vad läraren än väljer
  * under "Marginaler" i utskriftsdialogen ("Standard", "Minimum", "Inga").
  * Arken delas upp här, inte av webbläsaren: varje ark får sitt eget
@@ -38,13 +38,23 @@ const RULE_W = 1.5;
  */
 const SHEET_INNER_PX = ((296.5 - 2 * 15) * 96) / 25.4;
 
-let current = null; // { root, onAfter, prevTitle }
+/**
+ * Sidans marginal under utskriften. Appens övriga utskrifter har en egen
+ * @page utan namn (css/modes/rapport.css, 12 mm) och Chrome lägger ut hela
+ * dokumentet i DEN sidans bredd — då skulle arken (209 mm) krympas.
+ * Därför, bara medan arket finns: A4 utan marginal (arkens padding är
+ * marginalen). Läggs sist i <head> så att den vinner.
+ */
+const PAGE_CSS = "@page { size: A4 portrait; margin: 0; }";
+
+let current = null; // { root, pageStyle, onAfter, prevTitle }
 
 /** Ta bort arket och återställ sidan (efter utskrift, eller vid unmount). */
 export function closeSkrivPrint() {
   if (!current) return;
   window.removeEventListener("afterprint", current.onAfter);
   current.root.remove();
+  current.pageStyle.remove();
   document.documentElement.classList.remove("skr-printing");
   document.body.classList.remove("skr-printing");
   document.title = current.prevTitle;
@@ -134,8 +144,10 @@ export function buildSkrivPrint({ pages, className, title }) {
     return s;
   });
   document.body.append(root);
+  const pageStyle = el("style", null, PAGE_CSS);
+  document.head.append(pageStyle);
   const onAfter = () => closeSkrivPrint();
-  current = { root, onAfter, prevTitle: document.title }; // closeSkrivPrint städar även vid fel
+  current = { root, pageStyle, onAfter, prevTitle: document.title }; // closeSkrivPrint städar även vid fel
 
   // Baslinjen: linjens överkant där bokstäverna står.
   const baseY = base.getBoundingClientRect().bottom - probeLine.getBoundingClientRect().top;

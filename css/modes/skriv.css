@@ -231,13 +231,15 @@
 .skr-printpanel__actions .btn:disabled { opacity: 0.4; cursor: default; }
 
 /* Arken. A4 stående. @page har marginal 0 och varje ark är en egen box på
-   210 × 296,5 mm (en halv mm under A4: avrundning får aldrig ge en tom
-   extrasida) med 15 mm VIT padding → textbredd 180 mm. Vitt runt om blir
+   209 × 296,5 mm (strax under A4: avrundning får aldrig ge en tom
+   extrasida) med ~15 mm VIT padding → textbredd 180 mm. Vitt runt om blir
    det alltså oavsett "Marginaler" i utskriftsdialogen: "Standard" (= 0
    här), "Inga" och "Minimum" — med skrivarens minimimarginal krymper
    Chrome arket till sidbredden, så det får ändå plats på ett A4 (issue
    #55). Skärm och utskrift MÅSTE ha samma bredd; print.js räknar raderna
-   per ark med samma mått. */
+   per ark med samma mått. print.js sätter även sidan UTAN namn till
+   marginal 0 medan arken finns (rapport.css har 12 mm där, och Chrome
+   lägger ut dokumentet i den bredden — då skulle arken krympas). */
 @page skriv { size: A4 portrait; margin: 0; }
 
 .skr-print {
@@ -251,7 +253,7 @@
   position: fixed;
   top: 0;
   left: -10000px;
-  width: 210mm;
+  width: 209mm;
   visibility: hidden;
   pointer-events: none;
   color: var(--skr-p-ink);
@@ -262,9 +264,9 @@
 }
 .skr-print__sheet {
   box-sizing: border-box;
-  width: 210mm;
+  width: 209mm;          /* inte 210: 595 pt < 210 mm → Chrome krymper allt */
   height: 296.5mm;
-  padding: 15mm;
+  padding: 15mm 14.5mm;  /* → textbredd 180 mm */
   overflow: hidden;
   background: #fff;
   break-after: page;
