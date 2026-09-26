@@ -11,6 +11,7 @@
 
 import { weekStartFromKey, startOfWeek } from "./week.js";
 import { serverNow } from "./clock.js";
+import { pickedToday } from "./backgrounds.js";
 
 export const MORNING_KEY = "morningScreen";
 export const settingsPath = (classId) => `classes/${classId}/settings`;
@@ -51,25 +52,9 @@ function seedTasks() {
   ];
 }
 
-/**
- * Naturbilder (Unsplash) — behåll id-formatet ur specen. En bild som
- * inte laddar faller tillbaka på en lugn färgbakgrund (hanteras i vyn).
- */
-export const UNSPLASH_IDS = [
-  "1506905925346-21bda4d32df4", // bergskedja i gryning
-  "1470071459604-3b5ec3a7fe05", // dimmig skog
-  "1441974231531-c6227db76b6e", // sol genom skog
-  "1501785888041-af3ef285b470", // sjö och berg
-  "1472214103451-9374bd1c798e", // gröna kullar
-  "1447752875215-b2761acb3c5d", // skogsstig
-  "1518495973542-4542c06a5843", // sol genom grenar
-  "1439066615861-d1af74d74000", // höstskog uppifrån
-  "1426604966848-d7adac402bff", // dal med flod
-  "1469474968028-56623f02e42e", // bergstopp mot himmel
-];
-
-export const unsplashUrl = (id) =>
-  `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=1920&q=80`;
+// Bakgrundsbilderna (kategorier per årstid + Platser i världen) och
+// slumplogiken ligger i js/lib/backgrounds.js (issue #64).
+export { UNSPLASH_IDS, unsplashUrl } from "./backgrounds.js";
 
 /** Ger giltig, ifylld inställningsstruktur oavsett vad som fanns sparat. */
 export function normalize(value) {
@@ -89,6 +74,9 @@ export function normalize(value) {
     background: {
       current: typeof v.background?.current === "string" ? v.background.current : "",
       extraUrls: Array.isArray(v.background?.extraUrls) ? v.background.extraUrls.filter((u) => typeof u === "string") : [],
+      // Datum ("ÅÅÅÅ-MM-DD") då läraren själv valde bilden — gäller hela
+      // den dagen, sen slumpas en ny årstidsbild (issue #64).
+      pickedOn: typeof v.background?.pickedOn === "string" ? v.background.pickedOn : "",
     },
   };
 }
@@ -215,15 +203,21 @@ export function watchMorning(data, classId, cb) {
  * molndatan hunnit komma: en vanlig put av den lokala (kanske inaktuella)
  * kopian skulle då skriva över andra lärares ändringar — t.ex. måndagens
  * tömning av Bra jobbat, som annars kom tillbaka.
+ *
+ * { auto: true } = den automatiska slumpen: den skriver ingenting om
+ * senaste versionen har en bild som läraren själv valt i dag (issue #64),
+ * och nollställer annars pickedOn.
  */
-export async function saveBackground(data, classId, url) {
+export async function saveBackground(data, classId, url, { auto = false, now = serverNow() } = {}) {
   if (!classId) return;
   await data.once(settingsPath(classId), MORNING_KEY, (doc) => {
     // Delade dokumentet får ALDRIG innehålla praise/weekOf (issue #32) —
     // strippa även om ett äldre moln-dokument råkar ha fälten kvar.
     const { shared } = splitMorning(doc?.value);
-    if (doc && shared.background.current === url) return null;
+    if (auto && pickedToday(shared.background, now)) return null;
+    if (doc && shared.background.current === url && (!auto || !shared.background.pickedOn)) return null;
     shared.background.current = url;
+    if (auto) shared.background.pickedOn = "";
     return [{ path: settingsPath(classId), doc: { ...(doc ?? {}), id: MORNING_KEY, value: shared } }];
   }, { allowLocal: true });
 }
