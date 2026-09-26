@@ -11,9 +11,10 @@
  *   1. Bubblorna står i skapandeordning, medurs från toppen, med jämna
  *      vinklar på en, två eller tre elliptiska ringar runt molnet (högst
  *      9 → en ring). Grannar i vinkel står på olika ringar, så en yttre
- *      bubblas kurva går mellan två inre. Ringarna anpassas efter de
- *      faktiska bubblornas bredd/höjd: närmast molnet utan att röra det,
- *      längst ut utan att gå utanför scenen.
+ *      bubblas kurva går mellan två inre. Varje bubbla flyttas ut längs
+ *      sin egen stråle efter sin egen bredd/höjd: innersta ringen närmast
+ *      molnet utan att röra det, yttersta längst ut utan att gå utanför
+ *      scenen — så fungerar det även i smala (stående) format.
  *   2. En avslappning knuffar isär det som fortfarande överlappar (längs
  *      den axel där överlappet är minst), ut ur molnets ellips och in i
  *      scenen. Fästa bubblor (dragna av läraren) står still.
@@ -117,33 +118,43 @@ function placeRings({ w, h, cloud, bubbles, rings, margin, gap }) {
   const pattern = RING_PATTERN[R] ?? RING_PATTERN[1];
   const ringOf = free.map((_, i) => pattern[i % pattern.length]);
 
-  const maxW = Math.max(...free.map((b) => b.w));
-  const maxH = Math.max(...free.map((b) => b.h));
-  const rxOut = Math.max(0, w / 2 - margin - maxW / 2);
-  const ryOut = Math.max(0, h / 2 - margin - maxH / 2);
   // Hur långt ut den yttersta ringen går: få bubblor → närmare molnet.
   const reach = R === 1 ? Math.min(1, 0.35 + n * 0.08) : Math.min(1, 0.5 + n * 0.025);
 
-  const radii = [];
-  for (let r = 0; r < R; r++) {
-    const ring = free.filter((_, i) => ringOf[i] === r);
-    const rw = Math.max(...ring.map((b) => b.w));
-    const rh = Math.max(...ring.map((b) => b.h));
-    const rxIn = cloud.rx + gap + rw / 2;
-    const ryIn = cloud.ry + gap + rh / 2;
-    const t = R === 1 ? reach : (r / (R - 1)) * reach;
-    radii.push({
-      rx: Math.min(rxOut, rxIn) + Math.max(0, rxOut - rxIn) * t,
-      ry: Math.min(ryOut, ryIn) + Math.max(0, ryOut - ryIn) * t,
-    });
-  }
-
-  // Jämna vinklar i skapandeordning, medurs från toppen.
+  // Jämna vinklar i skapandeordning, medurs från toppen. Varje bubbla
+  // flyttas ut längs sin egen stråle: från närmast molnet (utan att röra
+  // det) till längst ut i scenen — efter SIN bredd och höjd, så att breda
+  // bubblor inte hamnar i molnet och smala inte står onödigt långt ut.
   free.forEach((it, i) => {
     const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
-    const { rx, ry } = radii[ringOf[i]];
-    it.x = cx + rx * Math.cos(a);
-    it.y = cy + ry * Math.sin(a);
+    // Strålen följer scenens form (en ellips i scenens proportioner).
+    let dx = Math.cos(a) * w;
+    let dy = Math.sin(a) * h;
+    const len = Math.hypot(dx, dy) || 1;
+    dx /= len;
+    dy /= len;
+    const hw = it.w / 2;
+    const hh = it.h / 2;
+    const tMax = Math.min(
+      Math.abs(dx) > 1e-9 ? (w / 2 - margin - hw) / Math.abs(dx) : Infinity,
+      Math.abs(dy) > 1e-9 ? (h / 2 - margin - hh) / Math.abs(dy) : Infinity,
+    );
+    // Närmast molnet: halvera fram till första t där rektangeln går fri.
+    let lo = 0;
+    let hi = Math.max(tMax, 1);
+    const at = (t) => ({ x: cx + dx * t, y: cy + dy * t, w: it.w, h: it.h });
+    if (hitsCloud(at(hi), cx, cy, cloud, gap)) lo = hi;
+    else {
+      for (let k = 0; k < 24; k++) {
+        const mid = (lo + hi) / 2;
+        if (hitsCloud(at(mid), cx, cy, cloud, gap)) lo = mid; else hi = mid;
+      }
+    }
+    const tMin = hi;
+    const f = R === 1 ? reach : (ringOf[i] / (R - 1)) * reach;
+    const t = tMin >= tMax ? tMax : tMin + (tMax - tMin) * f;
+    it.x = cx + dx * t;
+    it.y = cy + dy * t;
   });
   return items;
 }
