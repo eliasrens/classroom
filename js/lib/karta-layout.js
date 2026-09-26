@@ -24,16 +24,22 @@
  *
  * Grenar (issue #59): en bubbla kan ha under-bubblor (parent = index).
  * Då används en RADIELL TRÄDLAYOUT (placeTree) i stället för ringarna:
- *   - varje huvudbubbla får en vinkelsektor efter hur många "löv" dess
- *     gren har (en ensam bubbla = 1), i skapandeordning medurs från toppen;
- *     utan grenar blir sektorerna lika stora — samma vinklar som ringarna
+ *   - varje huvudbubbla får en sektor efter hur många "löv" dess gren har
+ *     (en ensam bubbla = 1), i skapandeordning medurs från toppen. Varvet
+ *     delas efter PLATS (angleWarp): åt håll där det är långt från molnet
+ *     till kanten ryms fler — smala (stående) format blir inte trånga
+ *     åt sidorna
  *   - en grens barn delar förälderns sektor (högst ~26° per barn, runt
  *     förälderns vinkel) — en solfjäder utåt i förälderns riktning
- *   - nivå 1 står närmast molnet, den djupaste nivån längst ut; varannan
- *     bubbla på den yttersta nivån kan stå en bit in (två "halvringar")
+ *   - girigt (placeGreedy), nivå för nivå: varje bubbla flyttas ut längs
+ *     sin stråle, från molnet — en gren från bortom sin förälder — tills
+ *     den inte rör något som redan står
  *   - barn till en FÄST (dragen) bubbla fläktar ut runt den, bort från
  *     molnet, så att en dragen gren följer med sin förälder
- *   Sedan samma avslappning och samma krympning som utan grenar.
+ *   Sedan samma avslappning och samma krympning som utan grenar. En
+ *   layout där avslappningen fått flytta en gren långt från sin plats
+ *   (drift) godtas bara om inget bättre finns — hellre lite mindre text
+ *   än en gren som hamnat hos grannen.
  *
  * Deterministiskt: ingen slump — elevskärmen och läraren får samma bild.
  */
@@ -220,15 +226,19 @@ function placeTree({ w, h, cloud, bubbles, tree, variant, margin, gap }) {
     }
   };
   if (total > 0) {
+    // Sektorerna delas ut efter hur mycket PLATS det finns åt varje håll
+    // (i ett smalt format är det trångt åt sidorna), sedan tillbaka till vinklar.
+    const warp = angleWarp({ items, w, h, cx, cy, cloud, margin, gap });
     const firstRoot = roots.find((i) => !items[i].fixed);
     const unit = (2 * Math.PI) / total;
-    const start = -Math.PI / 2 - (firstRoot != null ? weight[firstRoot] * unit : 0) / 2;
+    const start = warp.toU(-Math.PI / 2) - (firstRoot != null ? weight[firstRoot] * unit : 0) / 2;
     assign(roots, start, start + 2 * Math.PI);
+    for (let i = 0; i < n; i++) if (angle[i] != null) angle[i] = warp.toAngle(angle[i]);
   }
 
   const radial = [];
   for (let i = 0; i < n; i++) if (angle[i] != null) radial.push(i);
-  if (variant.greedy) placeGreedy({ items, radial, angle, level, w, h, cx, cy, cloud, margin, gap: gap + variant.pad });
+  if (variant.greedy) placeGreedy({ items, radial, angle, level, parent: tree.parent, w, h, cx, cy, cloud, margin, gap: gap + variant.pad });
   else placeLevels({ items, radial, angle, level, depth, variant, w, h, cx, cy, cloud, margin, gap });
   placeFans({ items, children, roots, w, h, cx, cy, margin, gap });
   return items;
@@ -240,7 +250,7 @@ function placeTree({ w, h, cloud, bubbles, tree, variant, margin, gap }) {
  * redan står (fästa bubblor, föräldern, grannarna). Ryms den inte hela
  * vägen ut står den där den överlappar minst — avslappningen tar resten.
  */
-function placeGreedy({ items, radial, angle, level, w, h, cx, cy, cloud, margin, gap }) {
+function placeGreedy({ items, radial, angle, level, parent, w, h, cx, cy, cloud, margin, gap }) {
   const placed = items.filter((it) => it.fixed);
   const overlap = (a) => {
     let sum = 0;
@@ -255,7 +265,20 @@ function placeGreedy({ items, radial, angle, level, w, h, cx, cy, cloud, margin,
   for (const i of order) {
     const it = items[i];
     const ray = rayFor(angle[i], w, h);
-    const { tMin, tMax } = rayRange({ it, ray, cx, cy, w, h, cloud, margin, gap });
+    const range = rayRange({ it, ray, cx, cy, w, h, cloud, margin, gap });
+    const { tMax } = range;
+    // En gren börjar bortom sin förälder, sett från molnet: minst så långt
+    // ut att den ligger på andra sidan linjen genom föräldern, vinkelrätt
+    // mot förälderns riktning — solfjädern går utåt, inte tillbaka.
+    const p = parent[i] >= 0 ? items[parent[i]] : null;
+    let tMin = range.tMin;
+    if (p) {
+      const px = p.x - cx;
+      const py = p.y - cy;
+      const pp = px * px + py * py;
+      const along = Math.max(px * ray.dx + py * ray.dy, 0.35 * Math.sqrt(pp));
+      tMin = Math.min(tMax, Math.max(tMin, pp / along + 1));
+    }
     const step = Math.max(4, Math.min(it.w, it.h) * 0.2);
     let best = null;
     for (let t = tMin; ; t = Math.min(tMax, t + step)) {
@@ -317,6 +340,44 @@ function placeFans({ items, children, roots, w, h, cx, cy, margin, gap }) {
     for (const c of children[i]) fan(c, inFan || kids.includes(c));
   };
   for (const r of roots) fan(r, false);
+}
+
+/**
+ * Vinkel ↔ "platsvinkel": åt håll där det är långt från molnet till kanten
+ * går det fler bubblor. u (0–2π) växer med platsen längs varvet, blandat
+ * med jämn fördelning så att inget håll blir tomt.
+ */
+function angleWarp({ items, w, h, cx, cy, cloud, margin, gap }) {
+  const K = 180;
+  const free = items.filter((it) => !it.fixed);
+  const avg = { w: 0, h: 0 };
+  for (const it of free) { avg.w += it.w / free.length; avg.h += it.h / free.length; }
+  const room = [];
+  for (let k = 0; k < K; k++) {
+    const a = -Math.PI + ((k + 0.5) * 2 * Math.PI) / K;
+    const { tMin, tMax } = rayRange({ it: avg, ray: rayFor(a, w, h), cx, cy, w, h, cloud, margin, gap });
+    room.push(Math.max(0, tMax - tMin));
+  }
+  const mean = room.reduce((s, r) => s + r, 0) / K || 1;
+  const cum = [0];
+  for (let k = 0; k < K; k++) cum.push(cum[k] + 0.45 + (0.55 * room[k]) / mean);
+  const total = cum[K];
+  const TAU = 2 * Math.PI;
+  return {
+    toU(a) {
+      const f = ((((a + Math.PI) / TAU) % 1) + 1) % 1 * K;
+      const k = Math.min(K - 1, Math.floor(f));
+      return ((cum[k] + (cum[k + 1] - cum[k]) * (f - k)) / total) * TAU;
+    },
+    toAngle(u) {
+      const v = ((((u / TAU) % 1) + 1) % 1) * total;
+      let lo = 0;
+      let hi = K;
+      while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (cum[mid] <= v) lo = mid; else hi = mid; }
+      const f = lo + (v - cum[lo]) / (cum[lo + 1] - cum[lo] || 1);
+      return -Math.PI + (f / K) * TAU;
+    },
+  };
 }
 
 /** Strålen för en vinkel — följer scenens form (en ellips i scenens proportioner). */
