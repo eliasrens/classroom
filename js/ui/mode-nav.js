@@ -42,7 +42,16 @@ const menuItem = (m) => `
   <a class="mode-nav__item" role="menuitem" tabindex="-1" href="#/${m.id}" data-mode="${m.id}">
     ${icon(m.icon)}<span>${esc(m.title)}</span></a>`;
 
-export function initModeNav({ el, store }) {
+/** Åtgärd (inte ett läge) sist i "Lärare ▾", t.ex. "Byt lösenord" (issue #49). */
+const actionItem = (a) => `
+  <button type="button" class="mode-nav__item mode-nav__action" role="menuitem" tabindex="-1" data-action="${esc(a.id)}">
+    ${icon(a.icon)}<span>${esc(a.title)}</span></button>`;
+
+/**
+ * @param actions  [{id, title, icon, run}] — lärarens åtgärder, efter en
+ *                 avdelare i "Lärare ▾". Menyn visas aldrig på elevskärmen.
+ */
+export function initModeNav({ el, store, actions = [] }) {
   const classroom = modesInGroup("classroom");
   const teacher = modesInGroup("teacher");
 
@@ -77,6 +86,7 @@ export function initModeNav({ el, store }) {
           <span class="mode-nav__teacher-label"></span>${chevron()}</button>
         <div class="mode-nav__popup mode-nav__popup--end" id="mode-nav-teacher-menu" aria-labelledby="mode-nav-teacher-btn">
           ${teacher.map(menuItem).join("")}
+          ${actions.length ? `<div class="mode-nav__sep" role="separator"></div>${actions.map(actionItem).join("")}` : ""}
         </div>
       </div>
     </div>`;
@@ -90,6 +100,13 @@ export function initModeNav({ el, store }) {
 
   createMenuButton({ root: moreEl, button: moreBtn, menu: moreEl.querySelector(".mode-nav__popup") });
   createMenuButton({ root: teacherEl, button: teacherBtn, menu: teacherEl.querySelector(".mode-nav__popup") });
+
+  // Åtgärderna: lyssna på el (bubblar EFTER menyns egen stängning, som
+  // lämnar fokus på knappen) — så att en dialog kan ta fokus själv.
+  el.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-action]");
+    if (btn) actions.find((a) => a.id === btn.dataset.action)?.run();
+  });
 
   // ---- Aktivt läge ----
 

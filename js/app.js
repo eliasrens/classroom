@@ -14,6 +14,7 @@ import { createRouter } from "./router.js";
 import { DEFAULT_MODE_ID, isStudentMode } from "./modes/registry.js";
 import { initClassPicker, ACTIVE_CLASS_KEY } from "./ui/class-picker.js";
 import { initModeNav } from "./ui/mode-nav.js";
+import { initChangePassword } from "./ui/change-password.js";
 import { initQuickNote } from "./ui/quick-note.js";
 import { initStudentPanel } from "./ui/student-panel.js";
 import { createSyncBus, isPreviewWindow, announceStudentScreen, watchStudentScreen } from "./sync.js";
@@ -270,7 +271,13 @@ function startApp() {
   }
 
   // Övermenyn: "I klassrummet" + "Lärare ▾" (byggs ur registret, issue #45)
-  initModeNav({ el: $("#mode-nav"), store });
+  // "Lärare ▾" har även "Byt lösenord" (issue #49) — aldrig på elevskärmen.
+  const changePassword = initChangePassword({ store, auth });
+  initModeNav({
+    el: $("#mode-nav"),
+    store,
+    actions: [{ id: "change-password", title: "Byt lösenord", icon: "lock", run: changePassword.open }],
+  });
 
   // Klassval
   initClassPicker({ el: $("#class-picker"), store, data });
