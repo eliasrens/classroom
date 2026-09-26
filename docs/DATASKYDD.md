@@ -38,6 +38,8 @@ självregistrering).
 - **Noteringar** — all text, uppföljningsmarkeringar, insatser.
 - **Bra jobbat-listan** och dess veckoarkiv (innehåller namn).
 - **Mönster och statistik per elev.**
+- **Skrivtavlans text** (de senaste sidorna) — läraren kan skriva elevnamn
+  på tavlan, så texten sparas bara lokalt och går aldrig till molnet.
 
 Datan lagras i webbläsarens lokala lagring på datorn och visas i
 lärarvyerna med märkningen "Endast den här datorn". Elevskärmen

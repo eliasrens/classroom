@@ -74,7 +74,8 @@ js/
   modes/                lägena + registret (registry.js: menyordning + grupp "I klassrummet"/"Lärare"),
                         oversikt.js = Översikt med flikar (oversikt/: idag, veckor = veckoarkivet,
                         atgarder = klassåtgärder, installningar = dataskydd),
-                        vecka.js = Veckans övergångar — elevvänlig veckosammanfattning för mentorstiden
+                        vecka.js = Veckans övergångar — elevvänlig veckosammanfattning för mentorstiden,
+                        skriv.js = Skrivtavla — läraren skriver live på linjerat papper (Andika)
   lib/week.js           veckologik (måndag 00:00) · lib/week-rhythm.js  rent varje måndag
   lib/week-goal.js      trafikljusets veckomål · lib/week-recap.js  veckosammanfattningen (Veckans övergångar)
   ui/login.js           login-vy + elevskärmens väntevy
@@ -84,6 +85,7 @@ js/
   ui/class-actions.js   klassåtgärder: dialoger (ny/ändra, "Testade också") + listan
   ui/help.js            genvägslista under "?" · ui/shortcuts.js  globala tangentgenvägar
   ui/praise-board.js    "Bra jobbat"-tavlan (växer i kolumner, scrollar aldrig) — morgonskärm, lektion
+fonts/andika/           Andika (SIL, OFL.txt) — självhostat för Skrivtavlan, fungerar offline
 firestore.rules         Firestore-säkerhetsregler: inloggning krävs för all läs/skriv
 firebase.json           pekar firebase-CLI:t på firestore.rules (för deploy av regler)
 docs/
