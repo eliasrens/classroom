@@ -370,7 +370,11 @@ function searchText(p, subjects) {
   ].join(" ").toLocaleLowerCase("sv");
 }
 
-/** [{ key, label, plans }] — veckor nyast först, inom veckan dag + tid stigande. */
+/**
+ * [{ key, label, name, range, plans }] — veckor nyast först, inom veckan dag +
+ * tid stigande. `label` = hela etiketten; `name` ("Vecka 39 · denna vecka")
+ * och `range` ("21 sep.–27 sep.") separat, så infälld vecka kan korta den.
+ */
 function groupByWeek(list) {
   const groups = new Map();
   const thisMonday = mondayOf(parseISO(todayISO()));
@@ -382,18 +386,21 @@ function groupByWeek(list) {
   }
   const keys = [...groups.keys()].sort((a, b) => (b || "0").localeCompare(a || "0"));
   return keys.map((key) => {
-    let label = "Utan datum";
+    let name = "Utan datum";
+    let range = "";
     if (key) {
       const mon = parseISO(key);
       const diff = Math.round((mon - thisMonday) / (7 * 86400000));
       const rel = { 0: "denna vecka", 1: "nästa vecka", [-1]: "förra veckan" }[diff];
-      label = `Vecka ${isoWeek(mon)}${rel ? ` · ${rel}` : ""} · ${fmtShort(mon)}–${fmtShort(addDays(mon, 6))}`;
+      name = `Vecka ${isoWeek(mon)}${rel ? ` · ${rel}` : ""}`;
+      range = `${fmtShort(mon)}–${fmtShort(addDays(mon, 6))}`;
     }
+    const label = range ? `${name} · ${range}` : name;
     const plans = groups.get(key).sort((a, b) =>
       (a.date ?? "").localeCompare(b.date ?? "") ||
       (a.start ?? "").localeCompare(b.start ?? "") ||
       (a.name ?? "").localeCompare(b.name ?? "", "sv"));
-    return { key, label, plans };
+    return { key, label, name, range, plans };
   });
 }
 
@@ -650,7 +657,7 @@ export default {
     // valda planeringen ligger där — hålls öppna i minnet men sparas inte.
     const thisWeekKey = () => isoLocal(mondayOf(parseISO(todayISO())));
     const autoOpenWeeks = new Set();
-    let revealEditing = true; // öppna den valda planeringens vecka vid nästa listritning
+    let revealEditing = false; // öppna den valda planeringens vecka vid nästa listritning
     const folds = mountCollapsibles(panel, {
       scope: "lektion",
       defaults: (key) => key === weekFoldKey(thisWeekKey()),
@@ -661,10 +668,12 @@ export default {
     // -- Redigerar nu (bara den här fliken) --
     let editingId = null;
     const editingPlan = () => plans.find((p) => p.id === editingId) ?? null;
-    function setEditing(id) {
+    // `reveal` = läraren valde planeringen → öppna dess vecka i listan.
+    // Vid inläsning (flikens senaste planering) gäller det sparade läget.
+    function setEditing(id, { reveal = true } = {}) {
       editingId = id ?? null;
       setEditingPlanId(activeClass.id, editingId);
-      revealEditing = true;
+      revealEditing = reveal;
     }
 
     // -- Visas för eleverna (lärarens PRIVATA inställning, delas med elevskärmen) --
@@ -786,7 +795,9 @@ export default {
           ? `<input type="checkbox" class="plan-week__check" data-week="${esc(g.key)}" ${allSel ? "checked" : ""} aria-label="Markera alla i ${esc(g.label)}">`
           : "";
         return collapsibleHTML({
-          key: weekFoldKey(g.key), level: 3, className: "plan-week-fold", title: esc(g.label), lead: check,
+          key: weekFoldKey(g.key), level: 3, className: "plan-week-fold", lead: check,
+          // Datumintervallet döljs när veckan är infälld (plats för antalet).
+          title: `${esc(g.name)}${g.range ? `<span class="plan-week__range"> · ${esc(g.range)}</span>` : ""}`,
           body: `<div class="plan-week">${g.plans.map((p) => rowHTML(p, curId, shownId)).join("")}</div>`,
         });
       }).join("");
@@ -1129,7 +1140,7 @@ export default {
       if (!editingPlan()) {
         const saved = getEditingPlanId(activeClass.id);
         const pick = plans.find((p) => p.id === saved) ?? presentedPlan() ?? sortedPlans()[0];
-        if (pick) setEditing(pick.id);
+        if (pick) setEditing(pick.id, { reveal: false });
       }
       // Planeringar som försvunnit (t.ex. borttagna i en annan flik) kan inte vara markerade.
       for (const id of [...selected]) if (!plans.some((p) => p.id === id)) selected.delete(id);

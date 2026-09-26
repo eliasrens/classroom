@@ -92,6 +92,9 @@
 }
 /* "Om lektionen" och "Fält" som fällbara block (issue #72). */
 .lesson-fold .collapsible__heading--row .ca-add { flex: none; }
+/* Klassåtgärd syns på rubrikraden när "Om lektionen" är öppet (som förut);
+   infällt får sammanfattningen hela raden. */
+.lesson-fold[data-open="false"] .ca-add { display: none; }
 .lesson-panel .btn-row { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .lesson-panel label.field-label {
   font-size: 0.8rem;
@@ -168,7 +171,9 @@
 }
 .plan-week-fold .collapsible__title { flex: 0 1 auto; min-width: 0; letter-spacing: 0.04em; }
 .plan-week-fold .collapsible__title > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-week-fold[data-open="false"] .plan-week__range { display: none; }
 .plan-week-fold .collapsible__summary { flex: none; margin-left: auto; }
+.plan-week-fold[data-open="true"] .collapsible__summary { display: none; }
 .plan-week-fold > .collapsible__body > .collapsible__inner { gap: 2px; }
 .plan-week__check { flex: none; margin: 0; accent-color: var(--color-accent); }
 .plan-list__row { display: flex; align-items: stretch; gap: 2px; }
