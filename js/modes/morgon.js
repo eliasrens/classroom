@@ -134,6 +134,15 @@ export default {
     }
     function syncNameSize() {
       if (!mounted() || board.el.hidden || nameSync > 4) return;
+      // Rubriken skalas efter namnens faktiska storlek (css/modes/morgon.css).
+      const list = board.el.querySelector(".praise-board__names");
+      const names = `${parseFloat(getComputedStyle(list).fontSize)}px`;
+      if (board.el.style.getPropertyValue("--nt-names") !== names) {
+        board.el.style.setProperty("--nt-names", names);
+        nameSync++;
+        try { board.fit(); } finally { nameSync--; }
+        return;
+      }
       const f = taskFontPx();
       const cur = parseFloat(board.el.style.getPropertyValue("--praise-font-max")) || 0;
       if (!f || Math.abs(f - cur) < 0.1) return;

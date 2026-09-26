@@ -5,7 +5,24 @@ fritextnamn, två ikryssade uppgifter. `fore-*` = main före ändringen,
 `efter-*` = den här grenen. (Stjärnan i före-bilderna och lektionsrutan
 visas som en ruta: headless Chrome saknar emoji-typsnitt.)
 
-## Mätningar (getComputedStyle / getBoundingClientRect, CSS-px)
+## Efter granskning: namn i normal vikt, rubrik 1,25 × namnen (semibold)
+
+Namnen har samma `font-weight` som uppgiftsraden (400). Rubriken "Bra jobbat"
+är 1,25 × namnens faktiska storlek, med vikten 600, och klart mindre än hälsningen.
+
+| Vy | Storlek | Namn | Uppgiftsrad px / vikt | Namn px / vikt | Rubrik px / vikt | Hälsning | Kolumner | Ruta b×h | Ingen scroll · alla syns · ej över kortet |
+|---|---|---|---|---|---|---|---|---|---|
+| elev | 1920×1080 | 12 | 57.2 / 400 | 57.2 / 400 | 71.5 / 600 | 109.9 | 2 | 459×644 | ✓ |
+| elev | 1920×1080 | 30 | 55.3 / 400 | 48.4 / 400 | 60.5 / 600 | 103.7 | 3 | 670×838 | ✓ |
+| lärare | 1366×768 | 5 | 29.3 / 400 | 29.2 / 400 | 36.5 / 600 | – | 1 | 325×324 | ✓ (även efter panel in/ut) |
+| lärare | 1366×768 | 30 | 27.2 / 400 | 25.0 / 400 | 31.3 / 600 | 51.0 | 3 | 365×470 | ✓ |
+
+`efter-elev-1920-12.jpeg` och `efter-elev-1920-30.jpeg` är tagna efter granskningen.
+
+## Första versionen (namn i fetstil, rubrik 1,3 × uppgiftsraden)
+
+Övriga skärmdumpar är från den här versionen. Storlekar och kolumner gäller
+fortfarande i stort; namnen är nu smalare (normal vikt) och rubriken mindre.
 
 | Vy | Storlek | Namn | Uppgiftsrad | Namn | Rubrik | Kolumner | Rutans höjd | Ingen scroll · alla syns · ej över kortet |
 |---|---|---|---|---|---|---|---|---|

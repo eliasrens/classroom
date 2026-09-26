@@ -193,13 +193,16 @@ html[data-theme="teacher"]:has(.morgon) { scrollbar-gutter: auto; }
 .morgon__nametavla .praise-board__title {
   flex: none;
   text-align: center;
-  font-size: calc(1.3 * var(--praise-font-max)); /* tydligt större än namnen */
+  /* Tydligt större än namnen men klart mindre än hälsningen. --nt-names är
+     namnens faktiska storlek (sätts av js/modes/morgon.js efter anpassningen). */
+  font-size: calc(1.25 * var(--nt-names, var(--praise-font-max)));
+  font-weight: 600;
 }
 .morgon__nametavla .praise-board__head:has(.praise-board__clear) { padding-inline: 2.4rem; }
 .morgon__nametavla .praise-board__clear { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
 /* Guldstrecket (.morgon__rule) mellan rubrik och namn. */
 .morgon__nametavla .morgon__rule { flex: none; margin-inline: auto; }
-.morgon__nametavla .praise-board__names { flex: none; margin-top: 0; justify-content: center; }
+.morgon__nametavla .praise-board__names { flex: none; margin-top: 0; justify-content: center; font-weight: normal; /* samma vikt som uppgiftsraden */ }
 .morgon[data-view="student"] .morgon__nametavla {
   --praise-font-max: calc(var(--morgon-scale) * clamp(1.6rem, 6vh, 2.9rem));
 }
