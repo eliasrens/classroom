@@ -42,7 +42,11 @@
  */
 
 import { icon } from "../lib/icons.js";
-import { deepTextColor, readableTextColor, SUBJECTS } from "../lib/color.js";
+import { deepTextColor, groupedSubjects, readableTextColor, SUBJECTS } from "../lib/color.js";
+import {
+  MY_SUBJECTS_DOC, mySubjectsPath, myIds, filterSubjects, withMine, saveMine,
+} from "../lib/my-subjects.js";
+import { openMySubjectsDialog } from "../ui/my-subjects-dialog.js";
 import {
   plansPath as plansPathFor, currentUid,
   lessonSettingsPath, LESSON_SETTINGS_DOC, getEditingPlanId, setEditingPlanId,
@@ -464,6 +468,12 @@ export default {
     let subjects = SUBJECTS;
     // Lärarens privata settings/lektion ({ value: { presentedPlanId } }), null = finns inte ännu.
     let presentedDoc = null;
+    // Mina ämnen (issue #81): lärarens PRIVATA val (teachers/{uid}/settings/
+    // subjects). null = inget val → alla ämnen visas, som innan.
+    let myDoc = null;
+    const mine = () => myIds(myDoc);
+    // "Visa alla ämnen…" — visar tillfälligt hela paletten i väljaren.
+    let showAllSubjects = false;
 
     // "Bra jobbat"-namnen: samma LOKALA data som morgonskärmen (issue #32) —
     // listan innehåller elevdata och lagras bara på den här datorn.
@@ -611,6 +621,7 @@ export default {
                 <select data-meta="subjectId"></select>
               </label>
             </div>
+            <div class="subject-mine-hint" data-el="subject-hint" hidden></div>
             <div class="row-2">
               <label class="field-label">Start
                 <input type="time" data-meta="start">
@@ -689,20 +700,71 @@ export default {
     }
 
     // -- Ämnesväljare (inbyggda + egna, + skapa nytt) --
+    // Visar bara MINA ämnen när läraren valt sådana (issue #81), plus
+    // planeringens redan valda ämne (t.ex. kopierad från annan lärare) —
+    // inget "försvinner". "Visa alla ämnen…" öppnar tillfälligt hela
+    // paletten; "Välj mina ämnen…" öppnar dialogen. SO-/NO-delämnena
+    // grupperas under sina rubriker (groupedSubjects).
     const ADD_SUBJECT = "__add_subject__";
+    const SHOW_ALL = "__show_all__";
+    const PICK_MINE = "__pick_mine__";
     function fillSubjectSelect(sel, current) {
       sel.innerHTML = "";
-      for (const s of subjects) sel.append(new Option(s.name, s.id, false, s.id === current));
+      const visible = showAllSubjects ? subjects : filterSubjects(subjects, mine(), { keep: [current] });
+      for (const g of groupedSubjects(visible)) {
+        const parent = g.group
+          ? Object.assign(document.createElement("optgroup"), { label: g.group.name })
+          : sel;
+        for (const s of g.subjects) parent.append(new Option(s.name, s.id, false, s.id === current));
+        if (parent !== sel) sel.append(parent);
+      }
+      if (mine() && !showAllSubjects) sel.append(new Option("Visa alla ämnen…", SHOW_ALL));
       sel.append(new Option("+ Eget ämne…", ADD_SUBJECT));
+      sel.append(new Option("Välj mina ämnen…", PICK_MINE));
       sel.value = current ?? "";
     }
     function fillSubjectFilter() {
       const cur = filter.subject;
       subjectFilterEl.innerHTML = "";
       subjectFilterEl.append(new Option("Alla ämnen", ""));
+      // Mina ämnen + ämnen som faktiskt används av en planering (en
+      // kopierad planering med ett annat ämne ska gå att filtrera fram).
       const used = new Set(plans.map((p) => p.subjectId));
-      for (const s of subjects) if (used.has(s.id) || s.id === cur) subjectFilterEl.append(new Option(s.name, s.id));
+      const m = mine();
+      for (const s of subjects) {
+        if (used.has(s.id) || s.id === cur || (m?.includes(s.id) ?? false)) {
+          subjectFilterEl.append(new Option(s.name, s.id));
+        }
+      }
       subjectFilterEl.value = cur;
+    }
+
+    /** "Lägg till i mina ämnen" — visas när planeringens ämne inte är
+     *  bland mina (valt via "Visa alla ämnen…" eller kopierat), så att
+     *  ett nytt ämne kan läggas till utan att öppna dialogen. */
+    function renderSubjectHint() {
+      const hintEl = el.querySelector('[data-el="subject-hint"]');
+      if (!hintEl) return;
+      const p = editingPlan();
+      const m = mine();
+      const id = p ? normalizePlan(p).subjectId : null;
+      const show = !!id && !!m && !m.includes(id);
+      hintEl.hidden = !show;
+      hintEl.innerHTML = show
+        ? `<button type="button" class="btn btn--ghost subject-mine-add" data-act="add-mine"
+             title="Ämnet visas alltid för den här planeringen — lägg till det så syns det i alla väljare">
+             ${icon("plus", { size: 14 })} Lägg till "${esc(styleFor(id, subjects).name)}" i mina ämnen</button>`
+        : "";
+    }
+
+    /** Rita om ämnesväljare, ämnesfilter och hinten — utan att röra
+     *  textfälten läraren kan stå i (renderEditor förstör fokus). */
+    function refreshSubjectUI() {
+      const sel = el.querySelector('[data-meta="subjectId"]');
+      const p = editingPlan();
+      if (sel && p) fillSubjectSelect(sel, normalizePlan(p).subjectId);
+      fillSubjectFilter();
+      renderSubjectHint();
     }
 
     async function addCustomSubject() {
@@ -716,6 +778,9 @@ export default {
       await data.put(settingsPath, { id: "subjects", value: { list } });
       // subjects uppdateras via watch; returnera id direkt så vi kan sätta det
       subjects = mergedSubjects([...(this?._settings ?? []).filter((d) => d.id !== "subjects"), { id: "subjects", value: { list } }]);
+      // Ett eget nytt ämne är förstås ett av MINA ämnen (issue #81) —
+      // läggs till automatiskt så det inte "försvinner" ur väljaren.
+      if (mine()) await saveMine(data, withMine(mine(), id));
       return id;
     }
 
@@ -912,6 +977,7 @@ export default {
       el.querySelector('[data-meta="start"]').value = np.start;
       el.querySelector('[data-meta="end"]').value = np.end;
       fillSubjectSelect(el.querySelector('[data-meta="subjectId"]'), np.subjectId);
+      renderSubjectHint();
       fieldsEl.innerHTML = fieldsHTML(np);
     }
     function syncEditor() {
@@ -1007,6 +1073,12 @@ export default {
           lesson: p?.date ? { date: p.date, start: p.start ?? null, end: p.end ?? null, subjectId: p.subjectId ?? null, title: p.name ?? "" } : undefined,
         });
       }
+      else if (act === "add-mine") {
+        // "Lägg till i mina ämnen" — kvickvägen (issue #81), utan dialogen.
+        const p = editingPlan();
+        const id = p ? normalizePlan(p).subjectId : null;
+        if (id && mine()) await saveMine(data, withMine(mine(), id));
+      }
       else if (act === "dup") await copyPlan(editingPlan());
       else if (act === "del") {
         const p = editingPlan();
@@ -1074,6 +1146,25 @@ export default {
         renderAll();
         return;
       }
+      if (metaKey === "subjectId" && e.target.value === SHOW_ALL) {
+        // Visa tillfälligt alla ämnen — planeringens ämne rörs inte.
+        showAllSubjects = true;
+        const p = editingPlan();
+        fillSubjectSelect(e.target, p ? normalizePlan(p).subjectId : "");
+        return;
+      }
+      if (metaKey === "subjectId" && e.target.value === PICK_MINE) {
+        const p = editingPlan();
+        e.target.value = p ? normalizePlan(p).subjectId : "";
+        await openMySubjectsDialog({ data, subjects, mine: mine() });
+        // myDoc uppdateras via watch → refreshSubjectUI ritar om väljarna.
+        return;
+      }
+      if (metaKey === "subjectId") {
+        await patchEditing({ subjectId: e.target.value });
+        renderList(); renderPreview(); renderSubjectHint();
+        return;
+      }
       if (metaKey) { await patchEditing({ [metaKey]: e.target.value }); renderList(); renderPreview(); return; }
 
       const showKey = e.target.dataset.show;
@@ -1126,6 +1217,12 @@ export default {
     }));
     watchStudents(refreshPraise);
     watchPraise(refreshPraise);
+    // Mina ämnen (issue #81) — lärarens privata val, kan ändras från
+    // dialogen här, från Översikt › Inställningar eller en annan enhet.
+    this._offs.push(data.watch(mySubjectsPath(), (docs) => {
+      myDoc = docs.find((d) => d.id === MY_SUBJECTS_DOC) ?? null;
+      refreshSubjectUI();
+    }));
     // Visas för eleverna — även ändringar från lärarens andra fönster.
     watchPresented(() => { renderList(); renderPresentBar(); });
     tickUntilChosen(() => { renderList(); renderPresentBar(); });

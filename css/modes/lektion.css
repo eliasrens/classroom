@@ -118,6 +118,19 @@
 .lesson-panel textarea { resize: vertical; min-height: 2.4em; line-height: 1.4; }
 .lesson-panel .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
 
+/* "Lägg till i mina ämnen" — kvickvägen under Ämne-fältet (issue #81):
+   syns bara när planeringens ämne inte är bland lärarens valda. */
+.subject-mine-hint { margin-top: calc(-1 * var(--space-1)); }
+.subject-mine-hint .subject-mine-add {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 1.8rem;
+  padding: 0 var(--space-2);
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+}
+
 /* Sök + ämnesfilter */
 .plan-filter { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 8.5rem); gap: var(--space-2); }
 .plan-filter__search {
