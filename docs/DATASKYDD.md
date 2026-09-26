@@ -40,6 +40,8 @@ självregistrering).
 - **Mönster och statistik per elev.**
 - **Skrivtavlans text** (de senaste sidorna) — läraren kan skriva elevnamn
   på tavlan, så texten sparas bara lokalt och går aldrig till molnet.
+- **Lottningen** — egna listor, dagens frånvaro, "Redan dragna" och vad som
+  senast drogs. Ingen historik över dragningar sparas i molnet.
 
 Datan lagras i webbläsarens lokala lagring på datorn och visas i
 lärarvyerna med märkningen "Endast den här datorn". Elevskärmen

@@ -408,9 +408,10 @@ export default {
 
       // ---- Händelser ----
 
-      el.addEventListener("click", (e) => {
+      const root = $(".lot");
+      root.addEventListener("click", (e) => {
         const b = e.target.closest("button");
-        if (!b || !el.contains(b)) return;
+        if (!b || !root.contains(b)) return;
         if (b.dataset.list) return selectList(b.dataset.list);
         if (b.dataset.method) return selectMethod(b.dataset.method);
         switch (b.dataset.act) {
@@ -437,7 +438,7 @@ export default {
         }
       });
 
-      el.addEventListener("change", (e) => {
+      root.addEventListener("change", (e) => {
         const t = e.target;
         if (t.matches('[data-act="remove-drawn"]')) {
           settings.removeDrawn[listKey()] = t.checked;
@@ -461,7 +462,7 @@ export default {
         return undefined;
       });
 
-      el.addEventListener("input", (e) => {
+      root.addEventListener("input", (e) => {
         const t = e.target;
         const l = customList(listKey());
         if (!l || !t.dataset.field) return;

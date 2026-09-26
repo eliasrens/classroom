@@ -42,6 +42,12 @@ export const shortcutGroups = () => [
     ],
   },
   {
+    title: "Lottning",
+    items: [
+      { keys: ["Mellanslag"], text: "Dra (när inget fält eller ingen knapp har fokus)" },
+    ],
+  },
+  {
     title: "Veckans övergångar",
     items: [
       { keys: ["←", "→"], text: "Bläddra mellan sidorna (även PageUp/PageDown från en presentationsklickare)" },
