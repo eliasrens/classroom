@@ -44,6 +44,9 @@ självregistrering).
   Sidhuvudet har bara klass, datum och lärarens rubrik, inga elevnamn.
 - **Lottningen** — egna listor, dagens frånvaro, "Redan dragna" och vad som
   senast drogs. Ingen historik över dragningar sparas i molnet.
+- **Tankekartorna** — rubriker och bubblor kan innehålla elevnamn, så
+  kartorna sparas bara lokalt. Utskriften görs med webbläsarens egen
+  utskrift, utan nätverk; sidhuvudet har bara klass och datum.
 
 Datan lagras i webbläsarens lokala lagring på datorn och visas i
 lärarvyerna med märkningen "Endast den här datorn". Elevskärmen

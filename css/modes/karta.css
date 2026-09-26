@@ -85,7 +85,9 @@
 .kt-title[contenteditable]:focus-visible,
 .kt-title[contenteditable]:hover { background: rgb(255 255 255 / 45%); }
 .kt-title[contenteditable]:focus { background: rgb(255 255 255 / 55%); box-shadow: 0 0 0 3px rgb(168 124 47 / 45%); }
-/* Platshållaren: bara grå hint i lärarvyn, aldrig innehåll. */
+/* Platshållaren: bara grå hint i lärarvyn, aldrig innehåll. Markören
+   står först, före hinten (centrerat hamnade den mitt i texten). */
+.kt-title[contenteditable]:empty { text-align: left; }
 .kt-title[contenteditable]:empty::before {
   content: attr(data-placeholder);
   font-size: 32px;
@@ -370,7 +372,8 @@
   background: #fff;
   border: 0;
 }
-.kt-print .kt-bubble { will-change: auto; box-shadow: 0 1px 3px rgb(60 50 30 / 14%); }
+/* Skuggor blir grumliga på papper — kanten räcker där. */
+.kt-print .kt-bubble { will-change: auto; box-shadow: none; }
 .kt-print .kt-cloud__shape { filter: none; }
 
 @media print {

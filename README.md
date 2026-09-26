@@ -77,7 +77,10 @@ js/
                         vecka.js = Veckans övergångar — elevvänlig veckosammanfattning för mentorstiden,
                         skriv.js = Skrivtavla — läraren skriver live på linjerat papper (Andika),
                         skriv/print.js = Skrivtavlans utskrift — linjerat A4, lokalt via window.print(),
-                        lotta.js = Lottning — lyckohjul/namnrulle/dra en lapp (lotta/stage.js = scenen)
+                        lotta.js = Lottning — lyckohjul/namnrulle/dra en lapp (lotta/stage.js = scenen),
+                        karta.js = Tankekarta — moln i mitten, bubblor runt om, flera kartor per klass
+                        (karta/scene.js = scenen, karta/print.js = utskrift A3/A4, karta/palette.js)
+  lib/karta-layout.js   tankekartans layout: ringar runt molnet, inga överlapp, samma bild i alla storlekar
   lib/lotta.js          lottningens logik: rättvis slump, listor, "inga upprepningar", animationsmål
   lib/week.js           veckologik (måndag 00:00) · lib/week-rhythm.js  rent varje måndag
   lib/week-goal.js      trafikljusets veckomål · lib/week-recap.js  veckosammanfattningen (Veckans övergångar)

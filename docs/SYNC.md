@@ -117,6 +117,21 @@ resultatet direkt. Scenen sparas även i den ENDAST LOKALA
 mot storage-eventet som hos Skrivtavlan. Elevskärmen får bara scenens
 alternativ och resultat — aldrig listorna, frånvaron eller "Redan dragna".
 
+Tankekartan (`js/modes/karta.js`, issue #53) skickar kartan som visas vid
+varje ändring (ny/borttagen/flyttad/ändrad bubbla, rubriken medan läraren
+skriver, byte av karta):
+
+```js
+ctx.sync.publish("karta:state", { cid, cur, map: { id, title, bubbles }, rev });
+```
+
+Elevskärmen ritar samma karta (`js/modes/karta/scene.js`) och
+räknar layouten själv i sitt eget bildformat. Kartorna sparas i den ENDAST
+LOKALA `classes/{cid}/karta` (bubblorna kan innehålla elevnamn → aldrig
+Firestore); en omladdad elevskärm läser `state.cur` och kartan därifrån.
+`rev` ordnar bussen mot storage-eventet som hos Skrivtavlan. Elevskärmen
+får bara rubriken och bubblorna — aldrig kartlistan eller namnen i den.
+
 Regler:
 
 1. Payload = ren JSON (structured clone — inga funktioner/DOM-noder).
@@ -168,7 +183,7 @@ mot `startedAt`, så den är korrekt även efter minuter i bakgrunden.
 Fyra lager, alla aktiva samtidigt:
 
 1. **Routern** vägrar montera annat än `STUDENT_MODE_IDS`
-   (`js/modes/registry.js`: morgon, lektion, trafikljus, skriv, lotta, vecka) i elevvyn —
+   (`js/modes/registry.js`: morgon, lektion, trafikljus, skriv, karta, lotta, vecka) i elevvyn —
    även om någon skriver `#/elev/elever` för hand.
 2. **Utskicks-logiken** (`present`) skickar bara ut elev-visningsbara
    lägen: "Visa på elevskärm" är avstängd på Elevlista/Översikt, och
