@@ -1,6 +1,6 @@
 /**
  * TRAFIKLJUSSTATISTIK — delad mellan Läge 3 (js/modes/trafikljus.js)
- * och veckoarkivet (js/modes/statistik.js).
+ * och veckoarkivet (Översikt › Veckor, js/modes/oversikt/veckor.js).
  *
  * Passtyper, veckosummering per typ och formattering. Typerna blandas
  * aldrig: datorer jämförs aldrig med övergångar. Veckan börjar måndag

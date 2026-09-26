@@ -90,6 +90,33 @@ en nyöppnad elevskärm hamnar på rätt sida (regel 3). I enskärmsläget
 bläddertangenterna och publicerar själv (`isSingleScreenWindow()`,
 `js/sync.js`); ett separat elevfönster gör det aldrig.
 
+Skrivtavlan (`js/modes/skriv.js`, issue #46) skickar hela sitt tillstånd
+som `skriv:state` vid varje tangenttryckning (text, markör, storlek,
+Följ, scroll som RADNUMMER) och sparar det med debounce i den ENDAST
+LOKALA `classes/{cid}/skriv/board` — texten kan innehålla elevnamn och
+går aldrig till Firestore. `rev` ordnar bussen mot storage-eventet: en
+sen sparning får aldrig skriva över nyare text på elevskärmen.
+
+Lottningen (`js/modes/lotta.js`, issue #47): LÄRAREN avgör resultatet
+(`crypto.getRandomValues` utan modulo-bias) och skickar
+
+```js
+ctx.sync.publish("lotta:draw", {
+  stage, // scenen: { rev, seq, method, listKey, kind, items: [{ label, color? }], result, angle, reelIndex }
+  draw,  // { seq, method, list, resultIndex, seed, from, to, start, land, startedAt }
+});
+ctx.sync.publish("lotta:stage", stage); // byte av lista/sätt, ångra — ingen animation
+```
+
+Elevskärmen spelar upp exakt samma animation (hjulets vinkel `from`→`to`,
+rullens rad `start`→`land`, lapparnas skakning ur `seed`) i
+`js/modes/lotta/stage.js` och landar på samma resultat. Den startar
+`Date.now() - startedAt` in i animationen; en sent öppnad elevskärm visar
+resultatet direkt. Scenen sparas även i den ENDAST LOKALA
+`classes/{cid}/lotta/stage` (namn → aldrig Firestore); `rev` ordnar bussen
+mot storage-eventet som hos Skrivtavlan. Elevskärmen får bara scenens
+alternativ och resultat — aldrig listorna, frånvaron eller "Redan dragna".
+
 Regler:
 
 1. Payload = ren JSON (structured clone — inga funktioner/DOM-noder).
@@ -141,7 +168,7 @@ mot `startedAt`, så den är korrekt även efter minuter i bakgrunden.
 Fyra lager, alla aktiva samtidigt:
 
 1. **Routern** vägrar montera annat än `STUDENT_MODE_IDS`
-   (`js/modes/registry.js`: morgon, lektion, trafikljus, vecka) i elevvyn —
+   (`js/modes/registry.js`: morgon, lektion, trafikljus, skriv, lotta, vecka) i elevvyn —
    även om någon skriver `#/elev/elever` för hand.
 2. **Utskicks-logiken** (`present`) skickar bara ut elev-visningsbara
    lägen: "Visa på elevskärm" är avstängd på Elevlista/Översikt, och

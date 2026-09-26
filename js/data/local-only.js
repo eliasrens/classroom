@@ -26,12 +26,16 @@
  *                                  exporterats, avvisade påminnelser och
  *                                  bekräftade namnpar för sammanslagning.
  *                                  ALDRIG dekrypterad notisdata.
+ *   classes/{cid}/skriv          — Skrivtavlan (issue #46, doc "board"): lärarens
+ *                                  text kan innehålla elevnamn → bara lokalt.
+ *   classes/{cid}/lotta          — Lottningen (issue #47): listor, frånvaro idag,
+ *                                  "Redan dragna" och scenen — namn → bara lokalt.
  */
 
 const PREFIX = "classroom:local:";
 
 /** Samlings-suffix (sista path-segmentet under classes/{cid}/) som är lokala. */
-const LOCAL_ONLY = new Set(["students", "notes", "praise", "praiseArchive", "privacy", "reports"]);
+const LOCAL_ONLY = new Set(["students", "notes", "praise", "praiseArchive", "privacy", "reports", "skriv", "lotta"]);
 
 /** Är detta en samling som bara får finnas lokalt? */
 export function isLocalOnlyPath(path) {

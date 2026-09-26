@@ -5,7 +5,7 @@ så modellen gäller oavsett om Firebase är anslutet eller ej.
 
 **ELEVDATA ÄR ENDAST LOKAL (issue #32).** Ingenting om enskilda elever
 lämnar lärardatorn: samlingarna `students`, `notes`, `praise`,
-`praiseArchive`, `privacy` och `reports` under en klass routas av datalagret till
+`praiseArchive`, `privacy`, `reports`, `skriv` och `lotta` under en klass routas av datalagret till
 en egen lokal lagring (`js/data/local-only.js`, prefix
 `classroom:local:`) som aldrig går via outboxen eller Firestore.
 Molnet innehåller bara klasstatistik: `sessions` (trafikljuspass) och
@@ -124,8 +124,9 @@ classes/{classId}/classActions/{id}     — KLASSÅTGÄRD (issue #34) — DELAD 
                        sparas inte. Kan inte finnas i reglerna — namnen
                        finns aldrig i molnet.
                      — Följer INTE måndagsrensningen: kunskap som ska finnas
-                       kvar. Statistik bläddrar dem per vecka (createdAt);
-                       Översikt visar de senaste.
+                       kvar. Översikt › Klassåtgärder filtrerar dem per
+                       vecka (createdAt), lärare och kategori; Översikt ›
+                       Idag visar de senaste.
 
 classes/{classId}/classActionReplies/{id} — "Testade också" (issue #34) — DELAD
   actionId           — klassåtgärden svaret gäller
@@ -173,6 +174,40 @@ classes/{classId}/reports/{id}          — elevrapporter (issue #33) — ENDAST
   AES-GCM 256, nyckel via PBKDF2-SHA-256 ≥ 600 000 iterationer, slumpad
   salt + IV per fil; klartextdelen är bara lärare/klass/period/antal) och
   js/modes/elever/report-data.js (nyttolasten, formatVersion 1).
+
+classes/{classId}/skriv/board           — Skrivtavlan (issue #46) — ENDAST LOKALT
+  pages:      [ { text, at } ]      — de senaste sidorna (max 10), äldst först
+  cur:        index i pages          — sidan som visas och skrivs på
+  caret:      teckenindex            — markören (elevskärmen "Följ skrivandet")
+  size:       0–5                    — textstorlek (A−/A+), gäller båda vyerna
+  follow:     bool                   — true: papperet följer skrivandet;
+                                       false: elevskärmen följer lärarens scroll
+  scrollLine: tal                    — lärarens scroll i RADER (inte px)
+  rev:        tal                    — ökar vid varje ändring; elevskärmen
+                                       ignorerar äldre tillstånd än det den visar
+                     — texten kan innehålla elevnamn → lämnar aldrig datorn.
+                       Live via sync-bussen (`skriv:state`, samma form),
+                       sparas med debounce så att en omladdad elevskärm
+                       visar samma text.
+
+classes/{classId}/lotta/{docId}         — Lottningen (issue #47) — ENDAST LOKALT
+  settings:  { list, method, colors, removeDrawn }
+    list:        "klassen" | "farger" | "list-<id>"  — listan man drar ur
+    method:      "hjul" | "rulle" | "lapp" | "direkt"
+    colors:      [färg-id]                        — valda färger (js/lib/lotta.js → COLORS)
+    removeDrawn: { [lista]: bool }                 — "Ta bort den som dragits"
+                                                     (saknas: på för klassen, av för övriga)
+  absent:    { date: "YYYY-MM-DD", ids: [elev-id] } — frånvarande IDAG; gäller
+                                                     bara det datumet (nollställs nästa dag)
+  drawn:     { lists: { [lista]: [nyckel] } }      — "Redan dragna" i dragordning
+                                                     (elev-id, färg-id eller textrad)
+  stage:     { rev, seq, method, listKey, kind, items: [{ label, color? }],
+               result, angle, reelIndex }          — det som visas på scenen, så att en
+                                                     omladdad elevskärm visar samma sak
+  list-<id>: { name, text }                        — egen lista, en rad per alternativ
+                     — innehåller elevnamn → lämnar aldrig datorn. Ingen
+                       historik över dragningar sparas i molnet. Live via
+                       sync-bussen (`lotta:stage`, `lotta:draw`, docs/SYNC.md).
 
 classes/{classId}/settings/{key}        — inställningar per klass
                                           (dokument-id = inställningens namn,
@@ -363,7 +398,8 @@ outboxen som `js/data/datalayer.js` tömmer mot Firestore. Semantik:
   klassåtgärder — men aldrig något om enskilda elever.
 - **ENDAST LOKALT per lärardator** (aldrig via outboxen/Firestore, se
   `js/data/local-only.js`): elevlistan, noteringarna, Bra jobbat med
-  arkiv, gallringsinställningen och rapportloggen (issue #33). Elevskärmen i samma webbläsare
+  arkiv, gallringsinställningen, rapportloggen (issue #33), Skrivtavlans
+  text (issue #46) och Lottningens listor och dragningar (issue #47). Elevskärmen i samma webbläsare
   läser samma lokala lagring (livespegling via storage-eventet).
   Varje notering skapar samtidigt ett anonymt `noteStats`-streck i
   molnet (`js/modes/elever/shared.js` → `createNote`).
@@ -381,8 +417,9 @@ outboxen som `js/data/datalayer.js` tömmer mot Firestore. Semantik:
 - Elevstatistik (noteringar, mönster, tallies i Elevlista och Översikt) och
   trafikljustider (tallies, rekord, veckans pass per typ) **filtreras** på
   innevarande vecka. Ingenting raderas: `notes` och `sessions` behåller all
-  historik, och tidigare veckor visas i arkivet under **Statistik**
-  (`js/modes/statistik.js`, ett lärarläge som aldrig är elev-visningsbart).
+  historik, och tidigare veckor visas i arkivet under **Översikt › Veckor**
+  (`js/modes/oversikt/veckor.js`, i ett lärarläge som aldrig är elev-visningsbart;
+  före issue #45 läget Statistik — `#/statistik` leder dit).
 - **Bra jobbat** (LOKALA `praise/board`, issue #32) är ett tillstånd, inte en
   logg. Första öppningen en ny vecka skriver det LOKALA `praiseArchive/{weekOf}`
   och tömmer listan (`weekOf` = den nya veckan) — helt lokalt per dator
@@ -391,8 +428,8 @@ outboxen som `js/data/datalayer.js` tömmer mot Firestore. Semantik:
   lista, inte heller innan tömningen hunnit sparas.
 - **Lektionsplaneringar rörs aldrig** av veckorytmen.
 - **Klassåtgärder** (`classActions`, issue #34) följer inte måndagsrensningen:
-  Översikt visar de senaste oavsett vecka, och Statistik bläddrar dem per
-  vecka (på `createdAt`) i arkivet som resten.
+  Översikt › Idag visar de senaste oavsett vecka, och Översikt › Klassåtgärder
+  filtrerar dem per vecka (på `createdAt`), lärare och kategori.
 - **Enhetsklockor** (issue #31): veckan räknas på servertid (`serverNow()`,
   se Tidsstämplar och klocka nedan), och med Firebase körs veckorytmen först
   när klockan är mätt mot servern. En dator vars klocka går fel rullar alltså

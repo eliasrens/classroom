@@ -11,8 +11,9 @@ import { createAuth } from "./auth.js";
 import { renderLogin } from "./ui/login.js";
 import { createDataLayer } from "./data/datalayer.js";
 import { createRouter } from "./router.js";
-import { MODES, isStudentMode } from "./modes/registry.js";
+import { DEFAULT_MODE_ID, isStudentMode } from "./modes/registry.js";
 import { initClassPicker, ACTIVE_CLASS_KEY } from "./ui/class-picker.js";
+import { initModeNav } from "./ui/mode-nav.js";
 import { initQuickNote } from "./ui/quick-note.js";
 import { initStudentPanel } from "./ui/student-panel.js";
 import { createSyncBus, isPreviewWindow, announceStudentScreen, watchStudentScreen } from "./sync.js";
@@ -200,7 +201,7 @@ function startApp() {
   // skickas ut (Elevlista/Översikt når som förut ALDRIG elevskärmen).
   const startableMode = () => {
     const { modeId } = store.get();
-    return isStudentMode(modeId) ? modeId : MODES[0].id;
+    return isStudentMode(modeId) ? modeId : DEFAULT_MODE_ID;
   };
 
   // Skicka ut ett läge till alla elevskärmar (och håll indikatorn i synk).
@@ -268,19 +269,8 @@ function startApp() {
     });
   }
 
-  // Lägesmeny
-  const navEl = $("#mode-nav");
-  navEl.innerHTML = MODES
-    .map((m) => `<a class="mode-nav__link" href="#/${m.id}" data-mode="${m.id}">
-        ${icon(m.icon)}<span>${m.title}</span></a>`)
-    .join("");
-
-  store.subscribe(["modeId"], ({ modeId }) => {
-    for (const link of navEl.querySelectorAll("a")) {
-      if (link.dataset.mode === modeId) link.setAttribute("aria-current", "page");
-      else link.removeAttribute("aria-current");
-    }
-  });
+  // Övermenyn: "I klassrummet" + "Lärare ▾" (byggs ur registret, issue #45)
+  initModeNav({ el: $("#mode-nav"), store });
 
   // Klassval
   initClassPicker({ el: $("#class-picker"), store, data });
@@ -296,7 +286,7 @@ function startApp() {
   // beteende: vanligt window.open + befintlig dubbelklick-för-helskärm.
   async function openStudentWindow() {
     const { modeId } = store.get();
-    const target = isStudentMode(modeId) ? modeId : MODES[0].id;
+    const target = isStudentMode(modeId) ? modeId : DEFAULT_MODE_ID;
     const url = `${location.pathname}#/elev/${target}`;
 
     let projector = null;

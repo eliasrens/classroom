@@ -7,7 +7,9 @@
  *
  * Globala nycklar:
  *   classId   — id för vald klass (gäller ALLA lägen, även elevskärm)
- *   modeId    — aktivt läge ('morgon' | 'lektion' | 'trafikljus' | 'elever' | 'oversikt')
+ *   modeId    — aktivt läge (se js/modes/registry.js)
+ *   modeSub   — flik i läget ur adressen (#/oversikt/veckor → 'veckor'),
+ *               null om ingen. Ändras utan att läget remountas.
  *   view      — 'teacher' | 'student' (vilken vy detta fönster visar)
  *   syncState — 'local' | 'online' | 'offline' (sätts av datalagret)
  *   studentOpen — true när en elevskärm är öppen (sätts av presence-
@@ -62,6 +64,7 @@ export function createStore(initial = {}) {
 export const store = createStore({
   classId: null,
   modeId: "morgon",
+  modeSub: null,
   view: "teacher",
   syncState: "local",
   studentOpen: false,

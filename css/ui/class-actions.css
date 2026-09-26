@@ -11,6 +11,7 @@
   align-items: center;
   gap: var(--space-2);
 }
+.ca-section__head > h1,
 .ca-section__head > h2 { margin-right: auto; }
 .ca-section__head select { min-height: 2.1rem; }
 .ca-add { display: inline-flex; align-items: center; gap: var(--space-1); }

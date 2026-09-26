@@ -2,7 +2,7 @@
 
 Webbaserat klassrumsverktyg för mellanstadiet (åk 4) — morgonskärm,
 lektionsplanering, trafikljusur för övergångar, elevlista med noteringar, en
-översiktsvy och Statistik med veckoarkiv (vyerna börjar om rent varje måndag). Ren frontend (HTML5 + CSS + Vanilla JS, **inget byggsteg**), delad
+översiktsvy med veckoarkiv, klassåtgärder och dataskydd (vyerna börjar om rent varje måndag). Ren frontend (HTML5 + CSS + Vanilla JS, **inget byggsteg**), delad
 data mellan lärare via Firebase/Firestore med **offline-first**-datalager.
 
 ## Köra
@@ -71,15 +71,23 @@ js/
   modes/elever/report-*.js, reports.js
                         Elevlista → Rapporter: ladda ned krypterad rapport/utskrift,
                         öppna och slå samman flera lärares filer (helt lokalt)
-  modes/                lägena + registret (oversikt.js = startvyn, statistik.js = veckoarkivet,
-                        vecka.js = Veckans övergångar — elevvänlig veckosammanfattning för mentorstiden)
+  modes/                lägena + registret (registry.js: menyordning + grupp "I klassrummet"/"Lärare"),
+                        oversikt.js = Översikt med flikar (oversikt/: idag, veckor = veckoarkivet,
+                        atgarder = klassåtgärder, installningar = dataskydd),
+                        vecka.js = Veckans övergångar — elevvänlig veckosammanfattning för mentorstiden,
+                        skriv.js = Skrivtavla — läraren skriver live på linjerat papper (Andika),
+                        lotta.js = Lottning — lyckohjul/namnrulle/dra en lapp (lotta/stage.js = scenen)
+  lib/lotta.js          lottningens logik: rättvis slump, listor, "inga upprepningar", animationsmål
   lib/week.js           veckologik (måndag 00:00) · lib/week-rhythm.js  rent varje måndag
   lib/week-goal.js      trafikljusets veckomål · lib/week-recap.js  veckosammanfattningen (Veckans övergångar)
   ui/login.js           login-vy + elevskärmens väntevy
+  ui/mode-nav.js        övermenyn: "I klassrummet" + "Lärare ▾" (+ "Mer ▾"), byggs ur registret
+  ui/menu-button.js     tillgänglig rullgardin (tangentbord, ARIA)
   ui/class-picker.js    klassval i topbaren
   ui/class-actions.js   klassåtgärder: dialoger (ny/ändra, "Testade också") + listan
   ui/help.js            genvägslista under "?" · ui/shortcuts.js  globala tangentgenvägar
   ui/praise-board.js    "Bra jobbat"-tavlan (växer i kolumner, scrollar aldrig) — morgonskärm, lektion
+fonts/andika/           Andika (SIL, OFL.txt) — självhostat för Skrivtavlan, fungerar offline
 firestore.rules         Firestore-säkerhetsregler: inloggning krävs för all läs/skriv
 firebase.json           pekar firebase-CLI:t på firestore.rules (för deploy av regler)
 docs/
