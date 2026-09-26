@@ -43,5 +43,7 @@ som etikettfärg. Listornas ämnesprickar fick en diskret inre ring
 ## Skärmdumpar
 
 - `elev-<ämne>.png` — tavlan i elevvy (#/elev/lektion) för varje ämne
+- `elev-ma-bra-jobbat.png` — tavlan efter merge med #78: Bra jobbat-rubriken
+  (guldstjärna + guldstreck) tillsammans med de nya ämnesfärgerna
 - `planeringslista-ljus.png` — planeringslistan med alla 12 ämnen, ljust tema
 - `larare-ljus.png` / `larare-mork.png` — lärarvyn i ljust respektive mörkt tema
