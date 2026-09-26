@@ -30,6 +30,11 @@
  * - Elevvyn visar planeringen ren (inga kontroller), synkad via
  *   datalagret (presentedPlanId + planeringens innehåll).
  *
+ * - Fällbart i vänsterkolumnen (issue #72, js/ui/collapsible.js): varje
+ *   veckogrupp i listan (standard: bara aktuell vecka öppen), "Om lektionen"
+ *   och "Fält" (standard: infällda, med sammanfattning). Läget sparas per
+ *   dator i localStorage. Innehållet i blocken är oförändrat.
+ *
  * Kontrakt: docs/MODULKONTRAKT.md. Data: DATAMODELL.md.
  * Planeringar OCH presentedPlanId är PRIVATA per lärare
  * (teachers/{uid}/classes/{id}/lessonPlans resp. …/settings/lektion, se
@@ -47,6 +52,7 @@ import { normalize as normalizeMorning, PRAISE_DOC, praisePath } from "../lib/mo
 import { studentLabel } from "../lib/names.js";
 import { serverNow } from "../lib/clock.js";
 import { openClassActionDialog } from "../ui/class-actions.js";
+import { collapsibleHTML, mountCollapsibles } from "../ui/collapsible.js";
 
 /* De nio av-/påslagbara delarna, i den ordning kryssrutorna visas.
    `slot` säger var i tavlan de bor; `list` = flerradsfält. */
@@ -391,6 +397,31 @@ function groupByWeek(list) {
   });
 }
 
+/* ---- Fällbara block (issue #72): nycklar + sammanfattningar ---- */
+
+/** Veckogruppens nyckel ("" = utan datum) — samma som groupByWeek. */
+const weekKeyOf = (p) => { const d = parseISO(p?.date); return d ? isoLocal(mondayOf(d)) : ""; };
+/** Nyckel för veckans fällbara block (sparas i localStorage). */
+const weekFoldKey = (weekKey) => `week:${weekKey || "utan-datum"}`;
+
+/** "Bråk intro · SO · lör 26 sep." — "Om lektionen" när blocket är infällt. */
+function aboutSummary(rawPlan, subjects) {
+  if (!rawPlan) return "Ingen planering";
+  const p = normalizePlan(rawPlan);
+  const d = parseISO(p.date);
+  return [p.name.trim() || "Ny planering", styleFor(p.subjectId, subjects).name, d ? fmtDay(d) : ""]
+    .filter(Boolean).join(" · ");
+}
+
+/** "Vad, Att göra, Mål visas" — "Fält" när blocket är infällt. */
+function fieldsSummary(rawPlan) {
+  if (!rawPlan) return "";
+  const show = normalizePlan(rawPlan).show;
+  const names = FIELD_KEYS.filter((k) => show[k]).map((k) => PARTS.find((p) => p.key === k).label);
+  if (show.praise) names.push("Bra jobbat");
+  return names.length ? `${names.join(", ")} visas` : "Inga fält visas";
+}
+
 /* ============================================================
    MODEN
    ============================================================ */
@@ -558,12 +589,10 @@ export default {
             <div class="plan-list" data-el="list"></div>
           </section>
 
-          <section class="lesson-panel__group">
-            <div class="lesson-panel__headrow">
-              <h2>Om lektionen</h2>
-              <button class="btn ca-add" data-act="class-action"
-                title="Testade ni något nytt arbetssätt på lektionen? Dela hur det gick med de andra lärarna">${icon("plus")}<span>Klassåtgärd</span></button>
-            </div>
+          ${collapsibleHTML({ key: "about", level: 2, className: "lesson-fold", title: "Om lektionen",
+            trail: `<button class="btn ca-add" data-act="class-action"
+                title="Testade ni något nytt arbetssätt på lektionen? Dela hur det gick med de andra lärarna">${icon("plus")}<span>Klassåtgärd</span></button>`,
+            body: `<div class="lesson-panel__group">
             <label class="field-label">Namn
               <input type="text" data-meta="name" autocomplete="off">
             </label>
@@ -583,13 +612,12 @@ export default {
                 <input type="time" data-meta="end">
               </label>
             </div>
-          </section>
+          </div>` })}
 
-          <section class="lesson-panel__group">
-            <h2>Fält</h2>
+          ${collapsibleHTML({ key: "fields", level: 2, className: "lesson-fold", title: "Fält", body: `<div class="lesson-panel__group">
             <p class="field-edit__hint">Kryssrutan slår av/på fältet på tavlan — layouten omfördelar sig automatiskt. Valen sparas med planeringen.</p>
             <div data-el="fields"></div>
-          </section>
+          </div>` })}
         </aside>
 
         <div class="lesson__main">
@@ -608,6 +636,7 @@ export default {
     const subjectFilterEl = el.querySelector('[data-filter="subject"]');
     const selectBtn = el.querySelector('[data-act="select"]');
     const metaInputs = () => [...el.querySelectorAll("[data-meta]")];
+    const panel = el.querySelector(".lesson-panel");
 
     // Listans vy-tillstånd (inte data — sparas inte)
     const filter = { q: "", subject: "" };
@@ -615,12 +644,27 @@ export default {
     const selected = new Set();
     let pendingDelete = null; // [ids] som väntar på bekräftelse
 
+    // -- Fällbara block (issue #72). Standard: bara aktuell vecka öppen,
+    // "Om lektionen" och "Fält" infällda. Lärarens egna klick sparas per
+    // dator (collapsible.js). Veckor som öppnats automatiskt — för att den
+    // valda planeringen ligger där — hålls öppna i minnet men sparas inte.
+    const thisWeekKey = () => isoLocal(mondayOf(parseISO(todayISO())));
+    const autoOpenWeeks = new Set();
+    let revealEditing = true; // öppna den valda planeringens vecka vid nästa listritning
+    const folds = mountCollapsibles(panel, {
+      scope: "lektion",
+      defaults: (key) => key === weekFoldKey(thisWeekKey()),
+      onToggle: (key) => autoOpenWeeks.delete(key),
+    });
+    this._offs.push(() => folds.destroy());
+
     // -- Redigerar nu (bara den här fliken) --
     let editingId = null;
     const editingPlan = () => plans.find((p) => p.id === editingId) ?? null;
     function setEditing(id) {
       editingId = id ?? null;
       setEditingPlanId(activeClass.id, editingId);
+      revealEditing = true;
     }
 
     // -- Visas för eleverna (lärarens PRIVATA inställning, delas med elevskärmen) --
@@ -735,14 +779,37 @@ export default {
       if (vis.length === 0) { listEl.innerHTML = `<p class="field-edit__hint">Inga planeringar matchar sökningen.</p>`; renderBulk(); return; }
       const curId = editingId;
       const shownId = presentedPlan()?.id;
-      listEl.innerHTML = groupByWeek(vis).map((g) => {
+      const groups = groupByWeek(vis);
+      listEl.innerHTML = groups.map((g) => {
         const allSel = selecting && g.plans.every((p) => selected.has(p.id));
-        const head = selecting
-          ? `<label class="plan-week__head"><input type="checkbox" data-week="${esc(g.key)}" ${allSel ? "checked" : ""}> ${esc(g.label)}</label>`
-          : `<div class="plan-week__head">${esc(g.label)}</div>`;
-        return `<div class="plan-week" data-weekgroup="${esc(g.key)}">${head}${g.plans.map((p) => rowHTML(p, curId, shownId)).join("")}</div>`;
+        const check = selecting
+          ? `<input type="checkbox" class="plan-week__check" data-week="${esc(g.key)}" ${allSel ? "checked" : ""} aria-label="Markera alla i ${esc(g.label)}">`
+          : "";
+        return collapsibleHTML({
+          key: weekFoldKey(g.key), level: 3, className: "plan-week-fold", title: esc(g.label), lead: check,
+          body: `<div class="plan-week">${g.plans.map((p) => rowHTML(p, curId, shownId)).join("")}</div>`,
+        });
       }).join("");
+      folds.init();
+      // Den valda planeringens vecka öppnas när planeringen väljs.
+      if (revealEditing && editingPlan()) {
+        const key = weekFoldKey(weekKeyOf(editingPlan()));
+        if (!folds.isOpen(key)) autoOpenWeeks.add(key);
+        revealEditing = false;
+      }
+      const searching = !!filter.q.trim();
+      for (const g of groups) {
+        const key = weekFoldKey(g.key);
+        // Under sökning visas alla träffar (utan att det sparas).
+        if (searching || autoOpenWeeks.has(key)) folds.setOpen(key, true);
+        folds.setSummary(key, g.plans.length === 1 ? "1 planering" : `${g.plans.length} planeringar`);
+      }
       renderBulk();
+    }
+
+    function renderSummaries() {
+      folds.setSummary("about", aboutSummary(editingPlan(), subjects));
+      folds.setSummary("fields", fieldsSummary(editingPlan()));
     }
 
     function renderBulk() {
@@ -788,6 +855,7 @@ export default {
       if (p) renderBoard(stageEl, p, subjects, praise());
       else stageEl.innerHTML = `<div class="lesson-empty"><h1>Ingen planering</h1><p>Skapa en ny planering för att börja.</p></div>`;
       renderPresentBar();
+      renderSummaries();
     }
 
     // "Visa för eleverna" + vad eleverna ser just nu.
@@ -859,6 +927,8 @@ export default {
       const id = await data.put(plansPath, normalizePlan({ name: "Ny planering", date: todayISO(), ownerUid: currentUid() }));
       setEditing(id);
       renderAll();
+      // "Ny planering" öppnar "Om lektionen" (utan att spara läget) och fokuserar Namn.
+      folds.setOpen("about", true);
       const name = el.querySelector('[data-meta="name"]');
       name.focus();
       name.select();
@@ -896,7 +966,6 @@ export default {
     }
 
     // ---- Händelser (event delegation på panelen) ----
-    const panel = el.querySelector(".lesson-panel");
 
     panel.addEventListener("click", async (e) => {
       const copyBtn = e.target.closest("[data-copy]");
@@ -1012,7 +1081,7 @@ export default {
       if (e.target.dataset.filter === "q") { filter.q = e.target.value; renderList(); return; }
 
       const metaKey = e.target.dataset.meta;
-      if (metaKey === "name") { await patchEditing({ name: e.target.value }); renderList(); return; }
+      if (metaKey === "name") { await patchEditing({ name: e.target.value }); renderList(); renderSummaries(); return; }
 
       const fieldKey = e.target.dataset.field;
       if (!fieldKey) return;
