@@ -122,7 +122,9 @@ varje ändring (ny/borttagen/flyttad/ändrad bubbla, rubriken medan läraren
 skriver, byte av karta):
 
 ```js
-ctx.sync.publish("karta:state", { cid, cur, map: { id, title, bubbles }, rev });
+ctx.sync.publish("karta:state", { cid, cur, map: { id, title, cloud, bubbles }, rev });
+// bubbles: [{ id, text, color, parentId, pin? }] — grenar och färger (issue #59).
+// Lärarens markering (vald bubbla) skickas aldrig: elevskärmen har ingen.
 ```
 
 Elevskärmen ritar samma karta (`js/modes/karta/scene.js`) och

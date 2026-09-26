@@ -219,13 +219,25 @@ classes/{classId}/karta/{docId}         — Tankekartorna (issue #53) — ENDAST
     cur:     "map-<id>" | null          — kartan som visas (även på elevskärmen)
     paper:   "a3-landscape" | "a3-portrait" | "a4-landscape" | "a4-portrait"
                                         — senast valda papper för utskrift
-  map-<id>:  { name, title, bubbles, nextColor, rev }
+  map-<id>:  { name, title, cloud, autoColor, bubbles, nextColor, rev }
     name:    ""                         — namnet i kartlistan (bara lärarvyn);
                                           tomt → listan visar rubriken eller "Ny karta"
     title:   ""                         — rubriken i molnet (tom från början)
-    bubbles: [{ id, text, color, pin? }] — i skapandeordning; color = index i
-                                          js/modes/karta/palette.js; pin = { x, y }
-                                          (andel 0–1 av scenen) för en dragen bubbla
+    cloud:   0                          — molnets färg, index i palette.js CLOUD_COLORS
+                                          (issue #59; saknas → 0, samma färg som i #53)
+    autoColor: true                     — "Färglägg bubblor automatiskt": huvudbubblorna
+                                          får var sin färg; false → neutrala (issue #59)
+    bubbles: [{ id, text, color, parentId, pin? }]
+                                        — i skapandeordning. color = index i
+                                          js/modes/karta/palette.js PALETTE, eller null
+                                          för en gren = ärv förälderns färg (ljusare);
+                                          parentId = förälderns id, null = huvudnivå
+                                          (issue #59, högst 3 nivåer — js/modes/karta/tree.js);
+                                          pin = { x, y } (andel 0–1 av scenen) för en
+                                          dragen bubbla
+                     Migrering: kartor från #53 saknar parentId, cloud och autoColor →
+                     alla bubblor huvudnivå, standardmolnet, automatiska färger
+                     (normalizeMap i js/modes/karta.js, när kartan läses).
     nextColor: tal                      — nästa färg i tur och ordning
                      — inga kartor från början och inget förifyllt innehåll.
                        Rubrik och bubblor kan innehålla elevnamn → lämnar

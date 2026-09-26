@@ -12,12 +12,20 @@
  * som läggs på som transform — ingen ommätning, inga avrundningsglapp.
  *
  * Rörelse: bubblorna glider till nya platser och nya bubblor växer fram
- * ur molnet (requestAnimationFrame, kopplingarna följer med). Av med
- * prefers-reduced-motion.
+ * ur molnet — en gren ur sin förälder (requestAnimationFrame,
+ * kopplingarna följer med). Av med prefers-reduced-motion.
+ *
+ * Grenar och färger (issue #59): en gren kopplas till sin förälder med
+ * samma mjuka kurva, i grenens färg, och har något mindre text per nivå.
+ * Molnets färg följer kartan (cloud = index i palette.js CLOUD_COLORS).
+ * I lärarvyn MARKERAS en bubbla med ett klick (inget klick tar bort
+ * något); den markerade har ett × och en tydlig ring. Elevskärmen och
+ * utskriften har ingen markering.
  */
 
 import { layoutMap, sceneSize, baseFontFor, linkPath, cloudPath } from "../../lib/karta-layout.js";
-import { bubbleColor } from "./palette.js";
+import { resolveColors, cloudColor } from "./palette.js";
+import { depths, treeOrder } from "./tree.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const TITLE_FONT = 58;       // rubriken i molnet (virtuella px)
@@ -39,6 +47,7 @@ const ease = (t) => 1 - (1 - t) ** 3;
  * @param {(text:string)=>void} [opts.onTitleInput]
  * @param {(text:string)=>void} [opts.onTitleCommit]
  * @param {(id:string)=>void} [opts.onRemove]
+ * @param {(id:string|null, how:{focusInput?:boolean, via?:string})=>void} [opts.onSelect]
  * @param {(id:string, pin:{x:number,y:number})=>void} [opts.onMove]
  * @param {(id:string, text:string)=>void} [opts.onEdit]
  */
@@ -85,6 +94,8 @@ export function createScene(host, opts = {}) {
   let destroyed = false;
   let dragging = null;     // { id, … } under en dragning
   let editingId = null;
+  let selected = null;     // markerad bubbla (bara lärarvyn)
+  let parentOf = new Map(); // id → förälderns id (grenar)
 
   const canAnimate = () => opts.animate !== false && !reducedMotion() && document.visibilityState === "visible";
 
@@ -126,11 +137,12 @@ export function createScene(host, opts = {}) {
     el.append(text);
     if (editable) {
       el.tabIndex = 0;
-      el.setAttribute("role", "group");
+      el.setAttribute("role", "button");
       const x = document.createElement("button");
       x.type = "button";
       x.className = "kt-bubble__x";
-      x.title = "Ta bort bubblan (kan ångras)";
+      x.title = "Ta bort bubblan och dess grenar (kan ångras)";
+      x.tabIndex = -1;
       x.setAttribute("aria-label", "Ta bort bubblan");
       x.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg>`;
       el.append(x);
@@ -141,7 +153,7 @@ export function createScene(host, opts = {}) {
   }
 
   /**
-   * Rita kartan. map = { title, bubbles: [{ id, text, color, pin? }] } eller null.
+   * Rita kartan. map = { title, cloud?, bubbles: [{ id, text, color, parentId?, pin? }] } eller null.
    * animate: false → allt hoppar direkt (första visningen, storleksbyte).
    */
   function render(next, { animate = true } = {}) {
@@ -157,11 +169,22 @@ export function createScene(host, opts = {}) {
     scene.classList.toggle("is-empty-title", !(map?.title ?? "").trim());
     scene.hidden = !map;
 
-    // Bubblornas DOM i kartans ordning.
+    const cc = cloudColor(map?.cloud);
+    scene.style.setProperty("--kt-cloud", cc.fill);
+    scene.style.setProperty("--kt-cloud-edge", cc.edge);
+    scene.style.setProperty("--kt-title-ink", cc.ink);
+    scene.style.setProperty("--kt-title-soft", cc.soft);
+
+    // Bubblornas DOM i trädordning (= tabbordningen).
     const seen = new Set();
     const font = baseFontFor(bubbles.length);
     scene.style.setProperty("--kt-font", `${font}px`);
-    for (const b of bubbles) {
+    const colors = resolveColors(bubbles);
+    const level = depths(bubbles);
+    const ids = new Set(bubbles.map((b) => b.id));
+    parentOf = new Map(bubbles.map((b) => [b.id, b.parentId && ids.has(b.parentId) ? b.parentId : null]));
+    if (selected && !ids.has(selected)) selected = null;
+    for (const b of treeOrder(bubbles)) {
       seen.add(b.id);
       let node = nodes.get(b.id);
       if (!node) {
@@ -170,11 +193,18 @@ export function createScene(host, opts = {}) {
         links.append(node.link);
       }
       if (editingId !== b.id && node.text.textContent !== b.text) node.text.textContent = b.text;
-      const c = bubbleColor(b.color);
+      const c = colors.get(b.id);
+      const d = level.get(b.id) ?? 1;
       node.el.style.setProperty("--kt-bg", c.bg);
       node.el.style.setProperty("--kt-edge", c.edge);
-      node.el.setAttribute("aria-label", b.text);
+      node.el.classList.toggle("kt-bubble--d2", d === 2);
+      node.el.classList.toggle("kt-bubble--d3", d >= 3);
       node.el.classList.toggle("is-pinned", !!b.pin);
+      node.link.classList.toggle("kt-link--branch", d > 1);
+      if (d > 1) node.link.style.stroke = c.edge; else node.link.style.removeProperty("stroke");
+      node.parent = parentOf.get(b.id);
+      node.label = b.text;
+      applySelected(node, b.id);
       // Ordningen = tabbordningen. Flytta bara det som står fel — en flyttad
       // nod tappar fokus.
       const at = layer.children[seen.size - 1];
@@ -200,11 +230,13 @@ export function createScene(host, opts = {}) {
     const th = hasTitle ? title.offsetHeight : TITLE_FONT * 1.25;
     const rx = Math.max(190, tw / 2 + 92);
     const ry = Math.max(112, th / 2 + 66, rx * 0.46);
+    const index = new Map(bubbles.map((b, i) => [b.id, i]));
     const sizes = bubbles.map((b) => {
       const node = nodes.get(b.id);
       node.w = node.el.offsetWidth;
       node.h = node.el.offsetHeight;
-      return { w: node.w, h: node.h, pin: dragging?.id === b.id ? dragging.pin : b.pin };
+      const p = parentOf.get(b.id);
+      return { w: node.w, h: node.h, pin: dragging?.id === b.id ? dragging.pin : b.pin, parent: p ? index.get(p) : -1 };
     });
 
     const res = layoutMap({ w: dims.w, h: dims.h, cloud: { rx, ry }, bubbles: sizes });
@@ -228,7 +260,11 @@ export function createScene(host, opts = {}) {
       const it = res.items[i];
       const to = { x: it.x, y: it.y, k: res.scale };
       if (dragging?.id === b.id) { node.cur = { ...dragging.pos, k: res.scale }; node.to = null; return; }
-      if (!node.cur) node.cur = anim ? { x: center.x, y: center.y, k: 0.12 } : { ...to };
+      if (!node.cur) {
+        // En ny gren växer fram ur sin förälder, en ny huvudbubbla ur molnet.
+        const from = nodes.get(node.parent)?.cur ?? center;
+        node.cur = anim ? { x: from.x, y: from.y, k: 0.12 } : { ...to };
+      }
       node.from = { ...node.cur };
       node.to = to;
       if (!anim) node.cur = { ...to };
@@ -292,8 +328,35 @@ export function createScene(host, opts = {}) {
       if (!c) continue;
       node.el.style.transform = `translate(${c.x.toFixed(2)}px, ${c.y.toFixed(2)}px) translate(-50%, -50%) scale(${c.k.toFixed(4)})`;
       node.el.style.opacity = c.k < 0.5 ? String(Math.max(0, (c.k - 0.1) / 0.4)) : "";
-      node.link.setAttribute("d", linkPath(center.x, center.y, c.x, c.y));
+      const p = node.parent ? nodes.get(node.parent)?.cur : null;
+      node.link.setAttribute("d", p ? linkPath(p.x, p.y, c.x, c.y) : linkPath(center.x, center.y, c.x, c.y));
     }
+  }
+
+  // ---- Markering (lärarvyn) ----
+
+  function applySelected(node, id) {
+    const on = editable && selected === id;
+    node.el.classList.toggle("is-selected", on);
+    node.el.setAttribute("aria-pressed", String(on));
+    node.el.querySelector(".kt-bubble__x")?.setAttribute("aria-hidden", String(!on));
+    if (editable) {
+      node.el.setAttribute("aria-label", node.label + (node.parent ? `, gren under ${nodes.get(node.parent)?.label ?? ""}` : ""));
+    }
+  }
+
+  function setSelected(id) {
+    selected = id && nodes.has(id) ? id : null;
+    for (const [nid, node] of nodes) applySelected(node, nid);
+  }
+
+  /** Nästa/föregående bubbla i trädordning (= DOM-ordningen). */
+  function neighbour(id, dir) {
+    const els = [...layer.children];
+    if (!els.length) return null;
+    const i = els.findIndex((e) => e.dataset.id === id);
+    if (i < 0) return els[dir > 0 ? 0 : els.length - 1].dataset.id;
+    return els[(i + dir + els.length) % els.length].dataset.id;
   }
 
   // ---- Lärarvyn: rubrik, ×, dra, dubbelklick ----
@@ -325,9 +388,28 @@ export function createScene(host, opts = {}) {
     layer.addEventListener("keydown", (e) => {
       const el = e.target.closest?.(".kt-bubble");
       if (!el || e.target !== el) return;
-      if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); opts.onRemove?.(el.dataset.id); }
-      if (e.key === "Enter" || e.key === "F2") { e.preventDefault(); startEdit(el.dataset.id); }
+      const id = el.dataset.id;
+      if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); opts.onRemove?.(id); }
+      else if (e.key === "F2") { e.preventDefault(); startEdit(id); }
+      else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); opts.onSelect?.(id, { focusInput: true, via: "key" }); }
+      else if (e.key === "Escape") { e.preventDefault(); opts.onSelect?.(null, { focusInput: true, via: "key" }); }
+      else if (["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"].includes(e.key)) {
+        e.preventDefault();
+        const next = neighbour(id, e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1);
+        nodes.get(next)?.el.focus({ preventScroll: true });
+      }
     });
+    // Tangentbordet (Tab, pilar) markerar bubblan som får fokus.
+    layer.addEventListener("focusin", (e) => {
+      const el = e.target.closest?.(".kt-bubble");
+      if (el && e.target === el && !editingId && selected !== el.dataset.id) opts.onSelect?.(el.dataset.id, { via: "focus" });
+    });
+    // Klick på molnet eller på tom yta: tillbaka till huvudnivån.
+    host.addEventListener("click", (e) => {
+      if (e.target.closest(".kt-bubble") || e.target.closest(".kt-title") || (!scene.contains(e.target) && e.target !== host)) return;
+      if (selected) opts.onSelect?.(null, { focusInput: true, via: "pointer" });
+    });
+    title.addEventListener("focus", () => { if (selected) opts.onSelect?.(null, { via: "title" }); });
     layer.addEventListener("dblclick", (e) => {
       const el = e.target.closest(".kt-bubble");
       if (!el || e.target.closest(".kt-bubble__x")) return;
@@ -364,7 +446,12 @@ export function createScene(host, opts = {}) {
         window.removeEventListener("pointerup", up);
         window.removeEventListener("pointercancel", up);
         el.classList.remove("is-dragging");
-        if (!active || !dragging) { dragging = null; return; }
+        if (!active || !dragging) {
+          dragging = null;
+          // Ett klick (ingen dragning) markerar bubblan — tar aldrig bort den.
+          if (!active) opts.onSelect?.(el.dataset.id, { focusInput: true, via: "pointer" });
+          return;
+        }
         const { id, pin } = dragging;
         dragging = null;
         opts.onMove?.(id, pin);
@@ -392,7 +479,7 @@ export function createScene(host, opts = {}) {
     sel.removeAllRanges();
     sel.addRange(range);
     let done = false;
-    const finish = (commit) => {
+    const finish = (commit, byKey = false) => {
       if (done) return;
       done = true;
       t.removeEventListener("keydown", onKey);
@@ -407,11 +494,14 @@ export function createScene(host, opts = {}) {
       } else {
         opts.onEdit?.(id, text);
       }
-      node.el.focus({ preventScroll: true });
+      // Enter/Esc: tillbaka till skrivraden (fortsätt skriva grenar under
+      // bubblan). Klick någon annanstans: fokus stannar där.
+      if (byKey && opts.onSelect) opts.onSelect(id, { focusInput: true, via: "edit" });
+      else if (byKey) node.el.focus({ preventScroll: true });
     };
     const onKey = (e) => {
-      if (e.key === "Enter") { e.preventDefault(); finish(true); }
-      if (e.key === "Escape") { e.preventDefault(); finish(false); }
+      if (e.key === "Enter") { e.preventDefault(); finish(true, true); }
+      if (e.key === "Escape") { e.preventDefault(); finish(false, true); }
       e.stopPropagation();
     };
     const onBlur = () => finish(true);
@@ -421,6 +511,13 @@ export function createScene(host, opts = {}) {
 
   return {
     render,
+    /** Markera en bubbla (null = ingen). Bara lärarvyn. */
+    setSelected,
+    get selected() { return selected; },
+    /** Ändra en bubblas text direkt i bubblan (dubbelklick, F2). */
+    edit(id) { startEdit(id); },
+    /** Ge en bubbla fokus (tangentbordet). */
+    focusBubble(id) { nodes.get(id)?.el.focus({ preventScroll: true }); },
     /** Värdytan har bytt storlek: räkna om utan animation. */
     refit() { if (map !== undefined) render(map, { animate: false }); },
     /** Senaste layoutens nyckeltal (för test och utskrift). */

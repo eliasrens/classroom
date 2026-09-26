@@ -5,7 +5,11 @@
    skalar som helhet till .kt-stage — alla mått här är i den virtuella
    scenens px (1600 × 900 vid 16:9). Ytan har elevtemats ljusa toner även
    i lärarvyn (.theme-student) — den ÄR förhandsvisningen. Bubblornas
-   pastellfärger är innehåll (js/modes/karta/palette.js).
+   pastellfärger och molnets färg är innehåll (js/modes/karta/palette.js;
+   scenen sätter --kt-cloud, --kt-cloud-edge och --kt-title-ink per karta).
+
+   Grenar (issue #59): .kt-bubble--d2 / --d3 har något mindre text; den
+   markerade bubblan (.is-selected, bara lärarvyn) har en blå ring och ×.
    ============================================================ */
 
 .kt-stage {
@@ -42,6 +46,8 @@
   stroke-width: 3.5;
   stroke-linecap: round;
 }
+/* En gren: kurvan i grenens färg (sätts inline), lite tunnare. */
+.kt-link--branch { stroke-width: 3; }
 
 /* ---- Molnet ---- */
 
@@ -78,7 +84,7 @@
   text-align: center;
   text-wrap: balance;
   overflow-wrap: anywhere;
-  color: var(--kt-ink);
+  color: var(--kt-title-ink, var(--kt-ink));
   border-radius: 10px;
   outline: none;
 }
@@ -93,7 +99,7 @@
   font-size: 32px;
   font-weight: 500;
   white-space: nowrap;
-  color: #8a7b5c;
+  color: var(--kt-title-soft, #8a7b5c);
   cursor: text;
 }
 
@@ -127,11 +133,21 @@
   user-select: none;
 }
 .kt-bubble__text { display: block; }
+/* Grenar: något mindre — fortfarande läsbart på projektorn. */
+.kt-bubble--d2 { font-size: calc(var(--kt-font, 32px) * 0.88); border-radius: 0.9em; }
+.kt-bubble--d3 { font-size: calc(var(--kt-font, 32px) * 0.78); border-radius: 0.85em; border-width: 1.5px; }
 
 /* Lärarvyn: fokus, ×, dra, ändra */
-.kt--teacher .kt-bubble { cursor: grab; touch-action: none; }
+.kt--teacher .kt-bubble { cursor: pointer; touch-action: none; }
 .kt--teacher .kt-bubble:focus { outline: none; }
 .kt--teacher .kt-bubble:focus-visible { box-shadow: 0 0 0 4px rgb(168 124 47 / 55%), 0 3px 8px rgb(60 50 30 / 12%); }
+/* Markerad: tydlig ring och glöd (syns även på avstånd). */
+.kt--teacher .kt-bubble.is-selected {
+  z-index: 1;
+  outline: 5px solid #2f6fd6;
+  outline-offset: 4px;
+  box-shadow: 0 0 0 12px rgb(47 111 214 / 18%), 0 6px 16px rgb(30 60 120 / 22%);
+}
 .kt-bubble.is-dragging { cursor: grabbing; z-index: 2; box-shadow: 0 10px 22px rgb(60 50 30 / 22%); }
 .kt-bubble.is-pinned { border-style: dashed; }
 .kt-bubble.is-editing { cursor: text; user-select: text; box-shadow: 0 0 0 4px rgb(168 124 47 / 55%); }
@@ -158,15 +174,12 @@
   transition: opacity 120ms, transform 120ms;
 }
 .kt-bubble__x svg { width: 18px; height: 18px; }
-.kt-bubble:hover .kt-bubble__x,
-.kt-bubble:focus-within .kt-bubble__x { opacity: 1; transform: none; }
+/* × bara på den markerade bubblan — ett klick markerar, tar aldrig bort. */
+.kt-bubble:not(.is-selected) .kt-bubble__x { pointer-events: none; }
+.kt-bubble.is-selected .kt-bubble__x { opacity: 1; transform: none; }
 .kt-bubble__x:hover { background: #a2463d; }
 .kt-bubble.is-dragging .kt-bubble__x,
 .kt-bubble.is-editing .kt-bubble__x { opacity: 0; pointer-events: none; }
-/* Pekskärm (t.ex. interaktiv tavla): ingen hover — × syns alltid, diskret. */
-@media (hover: none) {
-  .kt-bubble__x { opacity: 0.75; transform: none; }
-}
 
 @media (prefers-reduced-motion: reduce) {
   .kt-bubble__x { transition: none; }
@@ -228,9 +241,81 @@
 
 .kt-add {
   display: flex;
+  align-items: center;
   gap: var(--space-2);
-  width: min(100%, 44rem);
+  width: min(100%, 48rem);
   margin: 0 auto;
+}
+/* Var nästa bubbla hamnar: "Runt molnet" eller "Under ”Långskepp”". */
+.kt-target {
+  flex: none;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+}
+.kt-target.is-branch { color: #fff; background: #2f6fd6; border-color: #2f6fd6; font-weight: 600; }
+.kt-add.is-branch .kt-input { border-color: #2f6fd6; }
+
+/* ---- Färgraden: molnet, eller den markerade bubblan ---- */
+
+.kt-colors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+}
+.kt-colors[hidden] { display: none; }
+.kt-colors__label { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kt-swatches { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.kt-swatch {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: var(--sw);
+  border: 2px solid var(--sw-edge);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.kt-swatch:hover { transform: scale(1.08); }
+.kt-swatch:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.kt-swatch[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--color-bg), 0 0 0 5px var(--color-ink); }
+.kt-swatch[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sw-ink, #1f2328);
+}
+/* "Som föräldern": den ärvda nyansen, med en liten pil uppåt. */
+.kt-swatch--inherit::before {
+  content: "↑";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f2328;
+}
+.kt-swatch--inherit[aria-pressed="true"]::after { display: none; }
+.kt-auto { display: inline-flex; align-items: center; gap: var(--space-1); cursor: pointer; }
+.kt-auto[hidden] { display: none; }
+.kt-auto input { margin: 0; accent-color: var(--color-accent); }
+@media (prefers-reduced-motion: reduce) {
+  .kt-swatch:hover { transform: none; }
 }
 .kt-input {
   flex: 1;
@@ -265,6 +350,8 @@
 .kt-danger { border-color: var(--color-danger); color: var(--color-danger); }
 .kt-status { min-height: 1.3em; margin: 0; text-align: center; font-size: var(--text-s); color: var(--color-ink-soft); }
 .kt-hint { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); text-align: center; }
+.kt-hint--main { color: var(--color-ink); }
+.kt-hint kbd { padding: 0 0.35em; font: inherit; font-size: 0.9em; border: 1px solid var(--color-line); border-radius: 4px; }
 
 .kt-printpanel {
   display: flex;
