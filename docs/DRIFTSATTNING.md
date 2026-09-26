@@ -87,8 +87,12 @@ varje lärardator** och delas aldrig (issue #32, se docs/DATASKYDD.md).
 **Lektionsplaneringar är privata** per lärare — var och en ser bara
 sina egna.
 
-> Vill en lärare byta lösenord: gör det i **Authentication → Users**
-> (tre prickar → återställ lösenord).
+> Vill en lärare byta lösenord: **Lärare ▾ → Byt lösenord** i appen
+> (kräver det nuvarande lösenordet, se [AUTH.md](AUTH.md#byt-lösenord)).
+> "Återställ lösenord" i konsolen skickar e-post och fungerar INTE —
+> adresserna `@klassrum.local` är fiktiva. Har läraren glömt lösenordet:
+> ta bort kontot i **Authentication → Users** och skapa det igen med
+> samma förnamn och ett nytt startlösenord.
 
 ## 5. Deploya säkerhetsreglerna
 

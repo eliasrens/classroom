@@ -471,3 +471,63 @@ html[data-theme="student"] .view {
 @media (min-width: 1600px) {
   html[data-theme="teacher"] { --font-base: 16px; }
 }
+
+/* ---- "Lärare ▾": åtgärder efter lägena (issue #49) ---- */
+
+.mode-nav__sep {
+  height: 1px;
+  margin: var(--space-1) var(--space-2);
+  background: var(--color-line);
+}
+.mode-nav__action {
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* ---- Byt lösenord (dialog, lärarvy) ---- */
+
+.pwchange {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+.pwchange__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 45%);
+}
+.pwchange__box {
+  position: relative;
+  width: min(24rem, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  box-shadow: var(--shadow-m);
+}
+.pwchange__head { display: flex; align-items: center; gap: var(--space-2); }
+.pwchange__head strong {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-l);
+}
+.pwchange__head strong svg { color: var(--color-accent-text); }
+.pwchange__show {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+}
+.pwchange__rule { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); }
+.pwchange__done { margin: 0; color: var(--color-ok); font-weight: 600; }
+.pwchange__actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+.pwchange--done .pwchange__actions [type="submit"] { display: none; }

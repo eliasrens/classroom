@@ -28,6 +28,9 @@
  *   auth.setupPassword(pw)       lokalt läge, första start
  *   auth.signIn({name?, password})
  *   auth.signOut()               loggar ut ALLA fönster
+ *   auth.changePassword({current, next})  byt den inloggade lärarens lösenord
+ *                                (kräver ALLTID det nuvarande; fel bär .code
+ *                                som Firebase, se lib/password-change.js)
  *
  * INLOGGNING I FIREBASE-LÄGE: läraren skriver bara sitt FÖRNAMN (eller
  * initialer) — inte en e-postadress. Firebase Auth kräver e-post bakom
@@ -139,6 +142,28 @@ export function createAuth() {
       setSignedIn(cred.user.uid);
     },
 
+    /**
+     * Byt lösenord (issue #49). Det nuvarande lösenordet krävs alltid — en
+     * elev vid en inloggad dator ska inte kunna byta det. Läraren förblir
+     * inloggad och sessionsmarkören rörs inte, så andra fönster (elevskärmen)
+     * påverkas inte. Lösenorden loggas/lagras aldrig i klartext.
+     */
+    async changePassword({ current, next }) {
+      if (mode === "local") {
+        if ((await hashPassword(current)) !== readLS(LOCAL_HASH_KEY)) {
+          throw authError("auth/wrong-password");
+        }
+        writeLS(LOCAL_HASH_KEY, await hashPassword(next));
+        return;
+      }
+      if (!fbAuth) throw authError("auth/network-request-failed");
+      const user = fbAuth.auth.currentUser;
+      if (!user?.email) throw authError("auth/requires-recent-login");
+      const { EmailAuthProvider, reauthenticateWithCredential, updatePassword } = fbAuth.api;
+      await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, current));
+      await updatePassword(user, next);
+    },
+
     async signOut() {
       if (fbAuth) await fbAuth.api.signOut(fbAuth.auth).catch(() => {});
       writeLS(SESSION_KEY, null); // storage-eventet loggar ut övriga fönster
@@ -225,6 +250,10 @@ export function createAuth() {
   });
 
   return auth;
+}
+
+function authError(code) {
+  return Object.assign(new Error(code), { code });
 }
 
 function friendlyFirebaseError(err) {
