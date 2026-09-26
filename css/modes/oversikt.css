@@ -161,12 +161,6 @@
 /* ---- Integritet ---- */
 .ov-privacy { gap: var(--space-3); }
 .ov-privacy__note { margin: 0; color: var(--color-ink-soft); font-size: var(--text-s); }
-.ov-toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  cursor: pointer;
-}
 .ov-field { display: flex; flex-direction: column; gap: var(--space-1); }
 .ov-field__label { font-weight: 600; font-size: var(--text-s); color: var(--color-ink-soft); }
 .ov-field select { max-width: 20rem; }

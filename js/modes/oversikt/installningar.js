@@ -1,21 +1,20 @@
 /**
  * ÖVERSIKT › INSTÄLLNINGAR OCH DATASKYDD (issue #45 — flyttat ur Översikten).
  *
- * De tvärgående integritetsinställningarna (Läge 5): namnvisning
- * (förnamn/initialer), lokal gallring av noteringar med uppgraderings-
- * skyddet "pausad gallring" (#32) och påminnelsen om ej nedladdade
- * uppföljningar (#33), engångsflytten av elevdata ur molnet och
- * "Radera all data" för klassen.
+ * De tvärgående integritetsinställningarna (Läge 5): lokal gallring av
+ * noteringar med uppgraderingsskyddet "pausad gallring" (#32) och
+ * påminnelsen om ej nedladdade uppföljningar (#33), engångsflytten av
+ * elevdata ur molnet (visas bara om molnet faktiskt har elevdata kvar,
+ * #60) och "Radera all data" för klassen.
  */
 
 import { icon } from "../../lib/icons.js";
 import { setActiveClass } from "../../ui/class-picker.js";
-import { saveNameDisplay } from "../elever/shared.js";
 import {
-  savePrivacy, runRetention, RETENTION_OPTIONS, DEFAULT_RETENTION_WEEKS, deleteAllClassData,
+  savePrivacy, runRetention, parsePrivacy, RETENTION_OPTIONS, DEFAULT_RETENTION_WEEKS, deleteAllClassData,
 } from "../../lib/privacy.js";
 import { weekKey } from "../../lib/week.js";
-import { moveStudentDataFromCloud } from "../../data/cloud-cleanup.js";
+import { moveStudentDataFromCloud, cloudHasStudentData } from "../../data/cloud-cleanup.js";
 import { serverNow } from "../../lib/clock.js";
 import { followUpsAtRisk, reportsPath, REPORTS_LOG_ID } from "../elever/report-data.js";
 import { esc } from "./shared.js";
@@ -23,7 +22,7 @@ import { esc } from "./shared.js";
 export function mountInstallningar(el, { data, store }) {
   const offs = [];
   let classes = [];
-  let initials = false;
+  let cloudHasData = false; // flytt-knappen visas bara om molnet har elevdata kvar (#60)
   let retentionWeeks = DEFAULT_RETENTION_WEEKS;
   let retentionAwaiting = false; // uppgraderingsskydd: gallring pausad tills läraren valt
   let localNotes = [];     // LOKALA noteringar — bara för påminnelsen före gallring (issue #33)
@@ -34,13 +33,6 @@ export function mountInstallningar(el, { data, store }) {
   function goReports() {
     try { sessionStorage.setItem("classroom:elever:tab", "rapporter"); } catch { /* ok */ }
     location.hash = "#/elever";
-  }
-
-  // ---- Integritet: namnvisning ----
-  function toggleInitials(on) {
-    const cid = activeId();
-    if (!cid) return;
-    void saveNameDisplay(data, cid, on);
   }
 
   // ---- Integritet: lokal gallring av noteringar (per dator) ----
@@ -79,10 +71,21 @@ export function mountInstallningar(el, { data, store }) {
       const report = await moveStudentDataFromCloud();
       const lines = report.map((r) => `${r.name}: ${r.notes} noteringar → anonym statistik, ${r.deleted} dokument raderade`);
       alert(`Klart — elevdata är flyttad från molnet.\n\n${lines.join("\n")}`);
+      void checkCloud();
     } catch (err) {
       console.warn("[oversikt] flytt av elevdata från molnet misslyckades:", err);
       alert(`Kunde inte slutföra flytten: ${err?.message ?? err}\n\nInget lokalt har gått förlorat — försök igen.`);
     }
+  }
+
+  /** Kontrollera (billigt) om molnet har elevdata kvar. Vid fel visas
+   *  knappen inte — hellre aldrig än förvirrande i normalfallet. */
+  async function checkCloud() {
+    let next = false;
+    try { next = await cloudHasStudentData(); } catch (err) {
+      console.warn("[oversikt] kunde inte kontrollera elevdata i molnet:", err);
+    }
+    if (next !== cloudHasData) { cloudHasData = next; render(); }
   }
 
   // ---- Integritet: radera all data för klassen ----
@@ -115,17 +118,12 @@ export function mountInstallningar(el, { data, store }) {
     el.innerHTML = `
       <section class="ov-section ov-privacy card" aria-label="Integritet och data">
         <h2 class="ov-section__title">${icon("shield")} Integritet &amp; data</h2>
-        <p class="ov-privacy__note"><strong>Elevnoteringar sparas bara på den här datorn.</strong>
-          Elevlistan, noteringarna och Bra jobbat lämnar aldrig datorn — molnet får enbart
-          klasstatistik (trafikljus och anonyma räkningar). Det som ska sparas långsiktigt
-          dokumenteras i skolans system. Endast elevernas förnamn lagras, och noteringar
-          visas aldrig på elevskärmen.</p>
+        <p class="ov-privacy__note"><strong>Elevdata stannar på den här datorn.</strong>
+          Elevlistan, noteringar, Bra jobbat, skrivtavlan och tankekartor sparas bara här.
+          Till molnet går enbart klasstatistik (trafikljus och anonyma räkningar). Det som
+          ska sparas långsiktigt dokumenteras i skolans system, till exempel via
+          Elevlista › Rapporter.</p>
         ${!cls ? `<p class="ov-empty">Välj en klass för att ändra inställningarna.</p>` : `
-        <label class="ov-toggle">
-          <input type="checkbox" data-initials ${initials ? "checked" : ""}>
-          <span>Visa initialer i stället för förnamn (gäller hela lärarvyn)</span>
-        </label>
-
         <label class="ov-field">
           <span class="ov-field__label">Radera noteringar automatiskt efter</span>
           <select data-retention>
@@ -133,7 +131,7 @@ export function mountInstallningar(el, { data, store }) {
               <option value="${o.weeks}" ${o.weeks === retentionWeeks ? "selected" : ""}>${esc(o.label)}</option>`).join("")}
           </select>
         </label>
-        <p class="ov-field__hint">Lokal gallring på den här datorn (standard 12 veckor — en termin).
+        <p class="ov-field__hint">Lokal gallring på den här datorn (standard 20 veckor, ca en termin).
           Rensningen körs automatiskt när klassen öppnas. Klassens anonyma statistik i molnet påverkas inte.</p>
         ${retentionAwaiting ? `
         <div class="ov-retention-pause">
@@ -148,11 +146,12 @@ export function mountInstallningar(el, { data, store }) {
           <button class="btn" data-confirm-retention>Bekräfta ${retentionWeeks} veckor och starta gallringen</button>
         </div>` : ""}
 
+        ${cloudHasData ? `
         <div class="ov-danger">
           <button class="btn" data-migrate>${icon("upload")} Flytta elevdata från molnet</button>
           <span class="ov-danger__hint">Engångsflytt (alla klasser): räknar om molnets gamla noteringar till
             anonym klasstatistik och raderar elevlistor, noteringar och Bra jobbat-arkiv ur molnet.</span>
-        </div>
+        </div>` : ""}
 
         <div class="ov-danger">
           <button class="btn ov-danger__btn" data-del>${icon("trash")} Radera all data för ${esc(cls.name)}</button>
@@ -163,8 +162,7 @@ export function mountInstallningar(el, { data, store }) {
 
   // ---- Händelser (delegering — markupen ritas om) ----
   el.addEventListener("change", (e) => {
-    if (e.target.matches("[data-initials]")) toggleInitials(e.target.checked);
-    else if (e.target.matches("[data-retention]")) void setRetention(e.target.value);
+    if (e.target.matches("[data-retention]")) void setRetention(e.target.value);
   });
   el.addEventListener("click", (e) => {
     if (e.target.closest("[data-confirm-retention]")) void setRetention(retentionWeeks);
@@ -178,10 +176,6 @@ export function mountInstallningar(el, { data, store }) {
 
   const cid = activeId();
   if (cid) {
-    offs.push(data.watch(`classes/${cid}/settings`, (docs) => {
-      initials = docs.find((d) => d.id === "display")?.value?.nameDisplay === "initials";
-      render();
-    }));
     // Lokala noteringar + exportlogg: bara för att varna innan gallringen
     // raderar uppföljningar som aldrig laddats ned (issue #33).
     offs.push(data.watch(`classes/${cid}/notes`, (docs) => { localNotes = docs; render(); }));
@@ -191,14 +185,13 @@ export function mountInstallningar(el, { data, store }) {
     }));
     // Gallringsinställningen är LOKAL per dator (issue #32).
     offs.push(data.watch(`classes/${cid}/privacy`, (docs) => {
-      const value = docs.find((d) => d.id === "privacy")?.value;
-      const weeks = value?.noteRetentionWeeks;
-      retentionWeeks = Number.isFinite(weeks) && weeks > 0 ? weeks : DEFAULT_RETENTION_WEEKS;
-      retentionAwaiting = Boolean(value?.awaitingChoice);
+      ({ noteRetentionWeeks: retentionWeeks, awaitingChoice: retentionAwaiting } =
+        parsePrivacy(docs.find((d) => d.id === "privacy")?.value));
       render();
     }));
   }
 
   render();
+  void checkCloud();
   return offs;
 }

@@ -17,3 +17,17 @@ export function studentLabel(student) {
   const base = student?.firstName ?? "?";
   return student?.tag ? `${base} ${student.tag}` : base;
 }
+
+/** Id för det borttagna initial-lägets inställning (classes/{cid}/settings/display). */
+export const LEGACY_DISPLAY_SETTING_ID = "display";
+
+/**
+ * Städsteg (issue #60): ta bort ett kvarglömt settings/display ur klassens
+ * inställningar. Idempotent — gör inget om dokumentet saknas. Dokumentet
+ * läses aldrig längre, så det är ofarligt om städningen inte hinner köras.
+ */
+export async function removeLegacyNameDisplay(data, cid, settingsDocs) {
+  if (!cid || !settingsDocs?.some((d) => d.id === LEGACY_DISPLAY_SETTING_ID)) return false;
+  await data.remove(`classes/${cid}/settings`, LEGACY_DISPLAY_SETTING_ID);
+  return true;
+}

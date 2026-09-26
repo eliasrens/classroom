@@ -30,7 +30,7 @@ import { renderCard } from "./elever/card.js";
 import { renderPatterns } from "./elever/patterns.js";
 import { renderReports, renderReportBanner, closeReportWorkspace, REPORTS_TAB } from "./elever/reports.js";
 import { reportsPath } from "./elever/report-data.js";
-import { DEFAULT_RETENTION_WEEKS } from "../lib/privacy.js";
+import { parsePrivacy } from "../lib/privacy.js";
 
 const TABS = [
   { id: "registrera", title: "Registrera", icon: "check", render: renderRegister },
@@ -225,12 +225,7 @@ export default {
       safeRefresh();
     }));
     cleanup.push(data.watch(`classes/${cid}/privacy`, (docs) => {
-      const value = docs.find((d) => d.id === "privacy")?.value;
-      const weeks = value?.noteRetentionWeeks;
-      api.privacy = {
-        noteRetentionWeeks: Number.isFinite(weeks) && weeks > 0 ? weeks : DEFAULT_RETENTION_WEEKS,
-        awaitingChoice: Boolean(value?.awaitingChoice),
-      };
+      api.privacy = parsePrivacy(docs.find((d) => d.id === "privacy")?.value);
       safeRefresh();
     }));
     cleanup.push(() => closeReportWorkspace(api));

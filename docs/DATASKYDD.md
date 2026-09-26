@@ -74,8 +74,10 @@ enskild elev.
 ## Lokal gallring
 
 Noteringar raderas automatiskt efter en valbar tid — **standard
-12 veckor (en termin)**, valbart ner till 1 vecka (Översikt →
-Integritet & data). Elevnoteringar sparas bara på den här datorn;
+20 veckor (ca en termin)**, valbart ner till 1 vecka (Översikt →
+Inställningar och dataskydd). Standardvärdet gäller datorer och klasser
+där läraren inte gjort ett aktivt val; ett sparat val (t.ex. 8 veckor)
+ändras aldrig. Elevnoteringar sparas bara på den här datorn;
 det som ska sparas långsiktigt dokumenteras i skolans ordinarie system.
 
 En dator som före uppgraderingen hade "Spara tills vidare" (eller

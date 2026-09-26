@@ -147,13 +147,18 @@ classes/{classId}/praise/board          — Bra jobbat-listan — ENDAST LOKALT
                        listan innehåller elevdata och delas inte längre.
 
 classes/{classId}/privacy/privacy       — lokal gallring — ENDAST LOKALT
-  value: { noteRetentionWeeks,          — standard 12 (en termin), min 1.
+  value: { noteRetentionWeeks,          — standard 20 (ca en termin, #60), min 1.
+                                          Saknas dokumentet gäller standard;
+                                          ett sparat aktivt val ändras aldrig.
            awaitingChoice }             — uppgraderingsskydd: sätts av
                        migreringen när datorn hade "Spara tills vidare"
                        (eller ingen inställning). Gallringen körs INTE
                        förrän läraren bekräftat en lagringstid i
                        Översikten (annars hade lokala noteringar äldre
-                       än 12 veckor raderats tyst vid första öppningen).
+                       än standardtiden raderats tyst vid första
+                       öppningen). Med flaggan satt är det lagrade
+                       veckovärdet bara en platshållare — förvalet är
+                       standard (parsePrivacy i js/lib/privacy.js).
 
 classes/{classId}/reports/{id}          — elevrapporter (issue #33) — ENDAST LOKALT
   log:       { exports: [ { at, from, to, students: null | [studentId] } ] }
@@ -306,10 +311,11 @@ classes/{classId}/settings/vecka        — Veckans övergångar (issue #36): va
                        eller noteringar når elevskärmen.
                        Test: node docs/test-week-recap.mjs
 
-classes/{classId}/settings/display      — namnvisning (togglas i lärarvyn)
-  value: { nameDisplay: "first" | "initials" }
-                     — "initials" = reservläget: initialer räknas
-                       fram ur förnamnet (js/lib/names.js), lagras ej
+classes/{classId}/settings/display      — BORTTAGET (issue #60)
+                     — det tidigare initial-läget. Namn visas alltid som
+                       förnamn (+ tag). Ett kvarglömt dokument läses inte
+                       och tas bort (idempotent) när klassen öppnas i
+                       lärarvyn (removeLegacyNameDisplay, js/lib/names.js).
 
 teachers/{uid}                          — lärarprofil (se docs/AUTH.md)
   email, displayName — skrivs/uppdateras automatiskt vid inloggning
@@ -551,6 +557,5 @@ Skyddet, i `js/lib/clock.js`:
 - **Endast förnamn på elever** — medvetet integritetsval: skärmen
   projiceras i klassrummet och data delas mellan lärare. Namnkrockar
   löses med den valfria `tag`-särskiljaren, aldrig med efternamn.
-  Visningshjälpare (`studentLabel`, `initialsFor`) finns i
-  `js/lib/names.js` och används av alla lägen så att initial-läget
-  fungerar överallt.
+  Visningshjälparen `studentLabel` (förnamn + ev. tag) finns i
+  `js/lib/names.js` och används av alla lägen.
