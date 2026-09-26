@@ -54,6 +54,7 @@ export default {
     // "Bra jobbat"-tavlan: återanvändbar komponent som växer i kolumner.
     // Centerytans högermarginal följer tavlans faktiska bredd (--nt-space).
     const board = createPraiseBoard({
+      title: "Bra jobbat", // utan stjärna (#71)
       className: "morgon__nametavla praise-board--glass",
       clearable: isTeacher,
       onClear: () => clearNt(),
@@ -66,8 +67,13 @@ export default {
         if (!w) { stage.style.removeProperty("--nt-space"); return; }
         const right = parseFloat(getComputedStyle(board.el).right) || 0;
         stage.style.setProperty("--nt-space", `${Math.ceil(w + right * 2)}px`);
+        syncNameSize();
       },
     });
+    // Samma korta guldstreck som under hälsningen, mellan rubrik och namn (#71).
+    const ntRule = document.createElement("hr");
+    ntRule.className = "morgon__rule";
+    board.el.querySelector(".praise-board__head").after(ntRule);
     board.el.hidden = true;
     stage.append(board.el);
     this._board = board;
@@ -110,6 +116,39 @@ export default {
       if (p.kind === "free") return p.text;
       const s = students.find((x) => x.id === p.studentId);
       return s ? studentLabel(s) : null;
+    }
+
+    // Namnen ska vara lika stora som uppgiftsraden (#71). Uppgifternas storlek
+    // beror på kortets bredd, som i sin tur beror på tavlans bredd — mät den
+    // färdiga storleken och anpassa om (några varv räcker; det konvergerar —
+    // toleransen 0,1 px stoppar en ±1 px-växling i tavlans avrundade bredd).
+    let nameSync = 0;
+    function taskFontPx() {
+      const ol = $(".morgon__tasks");
+      let li = ol.querySelector("li");
+      const temp = !li;
+      if (temp) { li = document.createElement("li"); ol.append(li); }
+      const f = parseFloat(getComputedStyle(li).fontSize);
+      if (temp) li.remove();
+      return f;
+    }
+    function syncNameSize() {
+      if (!mounted() || board.el.hidden || nameSync > 4) return;
+      // Rubriken skalas efter namnens faktiska storlek (css/modes/morgon.css).
+      const list = board.el.querySelector(".praise-board__names");
+      const names = `${parseFloat(getComputedStyle(list).fontSize)}px`;
+      if (board.el.style.getPropertyValue("--nt-names") !== names) {
+        board.el.style.setProperty("--nt-names", names);
+        nameSync++;
+        try { board.fit(); } finally { nameSync--; }
+        return;
+      }
+      const f = taskFontPx();
+      const cur = parseFloat(board.el.style.getPropertyValue("--praise-font-max")) || 0;
+      if (!f || Math.abs(f - cur) < 0.1) return;
+      board.el.style.setProperty("--praise-font-max", `${f}px`);
+      nameSync++;
+      try { board.fit(); } finally { nameSync--; }
     }
 
     function renderNametavla() {
@@ -181,6 +220,11 @@ export default {
         open = !open; applyOpen();
         board.fit(); // tavlans maxbredd beror på panelen
         try { localStorage.setItem(PANEL_KEY, open ? "1" : "0"); } catch { /* ok */ }
+      });
+      // Kortet glider åt sidan (padding-övergång) och uppgifternas storlek kan
+      // ändras med det — låt namnen följa med när övergången är klar (#71).
+      $(".morgon__center").addEventListener("transitionend", (e) => {
+        if (e.target === e.currentTarget) board.fit();
       });
 
       // Utfällbara delar (issue #66) — öppet/stängt sparas per dator.
