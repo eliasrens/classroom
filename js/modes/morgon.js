@@ -54,7 +54,9 @@ export default {
     // "Bra jobbat"-tavlan: återanvändbar komponent som växer i kolumner.
     // Centerytans högermarginal följer tavlans faktiska bredd (--nt-space).
     const board = createPraiseBoard({
-      title: "Bra jobbat", // utan stjärna (#71)
+      title: "Bra jobbat",
+      // SVG-stjärna i guld i stället för emoji (#75) — ser likadan ut överallt.
+      titleIcon: icon("star", { strokeWidth: 2.4 }).replace('class="icon"', 'class="icon morgon__star"'),
       className: "morgon__nametavla praise-board--glass",
       clearable: isTeacher,
       onClear: () => clearNt(),

@@ -43,6 +43,7 @@ const STEP = 0.92;
 /**
  * @param {object}   [opts]
  * @param {string}   [opts.title]      rubrik (default "⭐ Bra jobbat!")
+ * @param {string}   [opts.titleIcon]  färdig SVG-markup före rubriken (valfri)
  * @param {boolean}  [opts.clearable]  visa töm-knapp (lärarvy)
  * @param {Function} [opts.onClear]    klick på töm-knappen
  * @param {Function} [opts.maxWidth]   () => px, hur bred rutan högst får bli
@@ -53,6 +54,7 @@ const STEP = 0.92;
 export function createPraiseBoard(opts = {}) {
   const {
     title = "⭐ Bra jobbat!",
+    titleIcon = "",
     clearable = false,
     onClear = null,
     maxWidth = () => Infinity,
@@ -66,7 +68,7 @@ export function createPraiseBoard(opts = {}) {
   el.setAttribute("aria-label", "Bra jobbat");
   el.innerHTML = `
     <header class="praise-board__head">
-      <h2 class="praise-board__title">${escapeHtml(title)}</h2>
+      <h2 class="praise-board__title">${titleIcon}${escapeHtml(title)}</h2>
       ${clearable ? `<button class="praise-board__clear teacher-only btn btn--ghost btn--icon" title="Töm namntavlan" aria-label="Töm namntavlan">${icon("trash")}</button>` : ""}
     </header>
     <ul class="praise-board__names"></ul>`;
