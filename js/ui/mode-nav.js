@@ -18,6 +18,9 @@
  *   3  lärarknappen kortad ("Elevlista ▾" i stället för "Lärare: Elevlista ▾")
  *   4… de minst prioriterade klassrumslägena (högst `priority`) flyttas,
  *      ett i taget, till "Mer ▾". Fler än MAX_INLINE lägen flyttas alltid.
+ * Skulle färre än MIN_INLINE klassrumslägen stå kvar (mycket smalt fönster)
+ * får menyn i stället en egen rad under topbaren (data-wrap) och
+ * komprimeras där på samma sätt.
  * Nivån räknas om när menyns bredd ändras (ResizeObserver) och vid lägesbyte.
  */
 
@@ -27,6 +30,8 @@ import { createMenuButton } from "./menu-button.js";
 
 /** Så många klassrumslägen får stå i raden innan resten alltid går till "Mer ▾". */
 export const MAX_INLINE = 8;
+/** Ryms inte så här många i topbaren får menyn en egen rad. */
+const MIN_INLINE = 3;
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -132,14 +137,24 @@ export function initModeNav({ el, store }) {
 
   const fits = () => rowEl.getBoundingClientRect().width <= el.clientWidth + 0.5;
 
-  let lastWidth = -1;
-  function layout() {
-    if (!el.isConnected || el.clientWidth === 0) return; // dold (t.ex. elevvy)
-    lastWidth = el.clientWidth;
-    const maxLevel = 3 + classroom.length;
+  /** Lägsta nivå som ryms (högst `maxLevel`); false om ingen gör det. */
+  function fitLevel(maxLevel) {
     let level = 0;
     apply(level);
     while (!fits() && level < maxLevel) apply(++level);
+    return fits();
+  }
+
+  let lastWidth = -1;
+  function layout() {
+    if (!el.isConnected || !el.getClientRects().length) return; // dold (t.ex. elevvy)
+    const minInline = Math.min(MIN_INLINE, classroom.length);
+    delete el.dataset.wrap;
+    if (!fitLevel(3 + classroom.length - minInline)) {
+      el.dataset.wrap = "true"; // egen rad under topbaren
+      fitLevel(3 + classroom.length);
+    }
+    lastWidth = el.clientWidth;
   }
 
   store.subscribe(["modeId"], () => { renderActive(); layout(); }); // ritar även direkt

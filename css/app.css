@@ -10,6 +10,7 @@
 
 .topbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   min-height: var(--topbar-height);
@@ -463,11 +464,9 @@ html[data-theme="student"] .view {
   .topbar__brand .brandtext { display: none; }
 }
 
-/* Smalt fönster: menyn får en egen rad under resten av topbaren. */
-@media (max-width: 760px) {
-  .topbar { flex-wrap: wrap; }
-  .mode-nav { order: 99; flex-basis: 100%; }
-}
+/* Smalt fönster: menyn får en egen rad under resten av topbaren
+   (sätts av mode-nav.js när färre än tre klassrumslägen skulle rymmas). */
+.mode-nav[data-wrap="true"] { order: 99; flex-basis: 100%; }
 
 @media (min-width: 1600px) {
   html[data-theme="teacher"] { --font-base: 16px; }
