@@ -270,12 +270,14 @@ function startApp() {
     });
   }
 
-  // Övermenyn: "I klassrummet" + "Lärare ▾" (byggs ur registret, issue #45)
+  // Övermenyn: lärarens fästa lägen + "Verktyg ▾" + "Lärare ▾" (byggs ur
+  // registret, issue #45, #52; de fästa lägena sparas privat per lärare).
   // "Lärare ▾" har även "Byt lösenord" (issue #49) — aldrig på elevskärmen.
   const changePassword = initChangePassword({ store, auth });
   initModeNav({
     el: $("#mode-nav"),
     store,
+    data,
     actions: [{ id: "change-password", title: "Byt lösenord", icon: "lock", run: changePassword.open }],
   });
 

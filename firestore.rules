@@ -35,7 +35,8 @@ rules_version = '2';
 //       (rapportloggen, issue #33 — lokal; nekas även av standardregeln)
 //   PRIVAT per lärare (bara ägaren läser+skriver):
 //     - teachers/{uid}/** (profil, klockmätning, lektionsplaneringar och
-//       vilken planering elevskärmen visar, settings/lektion — issue #39)
+//       vilken planering elevskärmen visar, settings/lektion — issue #39;
+//       fästa lägen i övermenyn, settings/menu — issue #52)
 // ============================================================
 
 service cloud.firestore {

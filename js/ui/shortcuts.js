@@ -5,8 +5,9 @@
  * (timer i trafikljus.js, snabbanteckning i quick-note.js, elevtangenter
  * i elever.js). Genvägslistan visas under "?" (js/ui/help.js).
  *
- *   1–N   byt läge i menyordning (klassrumslägena först, sedan
- *         lärarlägena — navOrder() i js/modes/registry.js, max 9)
+ *   1–N   byt läge i listans ordning (rutinerna, verktygen, sist
+ *         Lärare ▾ — navOrder() i js/modes/registry.js, max 9) —
+ *         oberoende av vilka lägen läraren fäst i övermenyn
  *   E     öppna/fokusera elevskärmen
  *   ?     visa genvägslistan
  *

@@ -49,10 +49,14 @@ export default {
 
 1. **Registrering**: modulen importeras i `js/modes/registry.js` och
    läggs in i `MODES` på sin plats i menyordningen med
-   `group: "classroom"` (I klassrummet — kan visas på elevskärmen) eller
+   `group: "classroom"` (Rutiner) eller `group: "tools"` (Verktyg) — båda
+   listas i "Verktyg ▾" och kan visas på elevskärmen; varje lärare fäster
+   själv vilka som står direkt i övermenyn (js/lib/menu-pins.js) — eller
    `group: "teacher"` (Lärare ▾ — aldrig elevskärmen), ett kort
-   menynamn (`short`) och, för klassrumslägen, `priority` (vilka som
-   flyttas till "Mer ▾" först när menyn inte ryms). Övermenyn,
+   menynamn (`short`) och valfritt `order` (ordning inom gruppen;
+   verktygen har 10, 20, 40, 50 — Tankekarta får 30). Ett nytt läge är
+   inte fäst från början.
+   Kortkommandona numrerar rutinerna, sedan verktygen, sist lärarlägena. Övermenyn,
    sifferkortkommandona och hjälpen byggs ur registret — ingen menykod
    behöver ändras. Flikar i ett läge kan stå i adressen
    (`#/<id>/<flik>` → `store.modeSub`, se js/modes/oversikt.js).

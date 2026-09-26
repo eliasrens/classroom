@@ -303,6 +303,14 @@ teachers/{uid}/meta/clock               — klockmätning (issue #31, js/lib/clo
   at                 — serverTimestamp() vid senaste mätningen
   localAt            — enhetens lokala tid när mätningen skickades (felsökning)
 
+teachers/{uid}/settings/menu            — fästa lägen i övermenyn (issue #52,
+                       js/lib/menu-pins.js). PRIVAT per lärare, ingen elevdata;
+                       följer läraren mellan datorer (i lokalt läge: uid "local").
+  pinned: [modeId, …] — rutiner/verktyg som står direkt i övermenyn; visas i
+                       listans ordning. Okända id ignoreras. Saknas dokumentet
+                       gäller standard: morgon, lektion, trafikljus. Ett nytt
+                       verktyg är inte fäst förrän läraren fäster det.
+
 teachers/{uid}/classes/{classId}/lessonPlans/{planId}
                      — lektionsplanering (Läge 2). PRIVAT per lärare:
                        ligger under lärarens uid, inte under den delade
