@@ -108,7 +108,7 @@
   left: 0;
   box-sizing: border-box;
   width: max-content;
-  max-width: 10.5em;
+  max-width: 12.5em;
   padding: 0.42em 0.9em 0.48em;
   font-size: var(--kt-font, 32px);
   font-weight: 600;

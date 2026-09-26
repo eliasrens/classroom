@@ -36,7 +36,7 @@ function fakeBubbles(n, f, seed = 1) {
     s = (s * 9301 + 49297) % 233280;
     const chars = 3 + (s % 26);                 // 3–28 tecken
     const lines = chars > 16 ? 2 : 1;
-    const w = Math.min(10.5 * f, (Math.min(chars, 16) * 0.58 + 1.8) * f);
+    const w = Math.min(12.5 * f, (Math.min(chars, 16) * 0.58 + 1.8) * f);
     const h = (lines * 1.22 + 0.9) * f + 4;
     out.push({ w, h });
   }

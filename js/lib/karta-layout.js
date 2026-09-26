@@ -57,10 +57,15 @@ const SCALES = [1, 0.93, 0.86, 0.8, 0.74, 0.68, 0.62, 0.57, 0.52, 0.47, 0.42, 0.
 export function layoutMap({ w, h, cloud, bubbles, margin = 22, gap = 16 }) {
   let last = null;
   // Trångt (många bubblor): molnet ger plats — högst 22 % mindre vid 30.
+  // Smalt format (stående papper): molnet får aldrig ta mer än ~46 % av
+  // bredden, annars ryms inga bubblor bredvid det.
   const n = bubbles.length;
-  const crowd = n <= 12 ? 1 : Math.max(0.78, 1 - (n - 12) * 0.012);
+  const crowd = Math.min(
+    n <= 12 ? 1 : Math.max(0.78, 1 - (n - 12) * 0.012),
+    (w * 0.23) / Math.max(1, cloud.rx),
+  );
   for (const scale of SCALES) {
-    const cloudScale = Math.max(0.55, Math.min(crowd, Math.sqrt(scale)));
+    const cloudScale = Math.max(0.45, Math.min(crowd, Math.sqrt(scale)));
     const c = { rx: cloud.rx * cloudScale, ry: cloud.ry * cloudScale };
     const sized = bubbles.map((b) => ({ w: b.w * scale, h: b.h * scale, pin: b.pin ?? null }));
     for (const rings of ringOptions(sized.length)) {
