@@ -291,6 +291,108 @@ html[data-theme="teacher"] .view {
   .page-tabs { display: none !important; }
 }
 
+/* ---- Utfällbar sektion (issue #66, js/ui/collapsible.js) ----
+   Samma utseende i Morgonskärmens och Lektionsplaneringens lärarpaneler:
+   rubrikraden (versaler, grå — som flikradens/panelernas rubriker) är en
+   knapp över hela bredden med pil ▸/▾. Stängd sektion visar en kort
+   sammanfattning i grå text på samma rad. Färgerna ärvs från panelen, så
+   komponenten fungerar på både mörk (morgon) och ljus/mörk (lektion) botten. */
+.collapsible,
+.collapsible__body,
+.collapsible__inner { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.collapsible { display: grid; }
+.collapsible__heading { margin: 0; font: inherit; }
+.collapsible__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 2rem;
+  margin: 0;
+  padding: var(--space-1) var(--space-1);
+  border: 0;
+  border-radius: var(--radius-m);
+  background: none;
+  color: var(--color-ink-soft);
+  font: inherit;
+  font-size: var(--text-s);
+  text-align: left;
+  cursor: pointer;
+}
+.collapsible__head:hover { background: var(--color-surface-alt); color: var(--color-ink); }
+.collapsible__arrow {
+  flex: none;
+  width: 1em;
+  line-height: 1;
+  text-align: center;
+}
+.collapsible__arrow::before { content: "▸"; }
+.collapsible[data-open="true"] > .collapsible__heading .collapsible__arrow::before { content: "▾"; }
+.collapsible__title {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.collapsible__title svg { color: var(--color-accent-text); }
+/* Sammanfattningen: grå, en rad, trunkeras — bara när sektionen är stängd. */
+.collapsible__summary {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--color-ink-soft);
+  font-weight: 400;
+  font-size: 0.95em;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.collapsible__summary > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.collapsible[data-open="true"] > .collapsible__heading .collapsible__summary { visibility: hidden; }
+.collapsible__summary:empty { display: none; }
+
+/* Mjuk öppning: raden går 0fr → 1fr. Stängt innehåll är visibility:hidden
+   (utanför Tab-ordningen och tillgänglighetsträdet) — det slår om först
+   när stängningen är klar tack vare transitionen på visibility. */
+.collapsible__body {
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  transition: grid-template-rows 0.22s ease, visibility 0s linear 0.22s;
+}
+.collapsible[data-open="true"] > .collapsible__body {
+  grid-template-rows: 1fr;
+  visibility: visible;
+  transition: grid-template-rows 0.22s ease, visibility 0s;
+}
+.collapsible__inner {
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  gap: var(--space-2);
+  /* Luft så fokusringar vid kanterna inte klipps av overflow:hidden. */
+  padding-inline: 3px;
+}
+/* Tomma rader först/sist → avstånd till rubriken och nästa sektion
+   (via gap). De klipps bort med resten när sektionen är stängd. */
+.collapsible__inner::before,
+.collapsible__inner::after { content: ""; }
+@media (prefers-reduced-motion: reduce) {
+  .collapsible__body,
+  .collapsible[data-open="true"] > .collapsible__body { transition: none; }
+}
+@media print {
+  .collapsible__head { display: none; }
+}
+
 html[data-theme="student"] .view {
   display: flex;
   flex-direction: column;

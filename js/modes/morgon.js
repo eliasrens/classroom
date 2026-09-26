@@ -22,9 +22,10 @@ import { rolloverPraise } from "../lib/week-rhythm.js";
 import { weekKey } from "../lib/week.js";
 import { serverNow } from "../lib/clock.js";
 import {
-  categoryById, seasonFor, pickSeasonBg, shouldAutoRandomize, dayKey, findImage,
+  categoryById, seasonFor, pickSeasonBg, shouldAutoRandomize, dayKey, findImage, thumbUrl,
 } from "../lib/backgrounds.js";
 import { openBgPicker, closeBgPicker } from "../ui/bg-picker.js";
+import { collapsibleHTML, mountCollapsibles } from "../ui/collapsible.js";
 
 const PANEL_KEY = "classroom:morgon:panelOpen";
 // Ny slumpad bild per sidladdning, men stabil inom sessionen (per klass).
@@ -181,6 +182,10 @@ export default {
         board.fit(); // tavlans maxbredd beror på panelen
         try { localStorage.setItem(PANEL_KEY, open ? "1" : "0"); } catch { /* ok */ }
       });
+
+      // Utfällbara delar (issue #66) — öppet/stängt sparas per dator.
+      const sections = mountCollapsibles(panel, { scope: "morgon", defaults: PANEL_DEFAULTS });
+      this._sections = sections;
 
       // ---- Hälsning ----
       panel.querySelectorAll('input[name="mg-variant"]').forEach((r) => {
@@ -349,7 +354,21 @@ export default {
         });
         syncNtStudents();
         syncBgHint();
+        syncSummaries();
       };
+
+      // Sammanfattningarna på de stängda rubrikraderna.
+      function syncSummaries() {
+        const n = settings.tasks.length;
+        const shown = settings.tasks.filter((t) => t.checked).length;
+        sections.setSummary("tasks",
+          `${n} ${n === 1 ? "uppgift" : "uppgifter"} · ${shown ? `${shown} visas` : "ingen visas"}`);
+        const names = currentPraise(settings).map(praiseName).filter(Boolean).length;
+        sections.setSummary("praise",
+          (names ? `${names} namn` : "Tom") + (settings.showNametavla ? "" : " · dold"));
+        sections.setSummary("greeting", greetingText(settings, activeClass));
+        sections.setSummary("background", { html: bgSummaryHTML(settings.background) });
+      }
 
       const bgHint = $(".morgon__bg-hint");
       function syncBgHint() {
@@ -386,7 +405,7 @@ export default {
         syncNtStudents();
       }
       // exponera för students-watch nedan
-      this._renderNtStudents = renderNtStudents;
+      this._renderNtStudents = () => { renderNtStudents(); syncSummaries(); };
 
       renderTaskControls();
     }
@@ -449,6 +468,8 @@ export default {
     for (const stop of this._stops ?? []) { try { stop(); } catch { /* ok */ } }
     this._stops = null;
     this._renderNtStudents = null;
+    this._sections?.destroy();
+    this._sections = null;
     this._closePicker?.();
     this._closePicker = null;
     this._board?.destroy();
@@ -485,43 +506,41 @@ function renderShell(isTeacher) {
     </div>`;
 }
 
+// Panelens delar är utfällbara (issue #66). Ordning: det som används
+// varje morgon först och öppet; hälsning och bakgrund stängda med en
+// sammanfattning på rubrikraden.
+const PANEL_DEFAULTS = { tasks: true, praise: true, greeting: false, background: false };
+
 function renderPanel() {
   return `
     <div class="morgon__panel-scroll">
-      <section class="morgon__section">
-        <h3>${icon("sunrise")} Hälsning</h3>
+      ${collapsibleHTML({ key: "tasks", className: "morgon__section", icon: icon("check"), title: "Att göra", body: `
+        <div class="morgon__tasklist" role="group" aria-label="Dagens uppgifter"></div>
+        <div class="morgon__addtask">
+          <input class="morgon__addtask-input" type="text" placeholder="Lägg till egen uppgift…" autocomplete="off" aria-label="Ny uppgift">
+          <button class="btn btn--icon morgon__addtask-btn" title="Lägg till uppgift" aria-label="Lägg till uppgift">${icon("plus")}</button>
+        </div>
+        <p class="morgon__hint">Listan visas i den ordning du kryssar i.</p>` })}
+
+      ${collapsibleHTML({ key: "praise", className: "morgon__section", icon: icon("star"), title: "Bra jobbat", body: `
+        <label class="morgon__show"><input type="checkbox" class="morgon__show-nt"> Visa Bra jobbat-tavlan</label>
+        <div class="morgon__ntstudents" role="group" aria-label="Elever"></div>
+        <div class="morgon__addtask">
+          <input class="morgon__ntfree-input" type="text" placeholder="Fritext, t.ex. hela bordsgrupp 3…" autocomplete="off" aria-label="Fritext till Bra jobbat">
+          <button class="btn btn--icon morgon__ntfree-btn" title="Lägg till" aria-label="Lägg till fritext">${icon("plus")}</button>
+        </div>
+        <button class="btn btn--ghost morgon__ntclear">${icon("trash")}<span>Töm Bra jobbat</span></button>` })}
+
+      ${collapsibleHTML({ key: "greeting", className: "morgon__section", icon: icon("sunrise"), title: "Hälsning", body: `
         <div class="morgon__variant">
           <label><input type="radio" name="mg-variant" value="godmorgon"> Godmorgon</label>
           <label><input type="radio" name="mg-variant" value="valkommen"> Välkommen</label>
         </div>
         <input class="morgon__greet-input" type="text" autocomplete="off"
           aria-label="Redigera hälsning" placeholder="Godmorgon 4A!">
-        <p class="morgon__hint">Följer klassvalet — skriv här för att åsidosätta.</p>
-      </section>
+        <p class="morgon__hint">Följer klassvalet — skriv här för att åsidosätta.</p>` })}
 
-      <section class="morgon__section">
-        <h3>${icon("check")} Att göra</h3>
-        <div class="morgon__tasklist" role="group" aria-label="Dagens uppgifter"></div>
-        <div class="morgon__addtask">
-          <input class="morgon__addtask-input" type="text" placeholder="Lägg till egen uppgift…" autocomplete="off" aria-label="Ny uppgift">
-          <button class="btn btn--icon morgon__addtask-btn" title="Lägg till uppgift" aria-label="Lägg till uppgift">${icon("plus")}</button>
-        </div>
-        <p class="morgon__hint">Listan visas i den ordning du kryssar i.</p>
-      </section>
-
-      <section class="morgon__section">
-        <h3>${icon("star")} Namntavla</h3>
-        <label class="morgon__show"><input type="checkbox" class="morgon__show-nt"> Visa namntavla</label>
-        <div class="morgon__ntstudents" role="group" aria-label="Elever"></div>
-        <div class="morgon__addtask">
-          <input class="morgon__ntfree-input" type="text" placeholder="Fritext, t.ex. hela bordsgrupp 3…" autocomplete="off" aria-label="Fritext till namntavlan">
-          <button class="btn btn--icon morgon__ntfree-btn" title="Lägg till" aria-label="Lägg till fritext">${icon("plus")}</button>
-        </div>
-        <button class="btn btn--ghost morgon__ntclear">${icon("trash")}<span>Töm namntavlan</span></button>
-      </section>
-
-      <section class="morgon__section">
-        <h3>${icon("image")} Bakgrund</h3>
+      ${collapsibleHTML({ key: "background", className: "morgon__section", icon: icon("image"), title: "Bakgrund", body: `
         <div class="morgon__bg-buttons">
           <button class="btn morgon__bg-random">${icon("refresh")}<span>Slumpa</span></button>
           <button class="btn morgon__bg-pick" aria-haspopup="dialog">${icon("image")}<span>Välj bild</span></button>
@@ -534,9 +553,20 @@ function renderPanel() {
         <label class="btn btn--ghost morgon__bg-upload">
           ${icon("upload")}<span>Ladda upp egen bild</span>
           <input class="morgon__bg-file" type="file" accept="image/*" hidden>
-        </label>
-      </section>
+        </label>` })}
     </div>`;
+}
+
+/** Bakgrundens sammanfattning: miniatyr + kategori (eller "Egen bild"). */
+function bgSummaryHTML(bg) {
+  const url = bg?.current ?? "";
+  if (!url) return `<span>Ingen bild</span>`;
+  const img = findImage(url);
+  const label = img
+    ? [categoryById(img.category)?.label, img.place].filter(Boolean).join(" · ")
+    : "Egen bild";
+  return `<span>${escapeHtml(label)}</span>`
+    + `<img class="morgon__bg-thumb" src="${escapeAttr(thumbUrl(url))}" alt="" loading="lazy">`;
 }
 
 function taskRow(t) {

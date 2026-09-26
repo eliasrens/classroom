@@ -232,7 +232,7 @@ html[data-theme="teacher"]:has(.morgon) { scrollbar-gutter: auto; }
   overflow: auto;
   padding: var(--space-4) var(--space-3) var(--space-5);
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-2);
   align-content: start;
 }
 
@@ -263,18 +263,17 @@ html[data-theme="teacher"]:has(.morgon) { scrollbar-gutter: auto; }
 /* När panelen är öppen sitter knappen inne i panelens överkant. */
 .morgon__panel-toggle[data-open="true"] { left: calc(min(22rem, 88vw) - 34px - var(--space-3)); }
 
-.morgon__section { display: grid; gap: var(--space-2); }
-.morgon__section h3 {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0 0 var(--space-1);
-  font-size: var(--text-s);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-ink-soft);
+/* Utfällbara delar (issue #66, css/app.css .collapsible). Första rubrikraden
+   lämnar plats för panelens fäll-in-knapp i övre högra hörnet. */
+.morgon__panel-scroll > .collapsible:first-child .collapsible__head { padding-right: calc(34px + var(--space-2)); }
+.morgon__bg-thumb {
+  flex: none;
+  width: 3.2rem;
+  height: 1.8rem;
+  object-fit: cover;
+  border-radius: var(--radius-s, 4px);
+  border: 1px solid var(--color-line);
 }
-.morgon__section h3 svg { color: var(--color-accent-text); }
 
 .morgon__variant { display: flex; gap: var(--space-3); }
 .morgon__variant label,
