@@ -1,0 +1,204 @@
+/**
+ * ÖVERSIKT › INSTÄLLNINGAR OCH DATASKYDD (issue #45 — flyttat ur Översikten).
+ *
+ * De tvärgående integritetsinställningarna (Läge 5): namnvisning
+ * (förnamn/initialer), lokal gallring av noteringar med uppgraderings-
+ * skyddet "pausad gallring" (#32) och påminnelsen om ej nedladdade
+ * uppföljningar (#33), engångsflytten av elevdata ur molnet och
+ * "Radera all data" för klassen.
+ */
+
+import { icon } from "../../lib/icons.js";
+import { setActiveClass } from "../../ui/class-picker.js";
+import { saveNameDisplay } from "../elever/shared.js";
+import {
+  savePrivacy, runRetention, RETENTION_OPTIONS, DEFAULT_RETENTION_WEEKS, deleteAllClassData,
+} from "../../lib/privacy.js";
+import { weekKey } from "../../lib/week.js";
+import { moveStudentDataFromCloud } from "../../data/cloud-cleanup.js";
+import { serverNow } from "../../lib/clock.js";
+import { followUpsAtRisk, reportsPath, REPORTS_LOG_ID } from "../elever/report-data.js";
+import { esc } from "./shared.js";
+
+export function mountInstallningar(el, { data, store }) {
+  const offs = [];
+  let classes = [];
+  let initials = false;
+  let retentionWeeks = DEFAULT_RETENTION_WEEKS;
+  let retentionAwaiting = false; // uppgraderingsskydd: gallring pausad tills läraren valt
+  let localNotes = [];     // LOKALA noteringar — bara för påminnelsen före gallring (issue #33)
+  let reportLog = null;    // lokal exportlogg (classes/{cid}/reports → log)
+  const activeId = () => store.get().classId ?? null;
+
+  /** Elevlista → fliken Rapporter (påminnelsen före gallring, issue #33). */
+  function goReports() {
+    try { sessionStorage.setItem("classroom:elever:tab", "rapporter"); } catch { /* ok */ }
+    location.hash = "#/elever";
+  }
+
+  // ---- Integritet: namnvisning ----
+  function toggleInitials(on) {
+    const cid = activeId();
+    if (!cid) return;
+    void saveNameDisplay(data, cid, on);
+  }
+
+  // ---- Integritet: lokal gallring av noteringar (per dator) ----
+  // Ett aktivt val häver uppgraderingsskyddet; kör gallringen direkt
+  // så att "starta gallringen" i bekräftelsen stämmer.
+  async function setRetention(value) {
+    const cid = activeId();
+    if (!cid) return;
+    // Issue #33: raderar valet noteringar med uppföljning som aldrig laddats
+    // ned? Fråga först — det finns ingen annan kopia av dem.
+    const risk = followUpsAtRisk({ notes: localNotes, weeks: Number(value), log: reportLog, before: serverNow() });
+    if (risk.length > 0) {
+      const weeks = [...new Set(risk.map((n) => weekKey(n.createdAt).replace(/^\d{4}-W0?/, "v.")))].join(", ");
+      const ok = confirm(
+        `${risk.length} ${risk.length === 1 ? "notering" : "noteringar"} med uppföljning (${weeks}) har inte laddats ned ` +
+        "och raderas nu från den här datorn.\n\nRadera ändå?\n\n" +
+        "Välj Avbryt och ladda ned en rapport först: Elevlista → Rapporter.");
+      if (!ok) { render(); return; }
+    }
+    await savePrivacy(data, cid, { noteRetentionWeeks: Number(value) });
+    await runRetention(data, cid);
+  }
+
+  // ---- Integritet: flytta elevdata från molnet (engångs, issue #32) ----
+  async function migrateCloud() {
+    const ok = confirm(
+      "Flytta elevdata från molnet?\n\n" +
+      "Detta gäller ALLA klasser i molnet:\n" +
+      "• Gamla noteringar räknas om till anonym klasstatistik (utan elever och texter).\n" +
+      "• Elevlistor, noteringar och Bra jobbat-arkiv RADERAS ur molnet.\n\n" +
+      "Varje lärardator behåller sin egen lokala kopia. Datorer som inte har " +
+      "öppnat appen med den nya versionen ännu behåller sin cache och migrerar " +
+      "den lokalt vid nästa start.");
+    if (!ok) return;
+    try {
+      const report = await moveStudentDataFromCloud();
+      const lines = report.map((r) => `${r.name}: ${r.notes} noteringar → anonym statistik, ${r.deleted} dokument raderade`);
+      alert(`Klart — elevdata är flyttad från molnet.\n\n${lines.join("\n")}`);
+    } catch (err) {
+      console.warn("[oversikt] flytt av elevdata från molnet misslyckades:", err);
+      alert(`Kunde inte slutföra flytten: ${err?.message ?? err}\n\nInget lokalt har gått förlorat — försök igen.`);
+    }
+  }
+
+  // ---- Integritet: radera all data för klassen ----
+  async function deleteClass() {
+    const cid = activeId();
+    const cls = classes.find((c) => c.id === cid);
+    if (!cid || !cls) return;
+    const typed = prompt(
+      `Detta raderar ALLT för klassen "${cls.name}" — elever, planeringar, ` +
+      `noteringar, pass och inställningar. Det går inte att ångra.\n\n` +
+      `Skriv klassens namn (${cls.name}) för att bekräfta:`
+    );
+    if (typed == null) return;
+    if (typed.trim() !== cls.name) { alert("Namnet stämde inte — inget raderades."); return; }
+    const n = await deleteAllClassData(data, cid);
+    // Ingen klass vald efteråt: "Välj klass…" (samma fallback som
+    // klassväljaren, #31). Välj ALDRIG automatiskt en annan (riktig) klass —
+    // lärarvyn börjar skriva där direkt (veckorytm, autosparning).
+    setActiveClass(store, null);
+    alert(`Klart — ${n} poster raderade för "${cls.name}".`);
+  }
+
+  function render() {
+    const cid = activeId();
+    const cls = classes.find((c) => c.id === cid) ?? null;
+    const risk = retentionAwaiting
+      ? followUpsAtRisk({ notes: localNotes, weeks: retentionWeeks, log: reportLog, before: serverNow() })
+      : [];
+
+    el.innerHTML = `
+      <section class="ov-section ov-privacy card" aria-label="Integritet och data">
+        <h2 class="ov-section__title">${icon("shield")} Integritet &amp; data</h2>
+        <p class="ov-privacy__note"><strong>Elevnoteringar sparas bara på den här datorn.</strong>
+          Elevlistan, noteringarna och Bra jobbat lämnar aldrig datorn — molnet får enbart
+          klasstatistik (trafikljus och anonyma räkningar). Det som ska sparas långsiktigt
+          dokumenteras i skolans system. Endast elevernas förnamn lagras, och noteringar
+          visas aldrig på elevskärmen.</p>
+        ${!cls ? `<p class="ov-empty">Välj en klass för att ändra inställningarna.</p>` : `
+        <label class="ov-toggle">
+          <input type="checkbox" data-initials ${initials ? "checked" : ""}>
+          <span>Visa initialer i stället för förnamn (gäller hela lärarvyn)</span>
+        </label>
+
+        <label class="ov-field">
+          <span class="ov-field__label">Radera noteringar automatiskt efter</span>
+          <select data-retention>
+            ${RETENTION_OPTIONS.map((o) => `
+              <option value="${o.weeks}" ${o.weeks === retentionWeeks ? "selected" : ""}>${esc(o.label)}</option>`).join("")}
+          </select>
+        </label>
+        <p class="ov-field__hint">Lokal gallring på den här datorn (standard 12 veckor — en termin).
+          Rensningen körs automatiskt när klassen öppnas. Klassens anonyma statistik i molnet påverkas inte.</p>
+        ${retentionAwaiting ? `
+        <div class="ov-retention-pause">
+          <p><strong>Gallringen är pausad.</strong> Den här datorn hade tidigare
+            "Spara tills vidare", så inga noteringar raderas förrän du bekräftar
+            en lagringstid ovan. Äldre noteringar än den valda tiden raderas då
+            från den här datorn.</p>
+          ${risk.length ? `
+          <p class="ov-retention-risk">${icon("flag")} <strong>${risk.length} ${risk.length === 1 ? "notering" : "noteringar"} med uppföljning
+            raderas när du bekräftar</strong> och har inte laddats ned.
+            <button class="ov-link" data-go-reports>Ladda ned en rapport först (Elevlista → Rapporter).</button></p>` : ""}
+          <button class="btn" data-confirm-retention>Bekräfta ${retentionWeeks} veckor och starta gallringen</button>
+        </div>` : ""}
+
+        <div class="ov-danger">
+          <button class="btn" data-migrate>${icon("upload")} Flytta elevdata från molnet</button>
+          <span class="ov-danger__hint">Engångsflytt (alla klasser): räknar om molnets gamla noteringar till
+            anonym klasstatistik och raderar elevlistor, noteringar och Bra jobbat-arkiv ur molnet.</span>
+        </div>
+
+        <div class="ov-danger">
+          <button class="btn ov-danger__btn" data-del>${icon("trash")} Radera all data för ${esc(cls.name)}</button>
+          <span class="ov-danger__hint">Elever, planeringar, noteringar, pass — allt, både på datorn och i molnet. Kan inte ångras.</span>
+        </div>`}
+      </section>`;
+  }
+
+  // ---- Händelser (delegering — markupen ritas om) ----
+  el.addEventListener("change", (e) => {
+    if (e.target.matches("[data-initials]")) toggleInitials(e.target.checked);
+    else if (e.target.matches("[data-retention]")) void setRetention(e.target.value);
+  });
+  el.addEventListener("click", (e) => {
+    if (e.target.closest("[data-confirm-retention]")) void setRetention(retentionWeeks);
+    else if (e.target.closest("[data-go-reports]")) goReports();
+    else if (e.target.closest("[data-migrate]")) void migrateCloud();
+    else if (e.target.closest("[data-del]")) void deleteClass();
+  });
+
+  // ---- Datakällor (live) ----
+  offs.push(data.watch("classes", (docs) => { classes = docs; render(); }));
+
+  const cid = activeId();
+  if (cid) {
+    offs.push(data.watch(`classes/${cid}/settings`, (docs) => {
+      initials = docs.find((d) => d.id === "display")?.value?.nameDisplay === "initials";
+      render();
+    }));
+    // Lokala noteringar + exportlogg: bara för att varna innan gallringen
+    // raderar uppföljningar som aldrig laddats ned (issue #33).
+    offs.push(data.watch(`classes/${cid}/notes`, (docs) => { localNotes = docs; render(); }));
+    offs.push(data.watch(reportsPath(cid), (docs) => {
+      reportLog = docs.find((d) => d.id === REPORTS_LOG_ID) ?? null;
+      render();
+    }));
+    // Gallringsinställningen är LOKAL per dator (issue #32).
+    offs.push(data.watch(`classes/${cid}/privacy`, (docs) => {
+      const value = docs.find((d) => d.id === "privacy")?.value;
+      const weeks = value?.noteRetentionWeeks;
+      retentionWeeks = Number.isFinite(weeks) && weeks > 0 ? weeks : DEFAULT_RETENTION_WEEKS;
+      retentionAwaiting = Boolean(value?.awaitingChoice);
+      render();
+    }));
+  }
+
+  render();
+  return offs;
+}

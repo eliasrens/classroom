@@ -3,7 +3,11 @@
  *
  * Rutter:
  *   #/<modeId>        lärarvy för ett läge      t.ex. #/morgon
+ *   #/<modeId>/<sub>  lärarvy + flik i läget    t.ex. #/oversikt/veckor
+ *                     (store.modeSub; byte av flik remountar INTE läget)
  *   #/elev/<modeId>   elevvy (projektor/elevskärm) för samma läge
+ *   Gamla adresser (MODE_ALIASES, t.ex. #/statistik) skrivs om till sin
+ *   nya plats (#/oversikt/veckor) utan att lämna ett extra historiksteg.
  *
  * Routern äger livscykeln: den unmountar aktivt läge och mountar
  * nästa enligt MODULKONTRAKTET. Byte av klass remountar aktivt läge
@@ -22,7 +26,7 @@
  *    aldrig skriva över det läge som visas nu.
  */
 
-import { getMode, DEFAULT_MODE_ID, isStudentMode } from "./modes/registry.js";
+import { getMode, DEFAULT_MODE_ID, isStudentMode, MODE_ALIASES } from "./modes/registry.js";
 
 /** Maxtid per livscykelsteg. Ett friskt läge monteras på millisekunder. */
 export const STEP_TIMEOUT_MS = 3000;
@@ -47,11 +51,19 @@ export function createRouter({ store, data, viewEl, sync, stepTimeoutMs = STEP_T
     const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
     const isStudent = parts[0] === "elev";
     let modeId = (isStudent ? parts[1] : parts[0]) || DEFAULT_MODE_ID;
-    if (!getMode(modeId)) modeId = DEFAULT_MODE_ID;
+    let modeSub = isStudent ? null : (parts[1] ?? null);
+    const alias = Object.hasOwn(MODE_ALIASES, modeId) ? MODE_ALIASES[modeId] : null;
+    if (alias) {
+      modeId = alias.modeId;
+      modeSub = alias.sub ?? null;
+      // Byt ut den gamla adressen mot den nya (ingen ny historikpost).
+      if (!isStudent) history.replaceState(null, "", `#/${modeId}${modeSub ? `/${modeSub}` : ""}`);
+    }
+    if (!getMode(modeId)) { modeId = DEFAULT_MODE_ID; modeSub = null; }
     // SPÄRR: elevvyn kan bara visa elevlägen — lärarlägen (elevlista,
     // översikt, noteringar) får aldrig renderas på projektorn.
     if (isStudent && !isStudentMode(modeId)) modeId = DEFAULT_MODE_ID;
-    return { view: isStudent ? "student" : "teacher", modeId };
+    return { view: isStudent ? "student" : "teacher", modeId, modeSub };
   }
 
   /**
@@ -139,8 +151,8 @@ export function createRouter({ store, data, viewEl, sync, stepTimeoutMs = STEP_T
   }
 
   function onHashChange() {
-    const { view, modeId } = parseHash();
-    store.set({ view, modeId });
+    const { view, modeId, modeSub } = parseHash();
+    store.set({ view, modeId, modeSub });
   }
 
   return {

@@ -11,17 +11,23 @@
  */
 
 import { icon } from "../lib/icons.js";
+import { shortTitle } from "../modes/registry.js";
+import { shortcutModes } from "./shortcuts.js";
+
+const modeCount = () => shortcutModes().length;
 
 /**
  * SANNINGSKÄLLA för genvägarna. shortcuts.js implementerar de globala;
  * timer-genvägarna ligger i js/modes/trafikljus.js, snabbanteckningen i
  * js/ui/quick-note.js och elevtangenter/ångra i js/modes/elever.js.
  */
-export const SHORTCUT_GROUPS = [
+export const shortcutGroups = () => [
   {
     title: "Överallt",
     items: [
-      { keys: ["1", "–", "7"], text: "Byt läge (Morgon, Lektion, Trafikljus, Elever, Översikt, Statistik, Veckans övergångar)" },
+      // Siffrorna följer övermenyns ordning: klassrumslägena, sedan Lärare ▾.
+      { keys: ["1", "–", String(modeCount())], text: `Byt läge: ${shortcutModes()
+        .map((m, i) => `${i + 1} ${shortTitle(m)}`).join(" · ")}` },
       { keys: ["E"], text: "Öppna eller fokusera elevskärmen" },
       { keys: ["F9"], text: "Snabbanteckning om en elev" },
       { keys: ["?"], text: "Visa den här genvägslistan" },
@@ -45,7 +51,7 @@ export const SHORTCUT_GROUPS = [
   {
     title: "Elevlista — Registrera",
     items: [
-      { keys: ["Elevens tangent"], text: "Snabbnotering på eleven (1–7 och E byter inte läge här — klicka i menyn)" },
+      { keys: ["Elevens tangent"], text: `Snabbnotering på eleven (1–${modeCount()} och E byter inte läge här — klicka i menyn)` },
       { keys: ["Shift", "+", "tangent"], text: "Positiv notering i stället" },
       { keys: ["Ctrl", "+", "Z"], text: "Ångra senaste noteringen" },
     ],
@@ -85,7 +91,7 @@ export function initHelp({ store }) {
           <strong>${icon("keyboard")} Tangentbordsgenvägar</strong>
           <button class="btn btn--ghost btn--icon" data-close aria-label="Stäng">${icon("x")}</button>
         </header>
-        <div class="help__body">${SHORTCUT_GROUPS.map(groupHTML).join("")}</div>
+        <div class="help__body">${shortcutGroups().map(groupHTML).join("")}</div>
         <p class="help__foot">Genvägar pausar när du skriver i ett fält.</p>
       </div>`;
     document.body.append(root);

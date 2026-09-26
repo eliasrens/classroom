@@ -41,7 +41,6 @@
   font-size: 13px;
   font-weight: 700;
 }
-.topbar__spacer { flex: 1; }
 
 /* Elevvy: rent, inga verktygsfält */
 html[data-theme="student"] .topbar { display: none; }
@@ -65,28 +64,124 @@ html[data-theme="student"] .teacher-only { display: none !important; }
 }
 #open-student-view[data-open="true"]::after { background: var(--color-ok); opacity: 1; }
 
-/* ---- Lägesmeny: låg profil, aktiv markeras med accenttext ---- */
+/* ---- Övermenyn: två grupper (issue #45, js/ui/mode-nav.js) ----
+   Menyn får platsen som blir över i topbaren (flex-basis 0) — resten av
+   raden (klassval, elevskärm, synkstatus …) trängs aldrig ut. Ryms den
+   inte komprimerar mode-nav.js den stegvis via data-level (0–3) och
+   flyttar till slut lägen till "Mer ▾". */
 
-.mode-nav { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+.mode-nav { flex: 1 1 0; min-width: 0; }
 
-.mode-nav__link {
+.mode-nav__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: max-content;
+}
+
+.mode-nav__group { display: flex; align-items: center; gap: var(--space-1); }
+
+.mode-nav__caption {
+  margin-right: var(--space-1);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+  white-space: nowrap;
+}
+
+.mode-nav__divider {
+  width: 1px;
+  height: 22px;
+  background: var(--color-line);
+}
+
+.mode-nav__link,
+.mode-nav__btn {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-m);
   border: 1px solid transparent;
+  background: none;
+  font: inherit;
   text-decoration: none;
   color: var(--color-ink-soft);
   white-space: nowrap;
+  cursor: pointer;
 }
-.mode-nav__link:hover { background: var(--color-surface-alt); color: var(--color-ink); }
-.mode-nav__link[aria-current="page"] {
+.mode-nav__link:hover,
+.mode-nav__btn:hover { background: var(--color-surface-alt); color: var(--color-ink); }
+
+/* Aktivt läge: accentyta + understreck — syns även i ikonläget. */
+.mode-nav__link[aria-current="page"],
+.mode-nav__menu[data-current="true"] > .mode-nav__btn {
   background: var(--color-accent-soft);
   border-color: var(--color-line);
   color: var(--color-accent-text);
   font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--color-accent);
 }
+
+.mode-nav__btn[aria-expanded="true"] { background: var(--color-surface-alt); color: var(--color-ink); }
+.mode-nav__btn-icon { display: contents; }
+.mode-nav__chevron { display: inline-flex; margin-left: calc(-1 * var(--space-1)); opacity: 0.8; }
+.mode-nav__btn[aria-expanded="true"] .mode-nav__chevron { transform: rotate(180deg); }
+
+/* Komprimering (se mode-nav.js). */
+.mode-nav[data-level="1"] .mode-nav__caption,
+.mode-nav[data-level="2"] .mode-nav__caption,
+.mode-nav[data-level="3"] .mode-nav__caption,
+.mode-nav[data-level="2"] .mode-nav__label,
+.mode-nav[data-level="3"] .mode-nav__label,
+.mode-nav[data-level="3"] .mode-nav__teacher-prefix { display: none; }
+.mode-nav[data-level="2"] .mode-nav__link,
+.mode-nav[data-level="3"] .mode-nav__link { padding-inline: var(--space-2); }
+.mode-nav[data-level="2"] .mode-nav__link svg,
+.mode-nav[data-level="3"] .mode-nav__link svg { width: 1.35em; height: 1.35em; }
+
+/* Rullgardinerna (Lärare ▾, Mer ▾) */
+.mode-nav__menu { position: relative; }
+
+.mode-nav__popup {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  min-width: 13rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-1);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-m);
+}
+.mode-nav__popup--end { left: auto; right: 0; }
+
+.mode-nav__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-m);
+  text-decoration: none;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+.mode-nav__item svg { color: var(--color-ink-soft); }
+.mode-nav__item:hover,
+.mode-nav__item:focus-visible { background: var(--color-surface-alt); outline: none; }
+.mode-nav__item:focus-visible { box-shadow: inset 0 0 0 2px var(--color-accent); }
+.mode-nav__item[aria-current="page"] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-text);
+  font-weight: 600;
+}
+.mode-nav__item[aria-current="page"] svg { color: currentColor; }
 
 /* ---- Klassval ---- */
 
@@ -363,9 +458,15 @@ html[data-theme="student"] .view {
 
 /* ---- Responsivt: laptop ↔ projektor ---- */
 
-@media (max-width: 1100px) {
-  .topbar { flex-wrap: wrap; }
+/* Namnet i topbaren ger plats åt menyn på laptopskärmar. */
+@media (max-width: 1440px) {
   .topbar__brand .brandtext { display: none; }
+}
+
+/* Smalt fönster: menyn får en egen rad under resten av topbaren. */
+@media (max-width: 760px) {
+  .topbar { flex-wrap: wrap; }
+  .mode-nav { order: 99; flex-basis: 100%; }
 }
 
 @media (min-width: 1600px) {

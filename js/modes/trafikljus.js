@@ -537,7 +537,7 @@ export default {
           <h3>Veckans pass · ${KINDS[statsKind].label}</h3>
           <ul class="tl-passes">${latestRows}</ul>
           ${latest.length > shown ? `<button type="button" class="btn btn--ghost tl-more" data-stats-more>Visa fler (${latest.length - shown} till)</button>` : ""}
-          <p class="tl-archive-hint">Tidigare veckor finns i <a href="#/statistik">Statistik</a>.</p>
+          <p class="tl-archive-hint">Tidigare veckor finns under <a href="#/oversikt/veckor">Översikt › Veckor</a>.</p>
         </div>`;
     }
 

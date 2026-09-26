@@ -3,7 +3,7 @@
  *
  * En vecka börjar måndag 00:00 LOKAL tid. "Rent varje måndag" betyder
  * att vyerna FILTRERAR på innevarande vecka — ingen data raderas; äldre
- * veckor visas i arkivet under Statistik (js/modes/statistik.js).
+ * veckor visas i arkivet under Översikt › Veckor (js/modes/oversikt/veckor.js).
  *
  * Alla funktioner tar tiden som parameter (standard serverNow() — den
  * korrigerade klockan, js/lib/clock.js) så att de går att testa med falsk

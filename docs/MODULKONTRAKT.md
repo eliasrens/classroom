@@ -27,7 +27,7 @@ export default {
    *                //   teacher: kompakt arbetsvy (lärarens laptop)
    *                //   student: projektorvy — få element, stor text
    *   activeClass, // klassdokumentet { id, name, … } eller null
-   *   store,       //  globalt tillstånd (js/store.js): classId, modeId, view, syncState, studentOpen
+   *   store,       //  globalt tillstånd (js/store.js): classId, modeId, modeSub, view, syncState, studentOpen
    *   data,        //  datalagret (js/data/datalayer.js): list/get/put/patch/remove/watch
    *   sync,        //  sync-bussen (js/sync.js): publish/on — omedelbara händelser
    *                //  lärare→elevskärm, t.ex. timerstart. Kontrakt: docs/SYNC.md
@@ -47,9 +47,15 @@ export default {
 
 ## Regler
 
-1. **Registrering**: modulen importeras i `js/modes/registry.js`
-   (platshållarna är redan registrerade — ersätt filens innehåll,
-   behåll `id`).
+1. **Registrering**: modulen importeras i `js/modes/registry.js` och
+   läggs in i `MODES` på sin plats i menyordningen med
+   `group: "classroom"` (I klassrummet — kan visas på elevskärmen) eller
+   `group: "teacher"` (Lärare ▾ — aldrig elevskärmen), ett kort
+   menynamn (`short`) och, för klassrumslägen, `priority` (vilka som
+   flyttas till "Mer ▾" först när menyn inte ryms). Övermenyn,
+   sifferkortkommandona och hjälpen byggs ur registret — ingen menykod
+   behöver ändras. Flikar i ett läge kan stå i adressen
+   (`#/<id>/<flik>` → `store.modeSub`, se js/modes/oversikt.js).
 2. **Data**: läs/skriv ENBART via `ctx.data` med paths ur
    `DATAMODELL.md`, alltid under vald klass:
    `classes/${ctx.activeClass.id}/…`. Hantera `activeClass === null`
@@ -63,7 +69,8 @@ export default {
    eller noteringar. Märk dessutom ALLT lärarmaterial i din markup med
    klassen `teacher-only` (CSS-skyddsnätet släcker den i elevvyn) och
    lyssna/publicera händelser enligt sync-kontraktet i `docs/SYNC.md`.
-   Bara lägen i `STUDENT_MODE_IDS` (registry) kan renderas i elevvyn.
+   Bara lägen i `STUDENT_MODE_IDS` (registry = gruppen "classroom") kan
+   renderas i elevvyn.
    Nedräkningar/klockor: använd `js/lib/timer.js` (tidsstämpelbaserad,
    bakgrundssäker) — aldrig egna tick-räknare.
 5. **Elevnamn**: visa ALLTID namn via `studentLabel()`/`initialsFor()`

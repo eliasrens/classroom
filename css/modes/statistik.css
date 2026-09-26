@@ -1,5 +1,6 @@
 /* ============================================================
-   STATISTIK — veckoarkivet (endast lärarvy, issue #29).
+   ÖVERSIKT › VECKOR — veckoarkivet (endast lärarvy, issue #29;
+   var läget "Statistik" före issue #45, js/modes/oversikt/veckor.js).
    Återanvänder trafikljusets statistikdelar (.tl-tally, .tl-pass …
    i css/modes/trafikljus.css) och Elevlistans chips. Skriver mot
    designtokens så både mörkt och ljust schema följer med.

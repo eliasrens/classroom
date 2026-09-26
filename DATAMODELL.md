@@ -124,8 +124,9 @@ classes/{classId}/classActions/{id}     — KLASSÅTGÄRD (issue #34) — DELAD 
                        sparas inte. Kan inte finnas i reglerna — namnen
                        finns aldrig i molnet.
                      — Följer INTE måndagsrensningen: kunskap som ska finnas
-                       kvar. Statistik bläddrar dem per vecka (createdAt);
-                       Översikt visar de senaste.
+                       kvar. Översikt › Klassåtgärder filtrerar dem per
+                       vecka (createdAt), lärare och kategori; Översikt ›
+                       Idag visar de senaste.
 
 classes/{classId}/classActionReplies/{id} — "Testade också" (issue #34) — DELAD
   actionId           — klassåtgärden svaret gäller
@@ -381,8 +382,9 @@ outboxen som `js/data/datalayer.js` tömmer mot Firestore. Semantik:
 - Elevstatistik (noteringar, mönster, tallies i Elevlista och Översikt) och
   trafikljustider (tallies, rekord, veckans pass per typ) **filtreras** på
   innevarande vecka. Ingenting raderas: `notes` och `sessions` behåller all
-  historik, och tidigare veckor visas i arkivet under **Statistik**
-  (`js/modes/statistik.js`, ett lärarläge som aldrig är elev-visningsbart).
+  historik, och tidigare veckor visas i arkivet under **Översikt › Veckor**
+  (`js/modes/oversikt/veckor.js`, i ett lärarläge som aldrig är elev-visningsbart;
+  före issue #45 läget Statistik — `#/statistik` leder dit).
 - **Bra jobbat** (LOKALA `praise/board`, issue #32) är ett tillstånd, inte en
   logg. Första öppningen en ny vecka skriver det LOKALA `praiseArchive/{weekOf}`
   och tömmer listan (`weekOf` = den nya veckan) — helt lokalt per dator
@@ -391,8 +393,8 @@ outboxen som `js/data/datalayer.js` tömmer mot Firestore. Semantik:
   lista, inte heller innan tömningen hunnit sparas.
 - **Lektionsplaneringar rörs aldrig** av veckorytmen.
 - **Klassåtgärder** (`classActions`, issue #34) följer inte måndagsrensningen:
-  Översikt visar de senaste oavsett vecka, och Statistik bläddrar dem per
-  vecka (på `createdAt`) i arkivet som resten.
+  Översikt › Idag visar de senaste oavsett vecka, och Översikt › Klassåtgärder
+  filtrerar dem per vecka (på `createdAt`), lärare och kategori.
 - **Enhetsklockor** (issue #31): veckan räknas på servertid (`serverNow()`,
   se Tidsstämplar och klocka nedan), och med Firebase körs veckorytmen först
   när klockan är mätt mot servern. En dator vars klocka går fel rullar alltså
