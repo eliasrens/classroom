@@ -17,9 +17,14 @@
  *   --praise-font-min   läsbar minsta storlek innan rutan tillåts bli bredare
  *   --praise-fit: off   stäng av kolumnanpassningen (t.ex. när rutan inte
  *                       har en fast höjd, som på smala skärmar)
+ *   --praise-fit: content  rutan får sin höjd efter innehållet, upp till sin
+ *                       max-height (morgonskärmen, #71). Namnlistan ska då ha
+ *                       flex: none; kolumner läggs till först när en kolumn
+ *                       inte ryms under max-height.
  *
  * Rutan behöver en BEGRÄNSAD höjd (t.ex. position:absolute med top+bottom,
- * eller en flex-/grid-cell) — det är höjden som avgör var kolumnerna bryts.
+ * eller en flex-/grid-cell; i content-läget en max-height) — det är höjden
+ * som avgör var kolumnerna bryts.
  *
  *   const board = createPraiseBoard({ clearable: true, onClear, maxWidth: () => 600,
  *                                     onLayout: (w) => … });
@@ -70,6 +75,7 @@ export function createPraiseBoard(opts = {}) {
 
   let names = [];
   let frame = 0;
+  let content = false; // --praise-fit: content (höjd efter innehåll)
 
   function setNames(next, { emptyText = "" } = {}) {
     names = [...next];
@@ -89,8 +95,9 @@ export function createPraiseBoard(opts = {}) {
     list.style.removeProperty("--praise-rows");
     delete list.dataset.flow;
 
-    const off = getComputedStyle(el).getPropertyValue("--praise-fit").trim() === "off";
-    if (off || !names.length) { report(); return; }
+    const mode = getComputedStyle(el).getPropertyValue("--praise-fit").trim();
+    content = mode === "content";
+    if (mode === "off" || !names.length) { report(); return; }
 
     const fMax = parseFloat(getComputedStyle(list).fontSize);
     list.style.fontSize = "var(--praise-font-min)";
@@ -102,7 +109,10 @@ export function createPraiseBoard(opts = {}) {
     let f = fMax;
     for (;;) {
       layoutAt(f);
-      const fits = el.offsetWidth <= limit && list.scrollHeight <= list.clientHeight + 1;
+      const fitsHeight = content
+        ? list.getBoundingClientRect().height <= roomForList() + 1
+        : list.scrollHeight <= list.clientHeight + 1;
+      const fits = el.offsetWidth <= limit && fitsHeight;
       if (fits || f <= floor) break;
       // Ner till minsta storleken i jämna steg; därunder bara om det krävs.
       f = f > fMin ? Math.max(fMin, f * STEP) : Math.max(floor, f * STEP);
@@ -116,11 +126,20 @@ export function createPraiseBoard(opts = {}) {
     const first = list.firstElementChild;
     const rowH = first ? first.getBoundingClientRect().height : f * 1.2;
     const gap = parseFloat(getComputedStyle(list).rowGap) || 0;
-    const avail = list.clientHeight;
+    const avail = content ? roomForList() : list.clientHeight;
     const maxRows = Math.max(1, Math.min(names.length, Math.floor((avail + gap) / (rowH + gap))));
     // Jämna kolumner (10/10/10 i stället för 14/14/2) — samma antal kolumner, lägre höjd.
     const cols = Math.ceil(names.length / maxRows);
     list.style.setProperty("--praise-rows", String(Math.ceil(names.length / cols)));
+  }
+
+  /** content-läget: höjden från listans överkant ner till rutans innerkant.
+   *  Rutan är då antingen lika hög som innehållet eller kapad av max-height. */
+  function roomForList() {
+    const cs = getComputedStyle(el);
+    const bottom = el.getBoundingClientRect().bottom
+      - (parseFloat(cs.borderBottomWidth) || 0) - (parseFloat(cs.paddingBottom) || 0);
+    return Math.max(0, bottom - list.getBoundingClientRect().top);
   }
 
   function report() {
