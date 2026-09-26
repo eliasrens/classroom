@@ -353,6 +353,15 @@ teachers/{uid}/settings/menu            — fästa lägen i övermenyn (issue #5
                        gäller standard: morgon, lektion, trafikljus. Ett nytt
                        verktyg är inte fäst förrän läraren fäster det.
 
+teachers/{uid}/settings/subjects        — Mina ämnen (issue #81,
+                       js/lib/my-subjects.js). PRIVAT per lärare, ingen elevdata;
+                       följer läraren mellan datorer (i lokalt läge: uid "local").
+  mine: [subjectId, …] — ämnena läraren undervisar i; ämnesväljaren och
+                       ämnesfiltret i lektionsplaneringen visar bara dem (plus
+                       planeringens redan valda ämne). Saknas dokumentet eller
+                       är listan tom visas ALLA ämnen, som innan valet fanns.
+                       Statistik och Veckor filtreras aldrig.
+
 teachers/{uid}/classes/{classId}/lessonPlans/{planId}
                      — lektionsplanering (Läge 2). PRIVAT per lärare:
                        ligger under lärarens uid, inte under den delade
