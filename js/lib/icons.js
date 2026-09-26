@@ -49,6 +49,7 @@ const PATHS = {
   undo: `<path d="M4 8h10a5 5 0 0 1 0 10H8M4 8l3.5-3.5M4 8l3.5 3.5"/>`,
   flag: `<path d="M5 21V4c4-2 6 2 10 0v9c-4 2-6-2-10 0"/>`,
   keyboard: `<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6"/>`,
+  cloud: `<path d="M7 18.5h10.5a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.6 9.1 4.7 4.7 0 0 0 7 18.5z"/>`,
   pen: `<path d="m4 20 1-4L16.5 4.5a2.12 2.12 0 0 1 3 3L8 19l-4 1z"/>`,
   archive: `<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11h14V8M10 12h4"/>`,
   download: `<path d="M12 4v11m0 0 4-4m-4 4-4-4M4 19h16"/>`,

@@ -175,7 +175,10 @@ export function createScene(host, opts = {}) {
       node.el.style.setProperty("--kt-edge", c.edge);
       node.el.setAttribute("aria-label", b.text);
       node.el.classList.toggle("is-pinned", !!b.pin);
-      layer.append(node.el); // ordningen = tabbordningen
+      // Ordningen = tabbordningen. Flytta bara det som står fel — en flyttad
+      // nod tappar fokus.
+      const at = layer.children[seen.size - 1];
+      if (at !== node.el) layer.insertBefore(node.el, at ?? null);
     }
     for (const [id, node] of nodes) {
       if (seen.has(id)) continue;
