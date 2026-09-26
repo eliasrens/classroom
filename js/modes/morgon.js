@@ -14,13 +14,17 @@ import { icon } from "../lib/icons.js";
 import { studentLabel } from "../lib/names.js";
 import { createPraiseBoard } from "../ui/praise-board.js";
 import {
-  WEEKDAYS, UNSPLASH_IDS, unsplashUrl,
+  WEEKDAYS,
   normalize, loadMorning, saveMorning, saveBackground, watchMorning,
   studentTextFor, orderedTasks, greetingText, currentPraise, praiseIsStale,
 } from "../lib/morning.js";
 import { rolloverPraise } from "../lib/week-rhythm.js";
 import { weekKey } from "../lib/week.js";
 import { serverNow } from "../lib/clock.js";
+import {
+  categoryById, seasonFor, pickSeasonBg, shouldAutoRandomize, dayKey, findImage,
+} from "../lib/backgrounds.js";
+import { openBgPicker, closeBgPicker } from "../ui/bg-picker.js";
 
 const PANEL_KEY = "classroom:morgon:panelOpen";
 // Ny slumpad bild per sidladdning, men stabil inom sessionen (per klass).
@@ -86,15 +90,8 @@ export default {
       bgImg.src = url;
     }
 
-    function bgPool() {
-      return [...UNSPLASH_IDS.map(unsplashUrl), ...settings.background.extraUrls];
-    }
-    function pickRandomBg() {
-      const pool = bgPool();
-      const others = pool.filter((u) => u !== settings.background.current);
-      const choose = (others.length ? others : pool);
-      return choose[Math.floor(Math.random() * choose.length)] ?? "";
-    }
+    // Slumpen tar bara den aktuella årstidens bilder (issue #64).
+    const pickRandomBg = () => pickSeasonBg(settings.background.current, serverNow());
 
     // ---------- Rendering (elev-synlig del) ----------
     function renderGreeting() {
@@ -289,18 +286,32 @@ export default {
       // Töm-knappen på själva namntavlan (teacher-only) går via onClear ovan.
 
       // ---- Bakgrund ----
-      $(".morgon__bg-random").addEventListener("click", () => {
-        const next = clone(); next.background.current = pickRandomBg(); commit(next);
-      });
+      // Allt läraren själv gör med bakgrunden (Slumpa, Välj bild, egen
+      // bild) gäller resten av dagen — omladdning slumpar inte bort den.
+      const setBackground = (url, extra = false) => {
+        const next = clone();
+        if (extra && !next.background.extraUrls.includes(url)) next.background.extraUrls.push(url);
+        next.background.current = url;
+        next.background.pickedOn = dayKey(serverNow());
+        return commit(next);
+      };
+      $(".morgon__bg-random").addEventListener("click", () => { void setBackground(pickRandomBg()); });
+      const pickBtn = $(".morgon__bg-pick");
+      pickBtn.addEventListener("click", () => openBgPicker({
+        current: settings.background.current,
+        extraUrls: settings.background.extraUrls,
+        season: seasonFor(serverNow()),
+        container: document.body, // ovanför elevskärmens förhandsvisning
+        returnFocus: pickBtn,
+        onPick: (url) => { void setBackground(url); },
+      }));
+      this._closePicker = closeBgPicker;
       const bgUrl = $(".morgon__bg-url");
       const addUrl = () => {
         const url = bgUrl.value.trim();
         if (!url) return;
-        const next = clone();
-        if (!next.background.extraUrls.includes(url)) next.background.extraUrls.push(url);
-        next.background.current = url;
         bgUrl.value = "";
-        commit(next);
+        void setBackground(url, true);
       };
       $(".morgon__bg-urlbtn").addEventListener("click", addUrl);
       bgUrl.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addUrl(); } });
@@ -310,10 +321,7 @@ export default {
         const reader = new FileReader();
         reader.onload = () => {
           const url = String(reader.result || "");
-          const next = clone();
-          if (!next.background.extraUrls.includes(url)) next.background.extraUrls.push(url);
-          next.background.current = url;
-          commit(next);
+          if (url) void setBackground(url, true);
         };
         reader.readAsDataURL(file);
         e.target.value = "";
@@ -340,7 +348,18 @@ export default {
           if (t && sel !== document.activeElement) sel.value = t.weekday;
         });
         syncNtStudents();
+        syncBgHint();
       };
+
+      const bgHint = $(".morgon__bg-hint");
+      function syncBgHint() {
+        const season = categoryById(seasonFor(serverNow()))?.label ?? "";
+        const img = findImage(settings.background.current);
+        const name = img ? (img.place ?? img.alt) : settings.background.current ? "Egen bild" : "";
+        bgHint.textContent = `Slumpa tar en ${season.toLowerCase()}bild.`
+          + (name ? ` Nu: ${name}.` : "")
+          + (settings.background.pickedOn === dayKey(serverNow()) ? " Ditt val gäller i dag." : "");
+      }
 
       renderTaskControls = () => {
         if (!mounted()) return;
@@ -409,13 +428,15 @@ export default {
     // Slumpa bakgrund vid sidladdning (stabil inom sessionen per klass).
     // Bara bakgrunden skrivs (mot senaste versionen) — den lokala kopian
     // kan vara inaktuell precis efter sidladdning, se saveBackground.
+    // Har läraren själv valt en bild i dag slumpas den inte bort (#64).
     if (isTeacher) {
       const key = classId ?? "__noclass__";
-      const needsRandom = !settings.background.current || !randomizedThisSession.has(key);
-      if (needsRandom) {
-        randomizedThisSession.add(key);
+      const firstInSession = !randomizedThisSession.has(key);
+      randomizedThisSession.add(key);
+      if (shouldAutoRandomize(settings.background, { firstInSession }, serverNow())) {
         settings.background.current = pickRandomBg() || settings.background.current;
-        void saveBackground(data, classId, settings.background.current);
+        settings.background.pickedOn = "";
+        void saveBackground(data, classId, settings.background.current, { auto: true });
       }
     }
 
@@ -428,6 +449,8 @@ export default {
     for (const stop of this._stops ?? []) { try { stop(); } catch { /* ok */ } }
     this._stops = null;
     this._renderNtStudents = null;
+    this._closePicker?.();
+    this._closePicker = null;
     this._board?.destroy();
     this._board = null;
   },
@@ -499,7 +522,11 @@ function renderPanel() {
 
       <section class="morgon__section">
         <h3>${icon("image")} Bakgrund</h3>
-        <button class="btn morgon__bg-random">${icon("refresh")}<span>Slumpa om bild</span></button>
+        <div class="morgon__bg-buttons">
+          <button class="btn morgon__bg-random">${icon("refresh")}<span>Slumpa</span></button>
+          <button class="btn morgon__bg-pick" aria-haspopup="dialog">${icon("image")}<span>Välj bild</span></button>
+        </div>
+        <p class="morgon__hint morgon__bg-hint"></p>
         <div class="morgon__addtask">
           <input class="morgon__bg-url" type="url" placeholder="Egen bild-URL…" autocomplete="off" aria-label="Egen bild-URL">
           <button class="btn btn--icon morgon__bg-urlbtn" title="Lägg till bild-URL" aria-label="Lägg till bild-URL">${icon("plus")}</button>
