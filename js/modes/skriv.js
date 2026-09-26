@@ -566,7 +566,8 @@ export default {
         const pages = printable().filter((p) => chosen.has(p.i));
         if (pages.length === 0) return;
         closePrintPanel();
-        void printSkrivPages({ pages, className: activeClass.name ?? "", title: printTitle.value });
+        printSkrivPages({ pages, className: activeClass.name ?? "", title: printTitle.value })
+          .catch((err) => { console.warn("[skriv] utskrift:", err); closeSkrivPrint(); });
       });
 
       // Ctrl+P direkt i lärarvyn: skriv ut den aktuella sidan, inte appen.

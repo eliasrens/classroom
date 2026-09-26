@@ -35,6 +35,7 @@ export function closeSkrivPrint() {
   if (!current) return;
   window.removeEventListener("afterprint", current.onAfter);
   current.root.remove();
+  document.documentElement.classList.remove("skr-printing");
   document.body.classList.remove("skr-printing");
   document.title = current.prevTitle;
   current = null;
@@ -91,13 +92,17 @@ function pageSection({ text, at }, head) {
   if (head.title) left.append(el("span", "skr-print__title", head.title));
   header.append(left, el("span", "skr-print__date", longDate(new Date(at || Date.now()))));
   th.append(header);
-  thead.append(el("tr")).append(th);
+  const headRow = el("tr");
+  headRow.append(th);
+  thead.append(headRow);
   const tbody = el("tbody");
   const td = el("td");
   const body = el("div", "skr-print__text");
   for (const row of text.replace(/\s+$/, "").split("\n")) body.append(el("div", "skr-print__row", row));
   td.append(body);
-  tbody.append(el("tr")).append(td);
+  const bodyRow = el("tr");
+  bodyRow.append(td);
+  tbody.append(bodyRow);
   table.append(thead, tbody);
   section.append(table);
   return section;
@@ -123,6 +128,8 @@ export function buildSkrivPrint({ pages, className, title }) {
   const head = { className: className || "", title: (title || "").trim() };
   for (const p of pages) root.append(pageSection(p, head));
   document.body.append(root);
+  const onAfter = () => closeSkrivPrint();
+  current = { root, onAfter, prevTitle: document.title }; // closeSkrivPrint städar även vid fel
 
   // Baslinjen: linjens överkant där bokstäverna står.
   const baseY = base.getBoundingClientRect().bottom - probeLine.getBoundingClientRect().top;
@@ -137,10 +144,9 @@ export function buildSkrivPrint({ pages, className, title }) {
     row.replaceWith(...split[i].map((t) => el("div", "skr-print__line", t)));
   });
 
-  const onAfter = () => closeSkrivPrint();
-  current = { root, onAfter, prevTitle: document.title };
   // Dokumenttiteln = PDF:ens förslag på filnamn. Utan elevnamn.
   document.title = `Skrivtavla ${head.className} ${isoDate(new Date())}`.replace(/\s+/g, " ").trim();
+  document.documentElement.classList.add("skr-printing"); // marginalerna: vitt, inte appens mörka botten
   document.body.classList.add("skr-printing");
   window.addEventListener("afterprint", onAfter);
   return root;

@@ -308,6 +308,9 @@
 
 @media print {
   body.skr-printing > :not(.skr-print) { display: none !important; }
+  /* Lärarvyns mörka tema får inte färga marginalerna (color-scheme styr dem). */
+  html.skr-printing { color-scheme: light !important; }
+  html.skr-printing,
   body.skr-printing { background: #fff !important; margin: 0 !important; }
   body.skr-printing .skr-print {
     page: skriv;
