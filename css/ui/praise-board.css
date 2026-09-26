@@ -25,6 +25,27 @@
   font-size: clamp(1.3rem, 2.4vw, 1.9rem);
 }
 
+/* Rubrikens guldstjärna och guldstreck (#75, #78) — delas av morgonskärmen
+   och lektionsplaneringen. Samma guld och skugga som siffercirklarna. */
+.praise-board__star {
+  width: 0.95em;
+  height: 0.95em;
+  flex: none;
+  fill: var(--hue-accent);
+  stroke: var(--hue-accent);
+  filter: drop-shadow(0 1px 3px rgb(0 0 0 / 35%));
+}
+.praise-board__rule {
+  flex: none;
+  border: 0;
+  height: 2px;
+  width: 4.5rem;
+  margin: var(--space-2) auto var(--space-2) 0;
+  background: var(--hue-accent);
+  border-radius: var(--radius-round);
+  opacity: 0.9;
+}
+
 .praise-board__names {
   flex: 1 1 0;
   min-height: 0;
