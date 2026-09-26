@@ -50,7 +50,7 @@ function subjectColor(subjectId, settingsDocs) {
   return s?.color ?? "var(--color-ink-soft)";
 }
 
-export function mountIdag(el, { data, store, tabHref }) {
+export function mountIdag(el, { data, store }, { tabHref }) {
   const offs = [];
   let classes = [];
   let plans = [];
