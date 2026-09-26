@@ -65,6 +65,23 @@ export const SUBJECTS = [
   { id: "rast",   name: "Rast/övrigt",    color: "#d7d3cb" },
 ];
 
+/**
+ * Mörkare variant av en ämnesfärg för TEXT på ljus botten (t.ex. tavlans
+ * fältetiketter på det vita pappret): behåller färgfamiljen men mörknar
+ * stegvis tills kontrasten mot `on` klarar WCAG AA. Ljusa ämnen (gul,
+ * salvia, neutral) blir annars oläsliga som etikettfärg.
+ */
+export function deepTextColor(hex, { on = "#ffffff", min = 4.5 } = {}) {
+  let { r, g, b } = hexToRgb(hex);
+  const toHex = (v) => Math.round(Math.max(0, v)).toString(16).padStart(2, "0");
+  let out = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  for (let i = 0; i < 60 && contrastRatio(out, on) < min; i++) {
+    r *= 0.93; g *= 0.93; b *= 0.93;
+    out = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  }
+  return out;
+}
+
 /** Slår upp ett ämne och ger { ...subject, textColor } klart att använda. */
 export function subjectStyle(subjectId) {
   const s = SUBJECTS.find((x) => x.id === subjectId) ?? SUBJECTS.at(-1);

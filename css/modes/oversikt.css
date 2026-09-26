@@ -106,7 +106,11 @@
   text-align: left;
 }
 .ov-plan:hover { background: var(--color-surface-alt); }
-.ov-plan__dot { flex: none; width: 12px; height: 12px; border-radius: var(--radius-round); }
+.ov-plan__dot {
+  flex: none; width: 12px; height: 12px; border-radius: var(--radius-round);
+  /* Diskret ring så även ljusa ämnesfärger (rast, mentorstid) syns i ljust tema */
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 22%);
+}
 .ov-plan__name { flex: 1; font-weight: 600; }
 .ov-plan__time { color: var(--color-ink-soft); font-size: var(--text-s); font-variant-numeric: tabular-nums; }
 

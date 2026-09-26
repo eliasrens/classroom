@@ -14,7 +14,7 @@
 
 import { readFile } from "node:fs/promises";
 
-const { SUBJECTS, contrastRatio, readableTextColor, subjectStyle, hexToRgb } =
+const { SUBJECTS, contrastRatio, readableTextColor, subjectStyle, hexToRgb, deepTextColor } =
   await import("../js/lib/color.js");
 
 let failed = 0;
@@ -30,6 +30,13 @@ for (const s of SUBJECTS) {
   const text = readableTextColor(s.color);
   const ratio = contrastRatio(s.color, text);
   ok(ratio >= 4.5, `${s.id} (${s.color}) mot text ${text}: kontrast ${ratio.toFixed(2)} < 4,5`);
+}
+
+// --- Etikettvarianten (--subj-deep, tavlans fältetiketter på vitt papper) --
+for (const s of SUBJECTS) {
+  const deep = deepTextColor(s.color);
+  const ratio = contrastRatio(deep, "#ffffff");
+  ok(ratio >= 4.5, `deepTextColor(${s.id}) = ${deep} mot vitt: kontrast ${ratio.toFixed(2)} < 4,5`);
 }
 
 // --- SUBJECTS ↔ CSS-tokens i synk -----------------------------------------
