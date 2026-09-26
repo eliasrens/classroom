@@ -22,6 +22,19 @@
  *      grann) tills allt ryms. Med många bubblor är molnet redan från
  *      början något mindre.
  *
+ * Grenar (issue #59): en bubbla kan ha under-bubblor (parent = index).
+ * Då används en RADIELL TRÄDLAYOUT (placeTree) i stället för ringarna:
+ *   - varje huvudbubbla får en vinkelsektor efter hur många "löv" dess
+ *     gren har (en ensam bubbla = 1), i skapandeordning medurs från toppen;
+ *     utan grenar blir sektorerna lika stora — samma vinklar som ringarna
+ *   - en grens barn delar förälderns sektor (högst ~26° per barn, runt
+ *     förälderns vinkel) — en solfjäder utåt i förälderns riktning
+ *   - nivå 1 står närmast molnet, den djupaste nivån längst ut; varannan
+ *     bubbla på den yttersta nivån kan stå en bit in (två "halvringar")
+ *   - barn till en FÄST (dragen) bubbla fläktar ut runt den, bort från
+ *     molnet, så att en dragen gren följer med sin förälder
+ *   Sedan samma avslappning och samma krympning som utan grenar.
+ *
  * Deterministiskt: ingen slump — elevskärmen och läraren får samma bild.
  */
 
@@ -47,8 +60,9 @@ const SCALES = [1, 0.93, 0.86, 0.8, 0.74, 0.68, 0.62, 0.57, 0.52, 0.47, 0.42, 0.
  * @param {object} p
  * @param {number} p.w,p.h              scenens mått (virtuella px)
  * @param {{rx:number, ry:number}} p.cloud  molnets ellips (halvaxlar) vid skala 1
- * @param {Array<{w:number,h:number,pin?:{x:number,y:number}}>} p.bubbles
- *        bubblornas mått vid skala 1; pin = fäst plats som andel (0–1) av scenen
+ * @param {Array<{w:number,h:number,pin?:{x:number,y:number},parent?:number}>} p.bubbles
+ *        bubblornas mått vid skala 1; pin = fäst plats som andel (0–1) av scenen;
+ *        parent = förälderns index i listan (saknas/-1 = runt molnet)
  * @param {number} [p.margin]           luft mot scenens kant
  * @param {number} [p.gap]              minsta luft mellan två bubblor / bubbla–moln
  * @returns {{scale:number, cloudScale:number, ok:boolean,
@@ -65,19 +79,213 @@ export function layoutMap({ w, h, cloud, bubbles, margin = 22, gap = 16 }) {
     n <= 12 ? 1 : Math.max(0.78, 1 - (n - 12) * 0.012),
     (w * 0.23) / Math.max(1, cloud.rx),
   );
+  const tree = buildTree(bubbles);
+  const variants = tree.depth > 1 ? treeVariants(tree) : ringOptions(n);
   for (const scale of SCALES) {
     const cloudScale = Math.max(0.45, Math.min(crowd, Math.sqrt(scale)));
     const c = { rx: cloud.rx * cloudScale, ry: cloud.ry * cloudScale };
     const sized = bubbles.map((b) => ({ w: b.w * scale, h: b.h * scale, pin: b.pin ?? null }));
-    for (const rings of ringOptions(sized.length)) {
-      const items = placeRings({ w, h, cloud: c, bubbles: sized, rings, margin, gap });
-      relax({ w, h, cloud: c, items, margin, gap });
+    // Med grenar: hoppa över skalor som uppenbart inte ryms (bubblornas yta
+    // mot den fria ytan) — avslappningen är det som kostar.
+    if (tree.depth > 1 && scale !== SCALES.at(-1) && fillRatio({ w, h, cloud: c, bubbles: sized, margin, gap }) > FILL_MAX) continue;
+    for (const v of variants) {
+      const items = tree.depth > 1
+        ? placeTree({ w, h, cloud: c, bubbles: sized, tree, variant: v, margin, gap })
+        : placeRings({ w, h, cloud: c, bubbles: sized, rings: v, margin, gap });
+      relax({ w, h, cloud: c, items, margin, gap, stuck: tree.depth > 1 });
       const ok = isClean({ w, h, cloud: c, items, margin, gap: gap * 0.5 });
       last = { scale, cloudScale, ok, items: items.map(({ x, y, w: bw, h: bh }) => ({ x, y, w: bw, h: bh })) };
       if (ok) return last;
     }
   }
   return last ?? { scale: 1, cloudScale: 1, ok: true, items: [] };
+}
+
+/**
+ * Trädet ur parent-indexen. Ogiltiga föräldrar (utanför listan, sig själv,
+ * en slinga) räknas som huvudnivå.
+ * → { parent[], children[][], roots[], level[] (1 = huvudnivå), depth }
+ */
+export function buildTree(bubbles) {
+  const n = bubbles.length;
+  const parent = bubbles.map((b, i) => {
+    const p = Number.isInteger(b.parent) ? b.parent : -1;
+    return p >= 0 && p < n && p !== i ? p : -1;
+  });
+  // Slingor: gå uppåt; kommer vi tillbaka till en redan besökt nod på samma väg → bryt.
+  for (let i = 0; i < n; i++) {
+    const seen = new Set([i]);
+    let k = parent[i];
+    while (k >= 0) {
+      if (seen.has(k)) { parent[i] = -1; break; }
+      seen.add(k);
+      k = parent[k];
+    }
+  }
+  const children = bubbles.map(() => []);
+  const roots = [];
+  parent.forEach((p, i) => (p < 0 ? roots : children[p]).push(i));
+  const level = new Array(n).fill(1);
+  const visit = (i, l) => { level[i] = l; for (const c of children[i]) visit(c, l + 1); };
+  for (const r of roots) visit(r, 1);
+  return { parent, children, roots, level, depth: n ? Math.max(...level) : 0 };
+}
+
+/**
+ * Trädlayoutens varianter, bäst först:
+ *   reach = hur långt ut (andel av vägen molnet → kanten) den djupaste nivån står
+ *   f1    = var huvudnivån står (0 = tätt intill molnet)
+ *   alt   = hur långt in varannan bubbla på den djupaste nivån flyttas
+ *   alt1  = hur långt UT varannan huvudbubbla flyttas (många huvudbubblor)
+ */
+function treeVariants(tree) {
+  const n = tree.level.length;
+  const reach = Math.min(1, 0.4 + n * 0.03);
+  const out = [
+    { reach, f1: 0, alt: 0, alt1: 0 },
+    { reach: 1, f1: 0.12, alt: 0.34, alt1: 0 },
+  ];
+  if (tree.roots.length > 5) out.push({ reach: 1, f1: 0.1, alt: 0.4, alt1: 0.28 });
+  return out;
+}
+
+const CHILD_SPAN = 0.46; // högsta vinkel (rad) per barn i en solfjäder
+
+/** Steg 1 med grenar: radiell trädlayout (se överst). */
+function placeTree({ w, h, cloud, bubbles, tree, variant, margin, gap }) {
+  const cx = w / 2;
+  const cy = h / 2;
+  const n = bubbles.length;
+  const items = bubbles.map((b) => ({ ...b, x: cx, y: cy, fixed: false }));
+  const { children, roots, level, depth } = tree;
+
+  for (const it of items) {
+    if (!it.pin) continue;
+    it.x = clamp(it.pin.x * w, margin + it.w / 2, w - margin - it.w / 2);
+    it.y = clamp(it.pin.y * h, margin + it.h / 2, h - margin - it.h / 2);
+    it.fixed = true;
+  }
+
+  // Sektorernas vikt: antal löv i den radiella delen av grenen. En fäst
+  // bubbla (och allt under den) tar ingen sektor — den fläktar själv.
+  const weight = new Array(n).fill(0);
+  const weigh = (i) => {
+    if (items[i].fixed) { for (const c of children[i]) weigh(c); return 0; }
+    let s = 0;
+    for (const c of children[i]) s += weigh(c);
+    weight[i] = Math.max(1, s);
+    return weight[i];
+  };
+  let total = 0;
+  for (const r of roots) total += weigh(r);
+
+  // Vinklar: huvudnivån delar hela varvet, barnen förälderns sektor.
+  const angle = new Array(n).fill(null);
+  const assign = (list, from, to) => {
+    const free = list.filter((i) => !items[i].fixed);
+    const sum = free.reduce((s, i) => s + weight[i], 0) || 1;
+    let a = from;
+    for (const i of free) {
+      const span = ((to - from) * weight[i]) / sum;
+      angle[i] = a + span / 2;
+      const kids = children[i].filter((c) => !items[c].fixed);
+      if (kids.length) {
+        const width = Math.min(span, kids.length * CHILD_SPAN);
+        assign(children[i], angle[i] - width / 2, angle[i] + width / 2);
+      }
+      a += span;
+    }
+  };
+  if (total > 0) {
+    const firstRoot = roots.find((i) => !items[i].fixed);
+    const unit = (2 * Math.PI) / total;
+    const start = -Math.PI / 2 - (firstRoot != null ? weight[firstRoot] * unit : 0) / 2;
+    assign(roots, start, start + 2 * Math.PI);
+  }
+
+  // Radiella noder: ut längs sin stråle efter nivå.
+  const radial = [];
+  for (let i = 0; i < n; i++) if (angle[i] != null) radial.push(i);
+  const { reach, f1, alt, alt1 } = variant;
+  const atLevel = new Map();
+  [...radial].sort((a, b) => angle[a] - angle[b]).forEach((i) => {
+    const l = level[i];
+    atLevel.set(l, (atLevel.get(l) ?? 0) + 1);
+    const k = atLevel.get(l) - 1; // ordning i vinkel på sin nivå
+    const lo = f1 * reach;
+    let f = depth > 1 ? lo + ((l - 1) / (depth - 1)) * (reach - lo) : 0;
+    if (l === depth && alt && k % 2 === 1) f = Math.max(lo, f - alt * reach);
+    if (l === 1 && alt1 && k % 2 === 1) f += alt1 * reach;
+    const it = items[i];
+    const ray = rayFor(angle[i], w, h);
+    const { tMin, tMax } = rayRange({ it, ray, cx, cy, w, h, cloud, margin, gap });
+    const t = tMin >= tMax ? tMax : tMin + (tMax - tMin) * f;
+    it.x = cx + ray.dx * t;
+    it.y = cy + ray.dy * t;
+  });
+
+  // Barn till fästa bubblor (och deras barn): solfjäder runt föräldern,
+  // bort från molnet. I trädordning, så att föräldern alltid står först.
+  const fan = (i, inFan) => {
+    const kids = children[i].filter((c) => !items[c].fixed && (inFan || items[i].fixed));
+    const p = items[i];
+    if (kids.length) {
+      let dx = p.x - cx;
+      let dy = p.y - cy;
+      const len = Math.hypot(dx, dy) || 1;
+      if (len < 1e-6) { dx = 0; dy = -1; } else { dx /= len; dy /= len; }
+      const base = Math.atan2(dy, dx);
+      kids.forEach((c, j) => {
+        const it = items[c];
+        const a = base + (j - (kids.length - 1) / 2) * 0.62;
+        const dist = Math.hypot(p.w, p.h) / 2 + Math.hypot(it.w, it.h) / 2 + gap;
+        it.x = clamp(p.x + Math.cos(a) * dist, margin + it.w / 2, w - margin - it.w / 2);
+        it.y = clamp(p.y + Math.sin(a) * dist, margin + it.h / 2, h - margin - it.h / 2);
+      });
+    }
+    for (const c of children[i]) fan(c, inFan || kids.includes(c));
+  };
+  for (const r of roots) fan(r, false);
+  return items;
+}
+
+/** Strålen för en vinkel — följer scenens form (en ellips i scenens proportioner). */
+function rayFor(a, w, h) {
+  const dx = Math.cos(a) * w;
+  const dy = Math.sin(a) * h;
+  const len = Math.hypot(dx, dy) || 1;
+  return { dx: dx / len, dy: dy / len };
+}
+
+/** Längs en stråle: närmast molnet (utan att röra det) och längst ut i scenen. */
+function rayRange({ it, ray, cx, cy, w, h, cloud, margin, gap }) {
+  const { dx, dy } = ray;
+  const hw = it.w / 2;
+  const hh = it.h / 2;
+  const tMax = Math.min(
+    Math.abs(dx) > 1e-9 ? (w / 2 - margin - hw) / Math.abs(dx) : Infinity,
+    Math.abs(dy) > 1e-9 ? (h / 2 - margin - hh) / Math.abs(dy) : Infinity,
+  );
+  let lo = 0;
+  let hi = Math.max(tMax, 1);
+  const at = (t) => ({ x: cx + dx * t, y: cy + dy * t, w: it.w, h: it.h });
+  if (hitsCloud(at(hi), cx, cy, cloud, gap)) lo = hi;
+  else {
+    for (let k = 0; k < 24; k++) {
+      const mid = (lo + hi) / 2;
+      if (hitsCloud(at(mid), cx, cy, cloud, gap)) lo = mid; else hi = mid;
+    }
+  }
+  return { tMin: hi, tMax };
+}
+
+const FILL_MAX = 0.5;
+
+/** Hur stor del av scenens fria yta (utanför molnet) bubblorna tar, med luft. */
+export function fillRatio({ w, h, cloud, bubbles, margin = 22, gap = 16 }) {
+  const used = bubbles.reduce((s, b) => s + (b.w + gap) * (b.h + gap), 0);
+  const free = (w - 2 * margin) * (h - 2 * margin) - Math.PI * (cloud.rx + gap) * (cloud.ry + gap);
+  return used / Math.max(1, free);
 }
 
 /** Antal ringar att pröva, bäst först. */
@@ -160,7 +368,7 @@ function placeRings({ w, h, cloud, bubbles, rings, margin, gap }) {
 }
 
 /** Steg 2: knuffa isär överlapp, ut ur molnet och in i scenen. */
-function relax({ w, h, cloud, items, margin, gap }) {
+function relax({ w, h, cloud, items, margin, gap, stuck = false }) {
   const n = items.length;
   for (let iter = 0; iter < 400; iter++) {
     let moved = 0;
@@ -176,9 +384,13 @@ function relax({ w, h, cloud, items, margin, gap }) {
         if (ox <= 0 || oy <= 0) continue;
         if (dx === 0 && dy === 0) { dx = i % 2 ? 1 : -1; dy = 0.5; }
         // Längs den axel där överlappet är minst (i förhållande till storleken).
+        // Har paret fastnat (molnet eller kanten tar tillbaka knuffen) byts
+        // axeln varannan runda efter en stund.
         let px = 0;
         let py = 0;
-        if (ox / (a.w + b.w) < oy / (a.h + b.h)) px = Math.sign(dx || 1) * (ox + 0.5);
+        let alongX = ox / (a.w + b.w) < oy / (a.h + b.h);
+        if (stuck && iter > 120 && (iter + i + j) % 2) alongX = !alongX;
+        if (alongX) px = Math.sign(dx || 1) * (ox + 0.5);
         else py = Math.sign(dy || 1) * (oy + 0.5);
         const shareA = a.fixed ? 0 : b.fixed ? 1 : 0.5;
         const shareB = 1 - shareA;

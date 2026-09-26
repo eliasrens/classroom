@@ -10,17 +10,32 @@
  * js/modes/karta/scene.js och layouten räknas i js/lib/karta-layout.js —
  * samma bild i lärarens förhandsvisning, på projektorn och på papperet.
  *
- * Säker borttagning: ett klick på en bubbla gör ingenting farligt. Den tas
- * bort med sitt lilla × (eller Delete när den har fokus), och Ångra tar
- * tillbaka den. Ångra ångrar det senaste: tillagd, borttagen, flyttad,
- * ändrad bubbla, Töm tavlan och Ordna automatiskt. Dubbelklick ändrar
- * texten. En bubbla kan dras till en egen plats; "Ordna automatiskt"
- * släpper alla sådana.
+ * Grenar (issue #59): ett klick på en bubbla MARKERAR den (ring + ×).
+ * Skrivraden säger då "Lägg till under ”…”" och det du skriver hamnar som
+ * grenar under den, en i taget med Enter. Klick på molnet, på tom yta
+ * eller Esc går tillbaka till huvudnivån. Tre nivåer (tree.js MAX_DEPTH):
+ * markerar du en under-gren hamnar nya bubblor bredvid den.
+ *
+ * Säker borttagning: ett klick tar aldrig bort något. Den markerade
+ * bubblan tas bort med sitt lilla ×, eller med Delete/Backspace när
+ * skrivraden är tom — med alla sina grenar, och Ångra tar tillbaka allt.
+ * Ångra ångrar det senaste: tillagd, borttagen, flyttad, ändrad bubbla,
+ * färg, Töm tavlan och Ordna automatiskt. Dubbelklick eller F2 ändrar
+ * texten. En bubbla kan dras till en egen plats (dess grenar följer med);
+ * "Ordna automatiskt" släpper alla sådana.
+ *
+ * Färger (issue #59): färgraden under kartan byter molnets färg — eller,
+ * när en bubbla är markerad, bubblans. Grenar ärver förälderns färg i en
+ * ljusare nyans ("Som föräldern"). "Färglägg automatiskt" (standard) ger
+ * huvudbubblorna var sin färg; av → alla neutrala.
  *
  * Data (DATAMODELL.md): ENDAST LOKALT i classes/{cid}/karta (bubblorna kan
  * innehålla elevnamn — js/data/local-only.js, aldrig Firestore):
  *   state      { cur, paper, rev }        — kartan som visas, valt papper
- *   map-<id>   { name, title, bubbles: [{ id, text, color, pin? }], nextColor, rev }
+ *   map-<id>   { name, title, cloud, autoColor,
+ *                bubbles: [{ id, text, color, parentId, pin? }], nextColor, rev }
+ *     color: index i palette.js, eller null för en gren = ärv förälderns
+ *     parentId: null = huvudnivå. Kartor från #53 saknar parentId → huvudnivå.
  * Varje ändring går direkt ut på sync-bussen (`karta:state`
  * { cid, cur, map, rev }) och sparas (rubriken med debounce), så att en
  * omladdad elevskärm visar samma karta. `rev` ordnar bussen mot
@@ -31,7 +46,8 @@
 
 import { icon } from "../lib/icons.js";
 import { createScene } from "./karta/scene.js";
-import { PALETTE } from "./karta/palette.js";
+import { PALETTE, AUTO_COLORS, NEUTRAL, CLOUD_COLORS, cloudColor, resolveColors } from "./karta/palette.js";
+import { MAX_DEPTH, depths, treeOrder, subtreeIds, repairParents } from "./karta/tree.js";
 import { PAPERS, DEFAULT_PAPER, isPaper, printKarta, buildKartaPrint, closeKartaPrint, hasKartaPrint } from "./karta/print.js";
 
 const EVENT = "karta:state";
@@ -65,21 +81,29 @@ function normalizePin(p) {
   return Number.isFinite(x) && Number.isFinite(y) ? { x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) } : null;
 }
 
-/** Normalisera ett sparat kartdokument. */
+/**
+ * Normalisera ett sparat kartdokument. Migrerar kartor från #53: utan
+ * parentId blir alla bubblor huvudnivå, utan cloud får molnet sin gamla
+ * färg (index 0) och färgläggningen är automatisk.
+ */
 export function normalizeMap(raw) {
   if (!raw || !isMapId(raw.id)) return null;
   const seen = new Set();
-  const bubbles = (Array.isArray(raw.bubbles) ? raw.bubbles : [])
+  const list = (Array.isArray(raw.bubbles) ? raw.bubbles : [])
     .filter((b) => typeof b?.id === "string" && typeof b.text === "string" && b.text.trim() && !seen.has(b.id) && seen.add(b.id))
-    .slice(0, MAX_BUBBLES)
-    .map((b) => {
+    .slice(0, MAX_BUBBLES);
+  const bubbles = repairParents(list.map((b) => ({ id: b.id, parentId: b.parentId ?? null, src: b })))
+    .map(({ id, parentId, src: b }) => {
       const pin = normalizePin(b.pin);
-      return { id: b.id, text: cleanText(b.text, MAX_TEXT), color: Number.isInteger(b.color) ? b.color : 0, ...(pin ? { pin } : {}) };
+      const color = Number.isInteger(b.color) ? b.color : (parentId ? null : 0);
+      return { id, text: cleanText(b.text, MAX_TEXT), color, parentId, ...(pin ? { pin } : {}) };
     });
   return {
     id: raw.id,
     name: typeof raw.name === "string" ? raw.name.slice(0, MAX_TITLE) : "",
     title: typeof raw.title === "string" ? raw.title.slice(0, MAX_TITLE) : "",
+    cloud: Number.isInteger(raw.cloud) && raw.cloud >= 0 && raw.cloud < CLOUD_COLORS.length ? raw.cloud : 0,
+    autoColor: raw.autoColor !== false,
     bubbles,
     nextColor: Number.isInteger(raw.nextColor) ? raw.nextColor : bubbles.length,
     createdAt: Number(raw.createdAt) || 0,
@@ -90,8 +114,8 @@ export function normalizeMap(raw) {
 /** Namnet i listan: eget namn, annars rubriken, annars "Ny karta". */
 export const mapLabel = (m) => (m?.name?.trim() || m?.title?.trim() || NEW_NAME);
 
-/** Det som eleverna ser (och bussen bär): bara rubrik och bubblor. */
-const publicMap = (m) => (m ? { id: m.id, title: m.title, bubbles: m.bubbles.map((b) => ({ ...b })) } : null);
+/** Det som eleverna ser (och bussen bär): rubrik, molnets färg och bubblor. */
+const publicMap = (m) => (m ? { id: m.id, title: m.title, cloud: m.cloud, bubbles: m.bubbles.map((b) => ({ ...b })) } : null);
 
 export default {
   id: "karta",
@@ -185,6 +209,11 @@ export default {
       const printPanel = $(".kt-printpanel");
       const statusEl = $(".kt-status");
       const countEl = $(".kt-count");
+      const targetEl = $(".kt-target");
+      const colorsEl = $(".kt-colors");
+      const colorsLabel = $(".kt-colors__label");
+      const swatchesEl = $(".kt-swatches");
+      const autoBox = $('input[name="kt-auto"]');
 
       /** @type {Array<ReturnType<typeof normalizeMap>>} */
       let maps = [];
@@ -193,6 +222,7 @@ export default {
       let rev = 0;
       let loaded = false;
       let titleTimer = 0;
+      let selected = null; // markerad bubbla: nya bubblor hamnar som grenar under den
       const undoStacks = new Map(); // kart-id → [op] (bara i minnet)
 
       const scene = createScene(stage, {
@@ -220,6 +250,10 @@ export default {
           commit(m);
         },
         onRemove: (id) => removeBubble(id),
+        onSelect: (id, how = {}) => {
+          select(id);
+          if (how.focusInput && !input.disabled) input.focus({ preventScroll: true });
+        },
         onMove: (id, pin) => {
           const m = curMap();
           const b = m?.bubbles.find((x) => x.id === id);
@@ -305,7 +339,10 @@ export default {
         const text = (id) => m.bubbles.find((b) => b.id === id)?.text ?? "";
         switch (op.t) {
           case "add": return `Ångra: ta bort ${quote(text(op.id))}`;
-          case "remove": return `Ångra: ta tillbaka ${quote(op.bubble.text)}`;
+          case "remove": return `Ångra: ta tillbaka ${quote(op.items[0].bubble.text)}${branchesText(op.items.length - 1, " med ")}`;
+          case "cloud": return "Ångra: molnets förra färg";
+          case "color": return `Ångra: förra färgen på ${quote(text(op.id))}`;
+          case "auto": return op.prevAuto ? "Ångra: färgerna tillbaka" : "Ångra: neutrala bubblor igen";
           case "clear": return `Ångra: ta tillbaka alla ${op.bubbles.length} bubblor`;
           case "move": return `Ångra: flytta tillbaka ${quote(text(op.id))}`;
           case "edit": return `Ångra: tillbaka till ${quote(op.prev)}`;
@@ -322,8 +359,16 @@ export default {
         switch (op.t) {
           case "add": m.bubbles = m.bubbles.filter((b) => b.id !== op.id); say("Den senaste bubblan togs bort."); break;
           case "remove":
-            m.bubbles.splice(Math.min(op.index, m.bubbles.length), 0, op.bubble);
-            say(`${quote(op.bubble.text)} är tillbaka.`);
+            for (const { bubble, index } of [...op.items].sort((a, b) => a.index - b.index)) m.bubbles.splice(Math.min(index, m.bubbles.length), 0, bubble);
+            say(`${quote(op.items[0].bubble.text)}${branchesText(op.items.length - 1, " med ")} är tillbaka.`);
+            break;
+          case "cloud": m.cloud = op.prev; say(""); break;
+          case "color": { const b = find(op.id); if (b) b.color = op.prev; say(""); break; }
+          case "auto":
+            m.autoColor = op.prevAuto;
+            m.nextColor = op.prevNext;
+            for (const b of m.bubbles) if (op.prev[b.id] !== undefined) b.color = op.prev[b.id];
+            say("");
             break;
           case "clear": m.bubbles = op.bubbles.map((b) => ({ ...b })); say("Alla bubblor är tillbaka."); break;
           case "move": { const b = find(op.id); if (b) { if (op.prev) b.pin = op.prev; else delete b.pin; } say(""); break; }
@@ -339,13 +384,28 @@ export default {
 
       // ---- Bubblor ----
 
+      const branchesText = (n, lead) => (n > 0 ? `${lead}${n === 1 ? "1 gren" : `${n} grenar`}` : "");
+      const byId = (m, id) => m?.bubbles.find((b) => b.id === id) ?? null;
+
+      /** Var en ny bubbla hamnar: under den markerade (eller bredvid en under-gren). */
+      function targetParent(m) {
+        const s = byId(m, selected);
+        if (!s) return null;
+        return (depths(m.bubbles).get(s.id) ?? 1) < MAX_DEPTH ? s.id : s.parentId;
+      }
+
       function addBubble() {
         const m = curMap();
         const text = cleanText(input.value, MAX_TEXT);
         if (!m || !text) { input.focus(); return; }
         if (m.bubbles.length >= MAX_BUBBLES) { say(`Kartan rymmer högst ${MAX_BUBBLES} bubblor.`); return; }
-        const b = { id: newBubbleId(), text, color: m.nextColor % PALETTE.length };
-        m.nextColor = (m.nextColor + 1) % PALETTE.length;
+        const parentId = targetParent(m);
+        let color = null; // en gren ärver förälderns färg
+        if (!parentId) {
+          color = m.autoColor ? m.nextColor % AUTO_COLORS : NEUTRAL;
+          if (m.autoColor) m.nextColor = (m.nextColor + 1) % AUTO_COLORS;
+        }
+        const b = { id: newBubbleId(), text, color, parentId };
         m.bubbles.push(b);
         pushUndo(m, { t: "add", id: b.id });
         input.value = "";
@@ -355,18 +415,26 @@ export default {
         input.focus();
       }
 
+      /** Ta bort en bubbla med alla dess grenar (Ångra tar tillbaka allt). */
       function removeBubble(id) {
         const m = curMap();
-        const index = m?.bubbles.findIndex((b) => b.id === id) ?? -1;
-        if (index < 0) return;
-        const [bubble] = m.bubbles.splice(index, 1);
-        pushUndo(m, { t: "remove", bubble, index });
+        const bubble = byId(m, id);
+        if (!bubble) return;
+        const gone = subtreeIds(m.bubbles, id);
+        // Index i den ursprungliga listan, stigande — så sätts de tillbaka i
+        // samma ordning. En gren skapas alltid efter sin förälder, så den
+        // borttagna bubblan står först.
+        const items = [];
+        m.bubbles.forEach((b, index) => { if (gone.has(b.id)) items.push({ bubble: b, index }); });
+        if (items[0].bubble.id !== id) items.unshift(...items.splice(items.findIndex((x) => x.bubble.id === id), 1));
+        m.bubbles = m.bubbles.filter((b) => !gone.has(b.id));
+        pushUndo(m, { t: "remove", items });
+        // Markeringen går till föräldern (fortsätt på samma gren) eller huvudnivån.
+        selected = bubble.parentId && byId(m, bubble.parentId) ? bubble.parentId : null;
         closeConfirms();
         commit(m);
-        say(`${quote(bubble.text)} togs bort — Ångra tar tillbaka den.`);
-        // Fokus till grannen (eller inmatningen) så att tangentbordet inte tappar bort sig.
-        const next = stage.querySelectorAll(".kt-bubble")[Math.min(index, m.bubbles.length - 1)];
-        (next ?? input).focus({ preventScroll: true });
+        say(`${quote(bubble.text)}${branchesText(items.length - 1, " och ")} togs bort — Ångra tar tillbaka ${items.length > 1 ? "allt" : "den"}.`);
+        input.focus({ preventScroll: true });
       }
 
       function clearAll() {
@@ -375,6 +443,7 @@ export default {
         pushUndo(m, { t: "clear", bubbles: m.bubbles.map((b) => ({ ...b })) });
         const n = m.bubbles.length;
         m.bubbles = [];
+        selected = null;
         closeConfirms();
         commit(m);
         say(`${n} bubblor togs bort — Ångra tar tillbaka dem.`);
@@ -390,12 +459,108 @@ export default {
         commit(m);
       }
 
+      // ---- Markering och färger ----
+
+      /** Markera en bubbla (null = huvudnivån). Nya bubblor hamnar under den markerade. */
+      function select(id) {
+        const m = curMap();
+        const next = id && byId(m, id) ? id : null;
+        if (next === selected && scene.selected === next) return;
+        selected = next;
+        scene.setSelected(selected);
+        drawTarget();
+        drawColors();
+      }
+
+      function setCloudColor(i) {
+        const m = curMap();
+        if (!m || m.cloud === i) return;
+        pushUndo(m, { t: "cloud", prev: m.cloud });
+        m.cloud = i;
+        commit(m);
+      }
+
+      function setBubbleColor(id, i) {
+        const m = curMap();
+        const b = byId(m, id);
+        if (!b || b.color === i || (i === null && !b.parentId)) return;
+        pushUndo(m, { t: "color", id, prev: b.color });
+        b.color = i;
+        commit(m);
+      }
+
+      /** Färglägg automatiskt: på → huvudbubblorna får var sin färg; av → alla neutrala. */
+      function setAutoColor(on) {
+        const m = curMap();
+        if (!m || m.autoColor === on) return;
+        const prev = {};
+        const roots = m.bubbles.filter((b) => !b.parentId);
+        for (const b of roots) prev[b.id] = b.color;
+        pushUndo(m, { t: "auto", prevAuto: m.autoColor, prevNext: m.nextColor, prev });
+        m.autoColor = on;
+        roots.forEach((b, i) => { b.color = on ? i % AUTO_COLORS : NEUTRAL; });
+        m.nextColor = on ? roots.length % AUTO_COLORS : m.nextColor;
+        commit(m);
+      }
+
+      /** Skrivradens mål: runt molnet, eller under den markerade bubblan. */
+      function drawTarget() {
+        const m = curMap();
+        const s = byId(m, selected);
+        const parent = s ? byId(m, targetParent(m)) : null;
+        let hint = "Skriv och tryck Enter";
+        let label = "Runt molnet";
+        if (s && parent) {
+          label = `Under ${quote(parent.text)}`;
+          hint = parent.id === s.id ? `Lägg till under ${quote(s.text)} — tryck Enter` : `Lägg till bredvid ${quote(s.text)} — tryck Enter`;
+        } else if (s) {
+          hint = `Lägg till bredvid ${quote(s.text)} — tryck Enter`;
+        }
+        input.placeholder = hint;
+        input.setAttribute("aria-label", s ? `${hint}. Esc går tillbaka till huvudnivån.` : "Ny bubbla runt molnet");
+        targetEl.textContent = label;
+        targetEl.classList.toggle("is-branch", !!(s && parent));
+        form.classList.toggle("is-branch", !!s);
+      }
+
+      /** Färgraden: molnets färger, eller den markerade bubblans. */
+      function drawColors() {
+        const m = curMap();
+        colorsEl.hidden = !m;
+        if (!m) return;
+        const s = byId(m, selected);
+        if (!s) {
+          colorsLabel.textContent = "Molnets färg";
+          swatchesEl.innerHTML = CLOUD_COLORS.map((c, i) => {
+            const ink = cloudColor(i).ink;
+            return `<button type="button" class="kt-swatch" data-cloud="${i}" style="--sw:${c.fill};--sw-edge:${c.edge};--sw-ink:${ink}"
+              aria-pressed="${m.cloud === i}" title="${escapeHtml(c.label)}" aria-label="Molnet ${escapeHtml(c.label.toLowerCase())}"></button>`;
+          }).join("");
+          autoBox.closest("label").hidden = false;
+          autoBox.checked = m.autoColor;
+          return;
+        }
+        colorsLabel.textContent = `Färg på ${quote(s.text)}`;
+        const inherit = s.parentId
+          ? (() => {
+            const pc = resolveColors(m.bubbles.map((b) => (b.id === s.id ? { ...b, color: null } : b))).get(s.id);
+            return `<button type="button" class="kt-swatch kt-swatch--inherit" data-color="inherit" style="--sw:${pc.bg};--sw-edge:${pc.edge}"
+              aria-pressed="${s.color === null}" title="Som föräldern (ljusare nyans)" aria-label="Som föräldern"></button>`;
+          })()
+          : "";
+        swatchesEl.innerHTML = inherit + PALETTE.map((c, i) => `<button type="button" class="kt-swatch" data-color="${i}"
+            style="--sw:${c.bg};--sw-edge:${c.edge}" aria-pressed="${s.color === i}" title="${escapeHtml(c.label)}"
+            aria-label="${escapeHtml(c.label)}"></button>`).join("");
+        autoBox.closest("label").hidden = true;
+      }
+
       // ---- Kartor ----
 
       function selectMap(id, { focusTitle = false } = {}) {
         if (id === cur) return;
         flush();
         cur = maps.some((m) => m.id === id) ? id : null;
+        selected = null;
         closeConfirms();
         closePrintPanel();
         say("");
@@ -406,11 +571,15 @@ export default {
       }
 
       function newMap(from = null) {
+        // En kopia får nya id:n — grenarna pekar om till sina kopierade föräldrar.
+        const ids = new Map((from?.bubbles ?? []).map((b) => [b.id, newBubbleId()]));
         const m = {
           id: newMapId(),
           name: from ? `${mapLabel(from)} (kopia)`.slice(0, MAX_TITLE) : "",
           title: from?.title ?? "",
-          bubbles: from ? from.bubbles.map((b) => ({ ...b, id: newBubbleId() })) : [],
+          cloud: from?.cloud ?? 0,
+          autoColor: from?.autoColor ?? true,
+          bubbles: from ? from.bubbles.map((b) => ({ ...b, id: ids.get(b.id), parentId: b.parentId ? ids.get(b.parentId) ?? null : null })) : [],
           nextColor: from?.nextColor ?? 0,
           createdAt: Date.now(),
           rev: 0,
@@ -470,6 +639,10 @@ export default {
         mapBox.hidden = !has;
         if (has && document.activeElement !== nameInput) nameInput.value = m.name;
         if (has) nameInput.placeholder = m.title.trim() || NEW_NAME;
+        if (selected && !byId(m, selected)) selected = null;
+        scene.setSelected(selected);
+        drawTarget();
+        drawColors();
         for (const r of printPanel.querySelectorAll('input[name="kt-paper"]')) r.checked = r.value === paper;
       }
 
@@ -505,6 +678,33 @@ export default {
       // ---- Händelser ----
 
       form.addEventListener("submit", (e) => { e.preventDefault(); addBubble(); });
+
+      // Skrivraden: Esc = huvudnivån; tom rad + Delete/Backspace = ta bort
+      // den markerade; F2 = ändra den; pil upp/ner (tom rad) = markera nästa.
+      input.addEventListener("keydown", (e) => {
+        const m = curMap();
+        if (!m) return;
+        if (e.key === "Escape" && selected) { e.preventDefault(); select(null); return; }
+        if (e.key === "Escape" && input.value) { e.preventDefault(); input.value = ""; return; }
+        if (input.value !== "") return;
+        if ((e.key === "Delete" || e.key === "Backspace") && selected) { e.preventDefault(); removeBubble(selected); return; }
+        if (e.key === "F2" && selected) { e.preventDefault(); scene.edit(selected); return; }
+        if ((e.key === "ArrowDown" || e.key === "ArrowUp") && m.bubbles.length) {
+          e.preventDefault();
+          const order = treeOrder(m.bubbles).map((b) => b.id);
+          const i = order.indexOf(selected);
+          const dir = e.key === "ArrowDown" ? 1 : -1;
+          select(i < 0 ? order[dir > 0 ? 0 : order.length - 1] : order[(i + dir + order.length) % order.length]);
+        }
+      });
+
+      swatchesEl.addEventListener("click", (e) => {
+        const b = e.target.closest(".kt-swatch");
+        if (!b) return;
+        if (b.dataset.cloud != null) setCloudColor(Number(b.dataset.cloud));
+        else if (selected) setBubbleColor(selected, b.dataset.color === "inherit" ? null : Number(b.dataset.color));
+      });
+      autoBox.addEventListener("change", () => setAutoColor(autoBox.checked));
 
       const root = $(".kt");
       root.addEventListener("click", (e) => {
@@ -577,7 +777,13 @@ export default {
       });
 
       // Ctrl+Z utanför textfälten = Ångra (i textfälten gäller deras egen ångra).
+      // Esc utanför textfälten = tillbaka till huvudnivån.
       const onKey = (e) => {
+        if (e.key === "Escape" && selected && !e.defaultPrevented) {
+          const t = e.target;
+          if (!t?.closest?.("input, textarea, [contenteditable='true'], [contenteditable='plaintext-only'], .kt-printpanel")
+            && (el.contains(t) || t === document.body)) { e.preventDefault(); select(null); return; }
+        }
         if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== "z") return;
         const t = e.target;
         if (t?.closest?.("input, textarea, [contenteditable='true'], [contenteditable='plaintext-only']")) return;
@@ -642,9 +848,16 @@ function teacherMarkup() {
           </div>
         </div>
 
+        <div class="kt-colors teacher-only" role="group" aria-label="Färg" hidden>
+          <span class="kt-colors__label">Molnets färg</span>
+          <span class="kt-swatches"></span>
+          <label class="kt-auto"><input type="checkbox" name="kt-auto" checked><span>Färglägg bubblor automatiskt</span></label>
+        </div>
+
         <form class="kt-add teacher-only" autocomplete="off">
+          <span class="kt-target" aria-hidden="true">Runt molnet</span>
           <input class="kt-input" type="text" name="kt-text" maxlength="${MAX_TEXT}" autocomplete="off"
-            spellcheck="false" placeholder="Skriv och tryck Enter" aria-label="Ny bubbla">
+            spellcheck="false" placeholder="Skriv och tryck Enter" aria-label="Ny bubbla runt molnet">
           <button type="submit" class="btn btn--primary" data-act="add">${icon("plus")}<span>Lägg till</span></button>
         </form>
 
@@ -676,9 +889,9 @@ function teacherMarkup() {
           </div>
         </div>
 
-        <p class="kt-hint teacher-only">Skicka ut med <strong>Visa på elevskärm</strong>. Eleverna ser kartan växa medan du skriver.
-          Ta bort en bubbla med dess <strong>×</strong>, ändra texten med dubbelklick och dra den dit du vill.
-          Kartorna sparas bara på den här datorn, aldrig i molnet.</p>
+        <p class="kt-hint kt-hint--main teacher-only">Klicka på en bubbla för att lägga till grenar under den — <kbd>Esc</kbd> eller klick på molnet går tillbaka.</p>
+        <p class="kt-hint teacher-only">Skicka ut med <strong>Visa på elevskärm</strong>. Den markerade bubblan tas bort med sitt <strong>×</strong>,
+          dubbelklick ändrar texten och du kan dra den dit du vill. Kartorna sparas bara på den här datorn, aldrig i molnet.</p>
       </div>
 
       <aside class="kt-side teacher-only" aria-label="Tankekartor">
