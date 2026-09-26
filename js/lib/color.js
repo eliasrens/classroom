@@ -44,19 +44,25 @@ export function readableTextColor(bgHex, { dark = "#1f2430", light = "#ffffff" }
 /**
  * Ämnespalett. Samma värden som CSS-tokens (--subject-*) — hålls i
  * synk för att JS ska kunna räkna textfärg och rendera etiketter.
+ *
+ * Färgfamiljerna följer skolans veckoschema (Sv röd, So gul, Ma blå,
+ * No/Tk mörkgrön, En lila, Idh rosa, Bd brun, Sl ljusgrön, Mu gråbrun,
+ * Mentorstid grå, rast neutral) men i mjukare, mattare toner.
+ * `rast` måste ligga sist — den är fallback i subjectStyle m.fl.
  */
 export const SUBJECTS = [
-  { id: "ma",   name: "Matematik",      color: "#5577b5" },
-  { id: "sv",   name: "Svenska",        color: "#b05f7d" },
-  { id: "en",   name: "Engelska",       color: "#7a63a8" },
-  { id: "no",   name: "NO",             color: "#4e8f72" },
-  { id: "so",   name: "SO",             color: "#b88540" },
-  { id: "idh",  name: "Idrott & hälsa", color: "#b3564e" },
-  { id: "bl",   name: "Bild",           color: "#a86d94" },
-  { id: "mu",   name: "Musik",          color: "#4f93a8" },
-  { id: "sl",   name: "Slöjd",          color: "#937a45" },
-  { id: "tk",   name: "Teknik",         color: "#6b7f93" },
-  { id: "rast", name: "Rast/övrigt",    color: "#85905f" },
+  { id: "ma",     name: "Matematik",      color: "#3a63a6" },
+  { id: "sv",     name: "Svenska/SVA",    color: "#ad3a30" },
+  { id: "en",     name: "Engelska",       color: "#7463ad" },
+  { id: "no",     name: "NO",             color: "#2f6b4f" },
+  { id: "so",     name: "SO",             color: "#e2bc3f" },
+  { id: "idh",    name: "Idrott & hälsa", color: "#eb9d8e" },
+  { id: "bl",     name: "Bild",           color: "#84573f" },
+  { id: "mu",     name: "Musik",          color: "#7d6e5f" },
+  { id: "sl",     name: "Slöjd",          color: "#a9c8a4" },
+  { id: "tk",     name: "Teknik",         color: "#2f6b4f" },
+  { id: "mentor", name: "Mentorstid",     color: "#9aa0a8" },
+  { id: "rast",   name: "Rast/övrigt",    color: "#d7d3cb" },
 ];
 
 /** Slår upp ett ämne och ger { ...subject, textColor } klart att använda. */
