@@ -71,6 +71,7 @@ const SCALES = [1, 0.93, 0.86, 0.8, 0.74, 0.68, 0.62, 0.57, 0.52, 0.47, 0.42, 0.
  */
 export function layoutMap({ w, h, cloud, bubbles, margin = 22, gap = 16 }) {
   let last = null;
+  let fallback = null;
   // Trångt (många bubblor): molnet ger plats — högst 22 % mindre vid 30.
   // Smalt format (stående papper): molnet får aldrig ta mer än ~46 % av
   // bredden, annars ryms inga bubblor bredvid det.
@@ -92,13 +93,33 @@ export function layoutMap({ w, h, cloud, bubbles, margin = 22, gap = 16 }) {
       const items = tree.depth > 1
         ? placeTree({ w, h, cloud: c, bubbles: sized, tree, variant: v, margin, gap })
         : placeRings({ w, h, cloud: c, bubbles: sized, rings: v, margin, gap });
+      const start = items.map((it) => ({ x: it.x, y: it.y }));
       relax({ w, h, cloud: c, items, margin, gap, stuck: tree.depth > 1 });
       const ok = isClean({ w, h, cloud: c, items, margin, gap: gap * 0.5 });
       last = { scale, cloudScale, ok, items: items.map(({ x, y, w: bw, h: bh }) => ({ x, y, w: bw, h: bh })) };
-      if (ok) return last;
+      if (!ok) continue;
+      if (tree.depth <= 1) return last;
+      // Med grenar: en layout där avslappningen fått flytta en bubbla långt
+      // från sin plats i trädet (grenen hamnar hos grannen, kurvorna korsas)
+      // godtas bara om inget bättre finns — hellre lite mindre text.
+      last.drift = drift(items, start);
+      if (last.drift <= DRIFT_MAX) return last;
+      if (!fallback) fallback = last;
     }
   }
-  return last ?? { scale: 1, cloudScale: 1, ok: true, items: [] };
+  return fallback ?? last ?? { scale: 1, cloudScale: 1, ok: true, items: [] };
+}
+
+const DRIFT_MAX = 0.9;
+
+/** Största förflyttningen i avslappningen, i förhållande till bubblans egen storlek. */
+function drift(items, start) {
+  let worst = 0;
+  items.forEach((it, i) => {
+    if (it.fixed) return;
+    worst = Math.max(worst, Math.hypot(it.x - start[i].x, it.y - start[i].y) / (it.w + it.h));
+  });
+  return worst;
 }
 
 /**
@@ -142,6 +163,8 @@ function treeVariants(tree) {
   const n = tree.level.length;
   const reach = Math.min(1, 0.4 + n * 0.03);
   const out = [
+    { greedy: true, pad: 0 },
+    { greedy: true, pad: 10 },
     { reach, f1: 0, alt: 0, alt1: 0 },
     { reach: 1, f1: 0.12, alt: 0.34, alt1: 0 },
   ];
@@ -203,9 +226,53 @@ function placeTree({ w, h, cloud, bubbles, tree, variant, margin, gap }) {
     assign(roots, start, start + 2 * Math.PI);
   }
 
-  // Radiella noder: ut längs sin stråle efter nivå.
   const radial = [];
   for (let i = 0; i < n; i++) if (angle[i] != null) radial.push(i);
+  if (variant.greedy) placeGreedy({ items, radial, angle, level, w, h, cx, cy, cloud, margin, gap: gap + variant.pad });
+  else placeLevels({ items, radial, angle, level, depth, variant, w, h, cx, cy, cloud, margin, gap });
+  placeFans({ items, children, roots, w, h, cx, cy, margin, gap });
+  return items;
+}
+
+/**
+ * Radiella noder, girigt: nivå för nivå, i vinkelordning, flyttas varje
+ * bubbla ut längs sin stråle från molnet tills den inte rör något som
+ * redan står (fästa bubblor, föräldern, grannarna). Ryms den inte hela
+ * vägen ut står den där den överlappar minst — avslappningen tar resten.
+ */
+function placeGreedy({ items, radial, angle, level, w, h, cx, cy, cloud, margin, gap }) {
+  const placed = items.filter((it) => it.fixed);
+  const overlap = (a) => {
+    let sum = 0;
+    for (const b of placed) {
+      const ox = (a.w + b.w) / 2 + gap - Math.abs(a.x - b.x);
+      const oy = (a.h + b.h) / 2 + gap - Math.abs(a.y - b.y);
+      if (ox > 0 && oy > 0) sum += ox * oy;
+    }
+    return sum;
+  };
+  const order = [...radial].sort((a, b) => level[a] - level[b] || angle[a] - angle[b]);
+  for (const i of order) {
+    const it = items[i];
+    const ray = rayFor(angle[i], w, h);
+    const { tMin, tMax } = rayRange({ it, ray, cx, cy, w, h, cloud, margin, gap });
+    const step = Math.max(4, Math.min(it.w, it.h) * 0.2);
+    let best = null;
+    for (let t = tMin; ; t = Math.min(tMax, t + step)) {
+      const cand = { x: cx + ray.dx * t, y: cy + ray.dy * t, w: it.w, h: it.h };
+      const o = overlap(cand);
+      if (!best || o < best.o) best = { t, o };
+      if (o === 0 || t >= tMax) break;
+    }
+    const t = tMin >= tMax ? tMax : best.t;
+    it.x = cx + ray.dx * t;
+    it.y = cy + ray.dy * t;
+    placed.push(it);
+  }
+}
+
+/** Radiella noder efter nivå: huvudnivån intill molnet, den djupaste längst ut. */
+function placeLevels({ items, radial, angle, level, depth, variant, w, h, cx, cy, cloud, margin, gap }) {
   const { reach, f1, alt, alt1 } = variant;
   const atLevel = new Map();
   [...radial].sort((a, b) => angle[a] - angle[b]).forEach((i) => {
@@ -223,9 +290,13 @@ function placeTree({ w, h, cloud, bubbles, tree, variant, margin, gap }) {
     it.x = cx + ray.dx * t;
     it.y = cy + ray.dy * t;
   });
+}
 
-  // Barn till fästa bubblor (och deras barn): solfjäder runt föräldern,
-  // bort från molnet. I trädordning, så att föräldern alltid står först.
+/**
+ * Barn till fästa bubblor (och deras barn): solfjäder runt föräldern,
+ * bort från molnet. I trädordning, så att föräldern alltid står först.
+ */
+function placeFans({ items, children, roots, w, h, cx, cy, margin, gap }) {
   const fan = (i, inFan) => {
     const kids = children[i].filter((c) => !items[c].fixed && (inFan || items[i].fixed));
     const p = items[i];
@@ -246,7 +317,6 @@ function placeTree({ w, h, cloud, bubbles, tree, variant, margin, gap }) {
     for (const c of children[i]) fan(c, inFan || kids.includes(c));
   };
   for (const r of roots) fan(r, false);
-  return items;
 }
 
 /** Strålen för en vinkel — följer scenens form (en ellips i scenens proportioner). */
