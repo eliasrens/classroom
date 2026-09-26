@@ -1,34 +1,37 @@
 /**
- * ÖVERMENYN — två grupper (issue #45). Byggs helt ur js/modes/registry.js.
+ * ÖVERMENYN — rutiner + två rullgardiner (issue #45, #52). Byggs helt ur
+ * js/modes/registry.js.
  *
- *   [I klassrummet]  Morgon · Lektion · Trafikljus · … · [Mer ▾]   |   [Lärare ▾]
+ *   ☀ Morgon  ▤ Lektion  ◉ Trafikljus  ★ Veckan  [Mer ▾] │ Verktyg ▾ │ Lärare ▾
  *
- *  - "I klassrummet": lägena som kan visas för eleverna (group:
- *    "classroom"), var och ett med ikon + kort namn. Aktivt läge har
- *    aria-current="page" och markeras tydligt.
- *  - "Lärare ▾": rullgardin med lärarlägena (group: "teacher"). Står man
- *    i ett lärarläge visar knappen det: "Lärare: Elevlista ▾".
+ *  - Rutiner (group: "classroom"): alltid i raden, var och en med ikon +
+ *    kort namn. Aktivt läge har aria-current="page" och markeras tydligt.
+ *  - "Verktyg ▾" (group: "tools"): Skrivtavla, Lottning … Står man i ett
+ *    verktyg visar knappen det: "Verktyg: Lottning ▾". Ett nytt verktyg
+ *    behöver bara `group: "tools"` i registret.
+ *  - "Lärare ▾" (group: "teacher"): samma komponent. "Lärare: Elevlista ▾".
  *
  * RESPONSIVT. Menyn får den plats som blir över i topbaren (klassväljare,
  * elevskärmsknapp, synkstatus m.m. trängs aldrig ut). Ryms den inte
  * komprimeras den ett steg i taget tills den gör det:
  *   0  gruppetikett + ikon + namn
  *   1  utan gruppetikett
- *   2  klassrumslägena bara som ikoner (tooltip + aria-label)
- *   3  lärarknappen kortad ("Elevlista ▾" i stället för "Lärare: Elevlista ▾")
- *   4… de minst prioriterade klassrumslägena (högst `priority`) flyttas,
+ *   2  rutinerna bara som ikoner (tooltip + aria-label)
+ *   3  rullgardinsknapparna kortade ("Lottning ▾" i stället för
+ *      "Verktyg: Lottning ▾")
+ *   4… de minst prioriterade rutinerna (högst `priority`) flyttas,
  *      ett i taget, till "Mer ▾". Fler än MAX_INLINE lägen flyttas alltid.
- * Skulle färre än MIN_INLINE klassrumslägen stå kvar (mycket smalt fönster)
+ * Skulle färre än MIN_INLINE rutiner stå kvar (mycket smalt fönster)
  * får menyn i stället en egen rad under topbaren (data-wrap) och
  * komprimeras där på samma sätt.
  * Nivån räknas om när menyns bredd ändras (ResizeObserver) och vid lägesbyte.
  */
 
 import { icon } from "../lib/icons.js";
-import { NAV_GROUPS, modesInGroup, shortTitle } from "../modes/registry.js";
+import { NAV_GROUPS, NAV_GROUP_ORDER, modesInGroup, shortTitle } from "../modes/registry.js";
 import { createMenuButton } from "./menu-button.js";
 
-/** Så många klassrumslägen får stå i raden innan resten alltid går till "Mer ▾". */
+/** Så många rutiner får stå i raden innan resten alltid går till "Mer ▾". */
 export const MAX_INLINE = 8;
 /** Ryms inte så här många i topbaren får menyn en egen rad. */
 const MIN_INLINE = 3;
@@ -48,12 +51,37 @@ const actionItem = (a) => `
     ${icon(a.icon)}<span>${esc(a.title)}</span></button>`;
 
 /**
+ * En grupps rullgardin ("Verktyg ▾", "Lärare ▾"). Knappens etikett
+ * sätts i renderActive(). `end` = menyn öppnas åt vänster (sist i raden).
+ */
+const groupMenu = (group, modes, { end = false, extra = "" } = {}) => `
+  <span class="mode-nav__divider" aria-hidden="true"></span>
+  <div class="mode-nav__menu mode-nav__dropdown mode-nav__${group}" data-group="${group}">
+    <button type="button" class="mode-nav__btn" id="mode-nav-${group}-btn"
+      aria-controls="mode-nav-${group}-menu">
+      <span class="mode-nav__btn-icon"></span>
+      <span class="mode-nav__btn-label"></span>${chevron()}</button>
+    <div class="mode-nav__popup${end ? " mode-nav__popup--end" : ""}" id="mode-nav-${group}-menu" aria-labelledby="mode-nav-${group}-btn">
+      ${modes.map(menuItem).join("")}
+      ${extra}
+    </div>
+  </div>`;
+
+/** Vad knappen säger om gruppen, t.ex. "lärarlägen" i aria-label. */
+const GROUP_NOUN = { tools: "verktyg", teacher: "lärarlägen" };
+
+/**
  * @param actions  [{id, title, icon, run}] — lärarens åtgärder, efter en
  *                 avdelare i "Lärare ▾". Menyn visas aldrig på elevskärmen.
  */
 export function initModeNav({ el, store, actions = [] }) {
   const classroom = modesInGroup("classroom");
-  const teacher = modesInGroup("teacher");
+  // Rullgardinerna efter rutinerna, i menyordning. Tomma grupper visas inte
+  // (Lärare ▾ visas alltid — där står även lärarens åtgärder).
+  const dropdowns = NAV_GROUP_ORDER
+    .filter((g) => g !== "classroom")
+    .map((group) => ({ group, modes: modesInGroup(group) }))
+    .filter((d) => d.modes.length || (d.group === "teacher" && actions.length));
 
   // Överflödsordning: minst prioriterade först (högst priority; lika → sist i menyn först).
   const overflowOrder = classroom
@@ -78,28 +106,24 @@ export function initModeNav({ el, store, actions = [] }) {
           </div>
         </div>
       </div>
-      <span class="mode-nav__divider" aria-hidden="true"></span>
-      <div class="mode-nav__menu mode-nav__teacher">
-        <button type="button" class="mode-nav__btn" id="mode-nav-teacher-btn"
-          aria-controls="mode-nav-teacher-menu">
-          <span class="mode-nav__btn-icon"></span>
-          <span class="mode-nav__teacher-label"></span>${chevron()}</button>
-        <div class="mode-nav__popup mode-nav__popup--end" id="mode-nav-teacher-menu" aria-labelledby="mode-nav-teacher-btn">
-          ${teacher.map(menuItem).join("")}
-          ${actions.length ? `<div class="mode-nav__sep" role="separator"></div>${actions.map(actionItem).join("")}` : ""}
-        </div>
-      </div>
+      ${dropdowns.map(({ group, modes }, i) => groupMenu(group, modes, {
+        end: i === dropdowns.length - 1,
+        extra: group === "teacher" && actions.length
+          ? `<div class="mode-nav__sep" role="separator"></div>${actions.map(actionItem).join("")}` : "",
+      })).join("")}
     </div>`;
 
   const rowEl = el.querySelector(".mode-nav__row");
   const moreEl = el.querySelector(".mode-nav__more");
   const moreBtn = moreEl.querySelector("button");
-  const teacherEl = el.querySelector(".mode-nav__teacher");
-  const teacherBtn = teacherEl.querySelector("button");
-  const teacherLabel = teacherEl.querySelector(".mode-nav__teacher-label");
-
   createMenuButton({ root: moreEl, button: moreBtn, menu: moreEl.querySelector(".mode-nav__popup") });
-  createMenuButton({ root: teacherEl, button: teacherBtn, menu: teacherEl.querySelector(".mode-nav__popup") });
+
+  for (const d of dropdowns) {
+    d.el = el.querySelector(`.mode-nav__dropdown[data-group="${d.group}"]`);
+    d.btn = d.el.querySelector("button");
+    d.label = d.el.querySelector(".mode-nav__btn-label");
+    createMenuButton({ root: d.el, button: d.btn, menu: d.el.querySelector(".mode-nav__popup") });
+  }
 
   // Åtgärderna: lyssna på el (bubblar EFTER menyns egen stängning, som
   // lämnar fokus på knappen) — så att en dialog kan ta fokus själv.
@@ -117,15 +141,20 @@ export function initModeNav({ el, store, actions = [] }) {
       else a.removeAttribute("aria-current");
     }
 
-    // Lärarknappen: "Lärare ▾" — eller "Lärare: Elevlista ▾" i ett lärarläge.
-    const t = teacher.find((m) => m.id === modeId);
-    teacherEl.dataset.current = String(!!t);
-    teacherEl.querySelector(".mode-nav__btn-icon").innerHTML = t ? icon(t.icon) : "";
-    teacherLabel.innerHTML = t
-      ? `<span class="mode-nav__teacher-prefix">${esc(NAV_GROUPS.teacher.label)}: </span>${esc(shortTitle(t))}`
-      : esc(NAV_GROUPS.teacher.label);
-    teacherBtn.setAttribute("aria-label", t ? `${NAV_GROUPS.teacher.label}: ${t.title} — fler lärarlägen` : `${NAV_GROUPS.teacher.label} — lärarlägen`);
-    teacherBtn.title = teacherBtn.getAttribute("aria-label");
+    // Rullgardinsknapparna: "Verktyg ▾" — eller "Verktyg: Lottning ▾" när
+    // man står i ett av gruppens lägen (likadant "Lärare: Elevlista ▾").
+    for (const d of dropdowns) {
+      const name = NAV_GROUPS[d.group].label;
+      const noun = GROUP_NOUN[d.group] ?? "lägen";
+      const cur = d.modes.find((m) => m.id === modeId);
+      d.el.dataset.current = String(!!cur);
+      d.el.querySelector(".mode-nav__btn-icon").innerHTML = cur ? icon(cur.icon) : "";
+      d.label.innerHTML = cur
+        ? `<span class="mode-nav__btn-prefix">${esc(name)}: </span>${esc(shortTitle(cur))}`
+        : esc(name);
+      d.btn.setAttribute("aria-label", cur ? `${name}: ${cur.title} — fler ${noun}` : `${name} — ${noun}`);
+      d.btn.title = d.btn.getAttribute("aria-label");
+    }
     renderMoreButton();
   }
 

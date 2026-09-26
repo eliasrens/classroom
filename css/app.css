@@ -65,7 +65,7 @@ html[data-theme="student"] .teacher-only { display: none !important; }
 }
 #open-student-view[data-open="true"]::after { background: var(--color-ok); opacity: 1; }
 
-/* ---- Övermenyn: två grupper (issue #45, js/ui/mode-nav.js) ----
+/* ---- Övermenyn: rutiner + Verktyg ▾ + Lärare ▾ (issue #45, #52, js/ui/mode-nav.js) ----
    Menyn får platsen som blir över i topbaren (flex-basis 0) — resten av
    raden (klassval, elevskärm, synkstatus …) trängs aldrig ut. Ryms den
    inte komprimerar mode-nav.js den stegvis via data-level (0–3) och
@@ -137,13 +137,13 @@ html[data-theme="student"] .teacher-only { display: none !important; }
 .mode-nav[data-level="3"] .mode-nav__caption,
 .mode-nav[data-level="2"] .mode-nav__label,
 .mode-nav[data-level="3"] .mode-nav__label,
-.mode-nav[data-level="3"] .mode-nav__teacher-prefix { display: none; }
+.mode-nav[data-level="3"] .mode-nav__btn-prefix { display: none; }
 .mode-nav[data-level="2"] .mode-nav__link,
 .mode-nav[data-level="3"] .mode-nav__link { padding-inline: var(--space-2); }
 .mode-nav[data-level="2"] .mode-nav__link svg,
 .mode-nav[data-level="3"] .mode-nav__link svg { width: 1.35em; height: 1.35em; }
 
-/* Rullgardinerna (Lärare ▾, Mer ▾) */
+/* Rullgardinerna (Verktyg ▾, Lärare ▾, Mer ▾) */
 .mode-nav__menu { position: relative; }
 
 .mode-nav__popup {
@@ -465,7 +465,7 @@ html[data-theme="student"] .view {
 }
 
 /* Smalt fönster: menyn får en egen rad under resten av topbaren
-   (sätts av mode-nav.js när färre än tre klassrumslägen skulle rymmas). */
+   (sätts av mode-nav.js när färre än tre rutiner skulle rymmas). */
 .mode-nav[data-wrap="true"] { order: 99; flex-basis: 100%; }
 
 @media (min-width: 1600px) {

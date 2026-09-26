@@ -25,7 +25,7 @@ export const shortcutGroups = () => [
   {
     title: "Överallt",
     items: [
-      // Siffrorna följer övermenyns ordning: klassrumslägena, sedan Lärare ▾.
+      // Siffrorna följer övermenyns ordning: rutinerna, Verktyg ▾, Lärare ▾.
       { keys: ["1", "–", String(modeCount())], text: `Byt läge: ${shortcutModes()
         .map((m, i) => `${i + 1} ${shortTitle(m)}`).join(" · ")}` },
       { keys: ["E"], text: "Öppna eller fokusera elevskärmen" },
