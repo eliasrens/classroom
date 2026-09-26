@@ -7,8 +7,13 @@
  * (DU BEHÖVER · MÅL). Finare typografi, mjukare former, ämnesfärg
  * som ram/band/accent mot ljus pappersyta.
  *
- * - Kryssruta per fält (lärarvy): av-/påslag omfördelar layouten utan
- *   tomma hål. Kryssvalen sparas MED planeringen (`show`).
+ * - Kryssruta per fält i sektionen "Visning" (lärarvy): av-/påslag
+ *   omfördelar layouten utan tomma hål. Kryssvalen sparas MED planeringen
+ *   (`show`).
+ * - Utfällbart (issue #66, js/ui/collapsible.js): planeringslistan kan
+ *   fällas ihop till en smal remsa, redigerarens fält fälls ut var för sig
+ *   (tomma stängda, ifyllda öppna när en planering öppnas) och "Visning" är
+ *   stängd som standard. Listans och Visnings läge sparas per dator.
  * - Spara/hämta: namngivna planeringar per klass + datum. Listan grupperas
  *   per vecka, med sök + ämnesfilter. Kopiera (till samma veckodag i
  *   kommande vecka), ta bort en eller flera (med bekräftelse). En sparad
@@ -47,6 +52,7 @@ import { normalize as normalizeMorning, PRAISE_DOC, praisePath } from "../lib/mo
 import { studentLabel } from "../lib/names.js";
 import { serverNow } from "../lib/clock.js";
 import { openClassActionDialog } from "../ui/class-actions.js";
+import { collapsibleHTML, mountCollapsibles, firstWords } from "../ui/collapsible.js";
 
 /* De nio av-/påslagbara delarna, i den ordning kryssrutorna visas.
    `slot` säger var i tavlan de bor; `list` = flerradsfält. */
@@ -536,10 +542,20 @@ export default {
 
     // ---------- LÄRARVY: panel + levande förhandsvisning ----------
     el.innerHTML = `
-      <div class="lesson">
-        <aside class="lesson-panel teacher-only">
-          <section class="lesson-panel__group">
-            <h2>Planeringar</h2>
+      <div class="lesson" data-plans-open="true">
+        <aside class="lesson-panel lesson-plans teacher-only" aria-label="Planeringar">
+          <button class="lesson-plans__strip" data-act="plans-toggle" aria-expanded="false" aria-controls="lesson-plans-body"
+            title="Visa planeringslistan" hidden>
+            ${icon("chevron-right", { size: 18 })}
+            <span class="lesson-plans__strip-dot" data-el="strip-dot"></span>
+            <span class="lesson-plans__strip-name" data-el="strip-name"></span>
+          </button>
+          <section class="lesson-panel__group lesson-plans__body" id="lesson-plans-body">
+            <div class="lesson-panel__headrow">
+              <h2>Planeringar</h2>
+              <button class="btn btn--ghost btn--icon" data-act="plans-toggle" aria-expanded="true" aria-controls="lesson-plans-body"
+                title="Fäll ihop listan till en remsa" aria-label="Fäll ihop planeringslistan">${icon("chevron-left", { size: 18 })}</button>
+            </div>
             <div class="btn-row">
               <button class="btn btn--primary" data-act="new">${icon("plus")} Ny planering</button>
               <button class="btn" data-act="dup" title="Kopiera den valda planeringen till samma veckodag, idag eller framåt">${icon("copy")} Kopiera</button>
@@ -557,7 +573,9 @@ export default {
             <p class="plan-status" data-el="status" aria-live="polite" hidden></p>
             <div class="plan-list" data-el="list"></div>
           </section>
+        </aside>
 
+        <aside class="lesson-panel lesson-editor teacher-only" aria-label="Redigera planeringen">
           <section class="lesson-panel__group">
             <div class="lesson-panel__headrow">
               <h2>Om lektionen</h2>
@@ -587,9 +605,10 @@ export default {
 
           <section class="lesson-panel__group">
             <h2>Fält</h2>
-            <p class="field-edit__hint">Kryssrutan slår av/på fältet på tavlan — layouten omfördelar sig automatiskt. Valen sparas med planeringen.</p>
-            <div data-el="fields"></div>
+            <div class="lesson-fields" data-el="fields"></div>
           </section>
+
+          <div data-el="display"></div>
         </aside>
 
         <div class="lesson__main">
@@ -600,6 +619,8 @@ export default {
 
     const listEl = el.querySelector('[data-el="list"]');
     const fieldsEl = el.querySelector('[data-el="fields"]');
+    const displayEl = el.querySelector('[data-el="display"]');
+    const lessonEl = el.querySelector(".lesson");
     const stageEl = el.querySelector('[data-el="stage"]');
     const presentEl = el.querySelector('[data-el="present"]');
     const bulkEl = el.querySelector('[data-el="bulk"]');
@@ -666,37 +687,101 @@ export default {
       return id;
     }
 
-    // -- Fältredigerare (kryssruta + innehåll) --
+    // -- Fältredigerare (issue #66): varje fält är utfällbart. Tomma fält
+    // är stängda och ifyllda öppna när en planering öppnas (sparas inte —
+    // standardläget följer innehållet). Vad eleverna ser styrs i "Visning".
+    const fieldValue = (plan, k) => k === "attGora" ? (plan.fields.attGora ?? []).join("\n") : plan.fields[k];
+    function fieldSummary(plan, k) {
+      return firstWords(fieldValue(plan, k)) + (plan.show[k] ? "" : " · dold för eleverna");
+    }
     function fieldsHTML(plan) {
-      const rows = FIELD_KEYS.map((k) => {
+      return FIELD_KEYS.map((k) => {
         const part = PARTS.find((p) => p.key === k);
-        const on = plan.show[k];
-        const val = k === "attGora" ? (plan.fields.attGora ?? []).join("\n") : plan.fields[k];
+        const val = fieldValue(plan, k);
         const multi = part.kind === "steps" || part.kind === "list";
+        const label = `aria-label="${esc(part.label)}"`;
         const input = multi
-          ? `<textarea data-field="${k}" rows="${k === "attGora" ? 4 : 2}" placeholder="En rad per punkt">${esc(val)}</textarea>`
-          : `<input type="text" data-field="${k}" value="${esc(val)}" autocomplete="off">`;
-        return `<div class="field-edit${on ? "" : " field-edit--off"}" data-fieldwrap="${k}">
-          <div class="field-edit__head">
-            <label><input type="checkbox" data-show="${k}" ${on ? "checked" : ""}> ${esc(part.label.toUpperCase())}</label>
-          </div>
-          ${input}
-        </div>`;
-      });
+          ? `<textarea data-field="${k}" ${label} rows="${k === "attGora" ? 4 : 2}" placeholder="En rad per punkt">${esc(val)}</textarea>`
+          : `<input type="text" data-field="${k}" ${label} value="${esc(val)}" autocomplete="off">`;
+        return collapsibleHTML({
+          key: `field-${k}`, persist: false, level: 3,
+          className: `field-edit${plan.show[k] ? "" : " field-edit--off"}`,
+          title: esc(part.label), body: input,
+        });
+      }).join("");
+    }
+    function fieldDefaults(plan) {
+      return Object.fromEntries(FIELD_KEYS.map((k) => [`field-${k}`, String(fieldValue(plan, k) ?? "").trim() !== ""]));
+    }
+
+    // -- Visning: vad eleverna ser (stängd som standard, sparas per dator) --
+    const DISPLAY_PARTS = ["subject", "time", ...FIELD_KEYS];
+    function displayHTML(plan) {
+      const rows = DISPLAY_PARTS.map((k) => {
+        const part = PARTS.find((p) => p.key === k);
+        return `<label class="display-opt"><input type="checkbox" data-show="${k}" ${plan.show[k] ? "checked" : ""}> ${esc(part.label)}</label>`;
+      }).join("");
       // Bra jobbat: bara en kryssruta — namnen väljs på morgonskärmen (delad data).
-      const n = praiseNames().length;
-      rows.push(`<div class="field-edit${plan.show.praise ? "" : " field-edit--off"}" data-fieldwrap="praise">
-        <div class="field-edit__head">
-          <label><input type="checkbox" data-show="praise" ${plan.show.praise ? "checked" : ""}> Visa Bra jobbat</label>
-        </div>
-        <p class="field-edit__hint" data-el="praise-hint">${praiseHint(n)}</p>
-      </div>`);
-      return rows.join("");
+      return collapsibleHTML({
+        key: "display", level: 2, className: "lesson-display", title: "Visning",
+        body: `<p class="field-edit__hint">Det som är ikryssat visas på tavlan — layouten omfördelar sig automatiskt. Valen sparas med planeringen.</p>
+          <div class="display-opts" role="group" aria-label="Visas för eleverna">${rows}</div>
+          <label class="display-opt display-opt--praise"><input type="checkbox" data-show="praise" ${plan.show.praise ? "checked" : ""}> Visa Bra jobbat</label>
+          <p class="field-edit__hint" data-el="praise-hint">${praiseHint(praiseNames().length)}</p>`,
+      });
+    }
+    function displaySummary(plan) {
+      const n = FIELD_KEYS.filter((k) => plan.show[k]).length;
+      const extra = [
+        !plan.show.subject && "utan ämne",
+        !plan.show.time && "utan tid",
+        plan.show.praise && "Bra jobbat",
+      ].filter(Boolean);
+      return [`${n} av ${FIELD_KEYS.length} fält visas`, ...extra].join(" · ");
     }
     function praiseHint(n) {
       const count = n === 0 ? "Inga namn just nu" : n === 1 ? "1 namn just nu" : `${n} namn just nu`;
       return `Visas i högerkolumnen (delar plats med "När du är klar"). Samma namn som på Morgonskärmen — ${count}.`;
     }
+
+    // Utfällbara sektioner i redigeraren (fälten + Visning).
+    const editorPanel = el.querySelector(".lesson-editor");
+    const sections = mountCollapsibles(editorPanel, { scope: "lektion", defaults: { display: false } });
+    this._offs.push(() => sections.destroy());
+    function syncSummaries() {
+      const p = editingPlan();
+      if (!p) return;
+      const np = normalizePlan(p);
+      for (const k of FIELD_KEYS) {
+        sections.setSummary(`field-${k}`, fieldSummary(np, k));
+        editorPanel.querySelector(`[data-collapsible="field-${k}"]`)?.classList.toggle("field-edit--off", !np.show[k]);
+      }
+      sections.setSummary("display", displaySummary(np));
+    }
+
+    // -- Planeringslistan kan fällas ihop till en smal remsa (sparas per dator) --
+    const PLANS_OPEN_KEY = "classroom:ui:collapse:lektion:plans";
+    const plansBody = el.querySelector(".lesson-plans__body");
+    const plansStrip = el.querySelector(".lesson-plans__strip");
+    let plansOpen = true;
+    try { plansOpen = localStorage.getItem(PLANS_OPEN_KEY) !== "0"; } catch { /* ok */ }
+    function applyPlansOpen() {
+      lessonEl.dataset.plansOpen = String(plansOpen);
+      plansBody.hidden = !plansOpen;
+      plansStrip.hidden = plansOpen;
+    }
+    function setPlansOpen(open) {
+      plansOpen = open;
+      applyPlansOpen();
+      try { localStorage.setItem(PLANS_OPEN_KEY, open ? "1" : "0"); } catch { /* ok */ }
+      (open ? plansBody.querySelector('[data-act="plans-toggle"]') : plansStrip).focus();
+    }
+    function renderStrip() {
+      const p = editingPlan();
+      el.querySelector('[data-el="strip-name"]').textContent = p ? p.name || "Namnlös planering" : "Planeringar";
+      el.querySelector('[data-el="strip-dot"]').style.background = p ? styleFor(p.subjectId, subjects).color : "transparent";
+    }
+    applyPlansOpen();
 
     // -- Sparade planeringar-lista --
     function visiblePlans() {
@@ -730,6 +815,7 @@ export default {
 
     function renderList() {
       fillSubjectFilter();
+      renderStrip();
       if (plans.length === 0) { listEl.innerHTML = `<p class="field-edit__hint">Inga planeringar ännu — tryck på "Ny planering".</p>`; renderBulk(); return; }
       const vis = visiblePlans();
       if (vis.length === 0) { listEl.innerHTML = `<p class="field-edit__hint">Inga planeringar matchar sökningen.</p>`; renderBulk(); return; }
@@ -826,7 +912,7 @@ export default {
       const disabled = !p;
       for (const inp of metaInputs()) inp.disabled = disabled;
       editorFor = p?.id ?? null;
-      if (!p) { fieldsEl.innerHTML = ""; return; }
+      if (!p) { fieldsEl.innerHTML = ""; displayEl.innerHTML = ""; return; }
       const np = normalizePlan(p);
       el.querySelector('[data-meta="name"]').value = np.name;
       el.querySelector('[data-meta="date"]').value = np.date;
@@ -834,6 +920,14 @@ export default {
       el.querySelector('[data-meta="end"]').value = np.end;
       fillSubjectSelect(el.querySelector('[data-meta="subjectId"]'), np.subjectId);
       fieldsEl.innerHTML = fieldsHTML(np);
+      displayEl.innerHTML = displayHTML(np);
+      // Visning har sparat läge; fälten öppnas efter innehåll varje gång.
+      for (const [key, open] of Object.entries(fieldDefaults(np))) {
+        const sec = fieldsEl.querySelector(`[data-collapsible="${key}"]`);
+        if (sec) { sec.dataset.clReady = ""; sections.setOpen(key, open); }
+      }
+      sections.init();
+      syncSummaries();
     }
     function syncEditor() {
       if ((editingPlan()?.id ?? null) !== editorFor) renderEditor();
@@ -896,9 +990,10 @@ export default {
     }
 
     // ---- Händelser (event delegation på panelen) ----
-    const panel = el.querySelector(".lesson-panel");
+    const panels = [...el.querySelectorAll(".lesson-panel")];
+    const onPanels = (type, fn) => { for (const p of panels) p.addEventListener(type, fn); };
 
-    panel.addEventListener("click", async (e) => {
+    onPanels("click", async (e) => {
       const copyBtn = e.target.closest("[data-copy]");
       if (copyBtn) { await copyPlan(plans.find((p) => p.id === copyBtn.dataset.copy)); return; }
 
@@ -917,7 +1012,8 @@ export default {
 
       const act = e.target.closest("[data-act]")?.dataset.act;
       if (!act) return;
-      if (act === "new") await createPlan();
+      if (act === "plans-toggle") setPlansOpen(!plansOpen);
+      else if (act === "new") await createPlan();
       else if (act === "class-action") {
         // Den öppna planeringen förväljs som lektion (issue #34); utan
         // datum → den pågående lektionen enligt schemat.
@@ -971,7 +1067,7 @@ export default {
     });
 
     // Metadata (namn/datum/tid/ämne), kryssrutor och filter
-    panel.addEventListener("change", async (e) => {
+    onPanels("change", async (e) => {
       const weekKey = e.target.dataset.week;
       if (weekKey !== undefined && selecting) {
         const inWeek = visiblePlans().filter((p) => {
@@ -1002,13 +1098,13 @@ export default {
         if (!p) return;
         const show = { ...normalizePlan(p).show, [showKey]: e.target.checked };
         await patchEditing({ show });
-        e.target.closest("[data-fieldwrap]")?.classList.toggle("field-edit--off", !e.target.checked);
+        syncSummaries();
         renderPreview();
       }
     });
 
     // Fältinnehåll + sök — live medan man skriver
-    panel.addEventListener("input", async (e) => {
+    onPanels("input", async (e) => {
       if (e.target.dataset.filter === "q") { filter.q = e.target.value; renderList(); return; }
 
       const metaKey = e.target.dataset.meta;
@@ -1023,17 +1119,18 @@ export default {
         ? e.target.value.split("\n")
         : e.target.value;
       await patchEditing({ fields });
+      syncSummaries();
       renderPreview();
     });
 
-    panel.addEventListener("keydown", (e) => {
+    onPanels("keydown", (e) => {
       if (e.key === "Escape" && pendingDelete) { pendingDelete = null; renderConfirm(); }
     });
 
     // ---- Watchers: håll listan/förhandsvisningen live ----
     // (även vid ändringar från elevfönster/annan flik via storage-event)
     const refreshPraise = () => {
-      const hint = fieldsEl.querySelector('[data-el="praise-hint"]');
+      const hint = displayEl.querySelector('[data-el="praise-hint"]');
       if (hint) hint.textContent = praiseHint(praiseNames().length);
       renderPreview();
     };
