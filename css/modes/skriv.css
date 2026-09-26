@@ -1,0 +1,188 @@
+/* ============================================================
+   SKRIVTAVLA (issue #46) — linjerat papper med Andika.
+
+   Alla mått på papperet (typsnittsstorlek, radhöjd, marginaler, var
+   linjen ligger) räknas i js/modes/skriv.js → layout() ur papperets
+   bredd och sätts som --skr-* på .skr-paper. Radhöjden är hela px och
+   linjen ligger på den uppmätta baslinjen, så linjerna följer raderna
+   exakt i alla storlekar. Lärarens textarea och elevskärmens text har
+   exakt samma typografi (.skr-text) → samma radbrytning.
+   ============================================================ */
+
+/* Andika (SIL, OFL 1.1 — fonts/andika/OFL.txt). Självhostad: fungerar
+   offline, ingen CDN. Två delmängder: latin (inkl. åäö) och latin-ext. */
+@font-face {
+  font-family: "Andika";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../../fonts/andika/andika-regular-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Andika";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../../fonts/andika/andika-regular-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0,
+    U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* ---- Papperet (samma i båda vyerna) ---- */
+
+.skr-paper {
+  /* Papperets färger är desamma i lärarvyns mörka tema: det ÄR en förhandsvisning. */
+  --skr-bg: #fbf8f1;        /* svagt varm vit */
+  --skr-ink: #1f2328;
+  --skr-rule: #5c6066;      /* mörkgrå linjer som i skrivhäftet */
+  --skr-font: 48px;         /* sätts av layout() */
+  --skr-lh: 84px;
+  --skr-pad-x: 40px;
+  --skr-pad-top: 50px;
+  --skr-pad-bottom: 400px;
+  --skr-min-text: 400px;
+  --skr-rule-y: 60px;
+  --skr-rule-w: 2px;
+
+  position: relative;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--skr-bg);
+  color: var(--skr-ink);
+  text-align: left;
+  overscroll-behavior: contain;
+}
+
+.skr-sheet {
+  position: relative;
+  min-height: 100%;
+  padding: var(--skr-pad-top) var(--skr-pad-x) var(--skr-pad-bottom);
+  /* En linje per rad: perioden = radhöjden, linjen på baslinjen. */
+  background-image: linear-gradient(to bottom,
+    transparent var(--skr-rule-y),
+    var(--skr-rule) var(--skr-rule-y),
+    var(--skr-rule) calc(var(--skr-rule-y) + var(--skr-rule-w)),
+    transparent calc(var(--skr-rule-y) + var(--skr-rule-w)));
+  background-size: 100% var(--skr-lh);
+  background-repeat: repeat-y;
+  background-position: 0 var(--skr-pad-top);
+}
+
+/* Typografin — IDENTISK i textarean, spegeln, elevtexten och mätraden. */
+.skr-text {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-family: "Andika", "Andika New Basic", "Comic Neue", "Segoe UI", system-ui, sans-serif;
+  font-size: var(--skr-font);
+  font-weight: 400;
+  font-style: normal;
+  font-kerning: normal;
+  font-variant-ligatures: normal;
+  letter-spacing: 0;
+  word-spacing: 0;
+  line-height: var(--skr-lh);
+  color: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+  tab-size: 4;
+  text-transform: none;
+}
+.skr-line { min-height: var(--skr-lh); }
+
+/* Dolda hjälpare: spegeln (markörens rad i lärarvyn) och baslinjemätningen. */
+.skr-mirror,
+.skr-probe {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+.skr-mirror { top: var(--skr-pad-top); left: var(--skr-pad-x); right: var(--skr-pad-x); width: auto; }
+.skr-probe { top: 0; left: 0; width: 50%; }
+.skr-probe__base { display: inline-block; width: 0; height: 0; vertical-align: baseline; }
+
+/* ---- Elevskärmen: bara papperet, helskärm, ingen egen scroll ---- */
+
+.skr--student .skr-paper {
+  position: fixed;
+  inset: 0;
+  overflow: hidden; /* läraren styr scrollen */
+}
+
+/* ---- Lärarvyn ---- */
+
+.skr--teacher {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.skr-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+.skr-group { display: flex; align-items: center; gap: var(--space-1); }
+.skr-abtn { min-width: 2.6rem; font-family: "Andika", var(--font-family); font-weight: 600; }
+.skr-abtn--big { font-size: 1.15em; }
+.skr-abtn:disabled,
+.skr-pages .btn:disabled { opacity: 0.4; cursor: default; }
+.skr-size { min-width: 3rem; text-align: center; color: var(--color-ink-soft); font-variant-numeric: tabular-nums; }
+.skr-pagelabel { min-width: 6.5rem; text-align: center; font-variant-numeric: tabular-nums; }
+.skr-pages .btn { display: inline-flex; align-items: center; gap: var(--space-2); }
+.skr-redo svg { transform: scaleX(-1); }
+
+.skr-confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-left: var(--space-2); }
+.skr-confirm[hidden] { display: none; }
+.skr-confirm > span { color: var(--color-ink-soft); font-size: var(--text-s); }
+
+.skr-follow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+/* Följ av → knappen blir tydlig: tryck för att följa skrivandet igen. */
+.skr-follow.is-off {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-weight: 600;
+}
+.skr-follow[aria-pressed="true"] { color: var(--color-ink-soft); }
+
+.skr--teacher .skr-paper {
+  /* 16:9 som projektorn → samma radbrytning som eleverna ser */
+  width: min(100%, calc((100dvh - var(--topbar-height) - 9rem) * 16 / 9));
+  min-width: min(100%, 480px);
+  aspect-ratio: 16 / 9;
+  margin: 0 auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-l);
+  cursor: text;
+}
+.skr--teacher textarea.skr-text {
+  min-height: var(--skr-min-text);
+  resize: none;
+  overflow: hidden;
+  outline: none;
+  background: transparent;
+  caret-color: var(--skr-ink);
+}
+.skr--teacher .skr-paper:focus-within { border-color: var(--color-accent); }
+
+.skr-hint { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); text-align: center; }
+
+@media (prefers-reduced-motion: reduce) {
+  .skr-paper { scroll-behavior: auto; }
+}

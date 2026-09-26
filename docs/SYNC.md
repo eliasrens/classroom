@@ -90,6 +90,13 @@ en nyöppnad elevskärm hamnar på rätt sida (regel 3). I enskärmsläget
 bläddertangenterna och publicerar själv (`isSingleScreenWindow()`,
 `js/sync.js`); ett separat elevfönster gör det aldrig.
 
+Skrivtavlan (`js/modes/skriv.js`, issue #46) skickar hela sitt tillstånd
+som `skriv:state` vid varje tangenttryckning (text, markör, storlek,
+Följ, scroll som RADNUMMER) och sparar det med debounce i den ENDAST
+LOKALA `classes/{cid}/skriv/board` — texten kan innehålla elevnamn och
+går aldrig till Firestore. `rev` ordnar bussen mot storage-eventet: en
+sen sparning får aldrig skriva över nyare text på elevskärmen.
+
 Regler:
 
 1. Payload = ren JSON (structured clone — inga funktioner/DOM-noder).
@@ -141,7 +148,7 @@ mot `startedAt`, så den är korrekt även efter minuter i bakgrunden.
 Fyra lager, alla aktiva samtidigt:
 
 1. **Routern** vägrar montera annat än `STUDENT_MODE_IDS`
-   (`js/modes/registry.js`: morgon, lektion, trafikljus, vecka) i elevvyn —
+   (`js/modes/registry.js`: morgon, lektion, trafikljus, skriv, vecka) i elevvyn —
    även om någon skriver `#/elev/elever` för hand.
 2. **Utskicks-logiken** (`present`) skickar bara ut elev-visningsbara
    lägen: "Visa på elevskärm" är avstängd på Elevlista/Översikt, och
