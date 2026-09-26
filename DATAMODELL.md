@@ -5,7 +5,7 @@ så modellen gäller oavsett om Firebase är anslutet eller ej.
 
 **ELEVDATA ÄR ENDAST LOKAL (issue #32).** Ingenting om enskilda elever
 lämnar lärardatorn: samlingarna `students`, `notes`, `praise`,
-`praiseArchive`, `privacy`, `reports`, `skriv` och `lotta` under en klass routas av datalagret till
+`praiseArchive`, `privacy`, `reports`, `skriv`, `lotta` och `karta` under en klass routas av datalagret till
 en egen lokal lagring (`js/data/local-only.js`, prefix
 `classroom:local:`) som aldrig går via outboxen eller Firestore.
 Molnet innehåller bara klasstatistik: `sessions` (trafikljuspass) och
@@ -208,6 +208,24 @@ classes/{classId}/lotta/{docId}         — Lottningen (issue #47) — ENDAST LO
                      — innehåller elevnamn → lämnar aldrig datorn. Ingen
                        historik över dragningar sparas i molnet. Live via
                        sync-bussen (`lotta:stage`, `lotta:draw`, docs/SYNC.md).
+
+classes/{classId}/karta/{docId}         — Tankekartorna (issue #53) — ENDAST LOKALT
+  state:     { cur, paper, rev }
+    cur:     "map-<id>" | null          — kartan som visas (även på elevskärmen)
+    paper:   "a3-landscape" | "a3-portrait" | "a4-landscape" | "a4-portrait"
+                                        — senast valda papper för utskrift
+  map-<id>:  { name, title, bubbles, nextColor, rev }
+    name:    ""                         — namnet i kartlistan (bara lärarvyn);
+                                          tomt → listan visar rubriken eller "Ny karta"
+    title:   ""                         — rubriken i molnet (tom från början)
+    bubbles: [{ id, text, color, pin? }] — i skapandeordning; color = index i
+                                          js/modes/karta/palette.js; pin = { x, y }
+                                          (andel 0–1 av scenen) för en dragen bubbla
+    nextColor: tal                      — nästa färg i tur och ordning
+                     — inga kartor från början och inget förifyllt innehåll.
+                       Rubrik och bubblor kan innehålla elevnamn → lämnar
+                       aldrig datorn. Live via sync-bussen (`karta:state`,
+                       docs/SYNC.md); ångra-historiken finns bara i minnet.
 
 classes/{classId}/settings/{key}        — inställningar per klass
                                           (dokument-id = inställningens namn,

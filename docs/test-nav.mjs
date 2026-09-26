@@ -5,9 +5,9 @@
  *
  * Kontrollerar:
  *   - rutinerna (Morgon, Lektion) står i menyraden; Verktyg i ordningen
- *     Trafikljus, Skrivtavla, Lottning, Veckan; Elevlista + Översikt i "Lärare ▾"
- *   - `order` styr ordningen inom gruppen: ett verktyg med order 30
- *     (Tankekarta, #53) hamnar mellan Skrivtavla och Lottning
+ *     Trafikljus, Skrivtavla, Tankekarta, Lottning, Veckan; Elevlista + Översikt i "Lärare ▾"
+ *   - `order` styr ordningen inom gruppen: Tankekarta (#53, order 30)
+ *     står mellan Skrivtavla och Lottning
  *   - kortkommandonas ordning: rutinerna, sedan verktygen, sist lärarlägena,
  *     och alla lägen nås med en siffra (1–9)
  *   - verktygen är fortfarande elevlägen; lärarlägena aldrig
@@ -28,7 +28,7 @@ import { shortcutModes } from "../js/ui/shortcuts.js";
 const ids = (list) => list.map((m) => m.id);
 
 assert.deepEqual(ids(modesInGroup("classroom")), ["morgon", "lektion"]);
-assert.deepEqual(ids(modesInGroup("tools")), ["trafikljus", "skriv", "lotta", "vecka"]);
+assert.deepEqual(ids(modesInGroup("tools")), ["trafikljus", "skriv", "karta", "lotta", "vecka"]);
 assert.deepEqual(ids(modesInGroup("teacher")), ["elever", "oversikt"]);
 
 for (const m of MODES) {
@@ -44,19 +44,12 @@ assert.equal(order.length, MODES.length, "alla lägen står i menyordningen");
 assert.ok(MODES.length <= 9, "alla lägen ska nås med en siffra (1–9)");
 assert.deepEqual(ids(shortcutModes()), order);
 
-// Ett nytt verktyg med order 30 hamnar mellan Skrivtavla och Lottning —
-// både i menyn och i sifferordningen — oavsett var det står i MODES.
-const tankekarta = { id: "tankekarta", title: "Tankekarta", group: "tools", order: 30 };
-MODES.push(tankekarta);
-try {
-  assert.deepEqual(ids(modesInGroup("tools")), ["trafikljus", "skriv", "tankekarta", "lotta", "vecka"]);
-  assert.deepEqual(ids(shortcutModes()),
-    ["morgon", "lektion", "trafikljus", "skriv", "tankekarta", "lotta", "vecka", "elever", "oversikt"]);
-} finally {
-  MODES.pop();
-}
+// Tankekarta (order 30) står mellan Skrivtavla och Lottning — både i menyn
+// och i sifferordningen.
+assert.deepEqual(ids(shortcutModes()),
+  ["morgon", "lektion", "trafikljus", "skriv", "karta", "lotta", "vecka", "elever", "oversikt"]);
 
-for (const id of ["morgon", "lektion", "trafikljus", "vecka", "skriv", "lotta"]) {
+for (const id of ["morgon", "lektion", "trafikljus", "vecka", "skriv", "karta", "lotta"]) {
   assert.ok(isStudentMode(id), `${id} ska kunna visas på elevskärmen`);
 }
 for (const id of ["elever", "oversikt"]) {
@@ -74,7 +67,7 @@ const {
 
 assert.deepEqual(pinnedIds(null), ["morgon", "lektion", "trafikljus"], "standard första gången");
 assert.deepEqual([...DEFAULT_PINNED], ["morgon", "lektion", "trafikljus"]);
-assert.deepEqual(ids(pinnableModes()), ["morgon", "lektion", "trafikljus", "skriv", "lotta", "vecka"]);
+assert.deepEqual(ids(pinnableModes()), ["morgon", "lektion", "trafikljus", "skriv", "karta", "lotta", "vecka"]);
 assert.deepEqual(pinnedIds({ pinned: ["vecka", "okänt", "morgon", "elever", "morgon"] }), ["morgon", "vecka"],
   "listans ordning, okända id och lärarlägen faller bort, inga dubbletter");
 assert.deepEqual(pinnedIds({ pinned: [] }), [], "inget fäst är ett giltigt val");
@@ -84,13 +77,9 @@ assert.deepEqual(togglePinned(["morgon", "lotta"], "morgon"), ["lotta"]);
 assert.deepEqual(togglePinned(["morgon"], "oversikt"), ["morgon"], "lärarlägen kan inte fästas");
 {
   // Ett nytt verktyg (Tankekarta) är inte fäst hos någon som redan sparat ett val.
-  MODES.push(tankekarta);
-  try {
-    assert.deepEqual(pinnedIds({ pinned: ["morgon", "skriv", "lotta"] }), ["morgon", "skriv", "lotta"]);
-    assert.deepEqual(togglePinned(["morgon", "skriv", "lotta"], "tankekarta"), ["morgon", "skriv", "tankekarta", "lotta"]);
-  } finally {
-    MODES.pop();
-  }
+  assert.ok(!pinnedIds(null).includes("karta"), "Tankekarta är inte fäst som standard");
+  assert.deepEqual(pinnedIds({ pinned: ["morgon", "skriv", "lotta"] }), ["morgon", "skriv", "lotta"]);
+  assert.deepEqual(togglePinned(["morgon", "skriv", "lotta"], "karta"), ["morgon", "skriv", "karta", "lotta"]);
 }
 assert.equal(menuSettingsPath("uidA"), "teachers/uidA/settings");
 

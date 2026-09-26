@@ -54,7 +54,7 @@ export default {
    själv vilka som står direkt i övermenyn (js/lib/menu-pins.js) — eller
    `group: "teacher"` (Lärare ▾ — aldrig elevskärmen), ett kort
    menynamn (`short`) och valfritt `order` (ordning inom gruppen;
-   verktygen har 10, 20, 40, 50 — Tankekarta får 30). Ett nytt läge är
+   verktygen har 10, 20, 30, 40, 50 — luckor för nya verktyg). Ett nytt läge är
    inte fäst från början.
    Kortkommandona numrerar rutinerna, sedan verktygen, sist lärarlägena. Övermenyn,
    sifferkortkommandona och hjälpen byggs ur registret — ingen menykod

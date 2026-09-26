@@ -23,7 +23,7 @@
  * lärarlägena (1, 2, 3 …), var grupp i sin ordning — oberoende av vad som
  * är fäst. Ett nytt läge läggs alltså bara in här med sin grupp och
  * ordning — menyn, siffrorna och hjälpen följer med av sig själva.
- * Tankekarta (#53) får `group: "tools", order: 30` och hamnar mellan
+ * Tankekarta (#53) har `group: "tools", order: 30` och står mellan
  * Skrivtavla och Lottning. Ett nytt verktyg är inte fäst från början.
  */
 import morgon from "./morgon.js";
@@ -34,6 +34,7 @@ import oversikt from "./oversikt.js";
 import vecka from "./vecka.js";
 import skriv from "./skriv.js";
 import lotta from "./lotta.js";
+import karta from "./karta.js";
 
 export const NAV_GROUPS = {
   classroom: { label: "Rutiner" },
@@ -47,9 +48,10 @@ export const MODES = [
   // ---- Rutiner (kan visas på elevskärmen) ----
   entry(morgon, { group: "classroom", short: "Morgon" }),
   entry(lektion, { group: "classroom", short: "Lektion" }),
-  // ---- Verktyg (kan visas på elevskärmen). order 30 = Tankekarta (#53). ----
+  // ---- Verktyg (kan visas på elevskärmen) ----
   entry(trafikljus, { group: "tools", short: "Trafikljus", order: 10 }),
   entry(skriv, { group: "tools", short: "Skrivtavla", order: 20 }),
+  entry(karta, { group: "tools", short: "Tankekarta", order: 30 }),
   entry(lotta, { group: "tools", short: "Lottning", order: 40 }),
   entry(vecka, { group: "tools", short: "Veckan", order: 50 }),
   // ---- Lärare ▾ (aldrig på elevskärmen) ----
@@ -98,6 +100,8 @@ export const MODE_ALIASES = {
  * "skriv" (Skrivtavla) visar bara texten läraren själv skriver, på papperet.
  * "lotta" (Lottning) visar bara hjulet/rullen/lappen och resultatet — aldrig
  * listorna, frånvaron eller "Redan dragna".
+ * "karta" (Tankekarta) visar bara rubriken och bubblorna läraren själv
+ * skriver — aldrig kartlistan, namnen i listan eller kontrollerna.
  */
 export const STUDENT_MODE_IDS = Object.freeze(
   MODES.filter((m) => STUDENT_GROUPS.includes(m.group)).map((m) => m.id));
