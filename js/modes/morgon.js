@@ -120,7 +120,8 @@ export default {
 
     // Namnen ska vara lika stora som uppgiftsraden (#71). Uppgifternas storlek
     // beror på kortets bredd, som i sin tur beror på tavlans bredd — mät den
-    // färdiga storleken och anpassa om (några varv räcker; det konvergerar).
+    // färdiga storleken och anpassa om (några varv räcker; det konvergerar —
+    // toleransen 0,1 px stoppar en ±1 px-växling i tavlans avrundade bredd).
     let nameSync = 0;
     function taskFontPx() {
       const ol = $(".morgon__tasks");
@@ -132,10 +133,10 @@ export default {
       return f;
     }
     function syncNameSize() {
-      if (!mounted() || board.el.hidden || nameSync > 2) return;
+      if (!mounted() || board.el.hidden || nameSync > 4) return;
       const f = taskFontPx();
       const cur = parseFloat(board.el.style.getPropertyValue("--praise-font-max")) || 0;
-      if (!f || Math.abs(f - cur) < 0.5) return;
+      if (!f || Math.abs(f - cur) < 0.1) return;
       board.el.style.setProperty("--praise-font-max", `${f}px`);
       nameSync++;
       try { board.fit(); } finally { nameSync--; }

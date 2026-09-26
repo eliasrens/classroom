@@ -126,7 +126,8 @@ export function createPraiseBoard(opts = {}) {
     const first = list.firstElementChild;
     const rowH = first ? first.getBoundingClientRect().height : f * 1.2;
     const gap = parseFloat(getComputedStyle(list).rowGap) || 0;
-    const avail = content ? roomForList() : list.clientHeight;
+    // content-läget: +1 px så att en lista som precis ryms inte avrundas ner en rad.
+    const avail = content ? roomForList() + 1 : list.clientHeight;
     const maxRows = Math.max(1, Math.min(names.length, Math.floor((avail + gap) / (rowH + gap))));
     // Jämna kolumner (10/10/10 i stället för 14/14/2) — samma antal kolumner, lägre höjd.
     const cols = Math.ceil(names.length / maxRows);
