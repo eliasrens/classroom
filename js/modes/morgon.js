@@ -54,9 +54,9 @@ export default {
     // "Bra jobbat"-tavlan: återanvändbar komponent som växer i kolumner.
     // Centerytans högermarginal följer tavlans faktiska bredd (--nt-space).
     const board = createPraiseBoard({
-      title: "Bra jobbat",
-      // SVG-stjärna i guld i stället för emoji (#75) — ser likadan ut överallt.
-      titleIcon: icon("star", { strokeWidth: 2.4 }).replace('class="icon"', 'class="icon morgon__star"'),
+      // Guldstjärna, "Bra jobbat" och guldstreck kommer från komponenten (#78);
+      // strecket får samma mått som under hälsningen (#71).
+      rule: "morgon__rule",
       className: "morgon__nametavla praise-board--glass",
       clearable: isTeacher,
       onClear: () => clearNt(),
@@ -72,10 +72,6 @@ export default {
         syncNameSize();
       },
     });
-    // Samma korta guldstreck som under hälsningen, mellan rubrik och namn (#71).
-    const ntRule = document.createElement("hr");
-    ntRule.className = "morgon__rule";
-    board.el.querySelector(".praise-board__head").after(ntRule);
     board.el.hidden = true;
     stage.append(board.el);
     this._board = board;

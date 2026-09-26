@@ -39,11 +39,14 @@ import { icon } from "../lib/icons.js";
 // hellre lite mindre text än ett namn som inte syns.
 const HARD_MIN_RATIO = 0.7;
 const STEP = 0.92;
+const STAR = icon("star", { strokeWidth: 2.4 }).replace('class="icon"', 'class="icon praise-board__star"');
 
 /**
  * @param {object}   [opts]
- * @param {string}   [opts.title]      rubrik (default "⭐ Bra jobbat!")
- * @param {string}   [opts.titleIcon]  färdig SVG-markup före rubriken (valfri)
+ * @param {string}   [opts.title]      rubrik (default "Bra jobbat")
+ * @param {string}   [opts.titleIcon]  SVG-markup före rubriken (default guldstjärnan, "" = ingen)
+ * @param {string|false} [opts.rule]   kort guldstreck under rubriken; extra klass
+ *                                     på strecket, false = inget streck
  * @param {boolean}  [opts.clearable]  visa töm-knapp (lärarvy)
  * @param {Function} [opts.onClear]    klick på töm-knappen
  * @param {Function} [opts.maxWidth]   () => px, hur bred rutan högst får bli
@@ -53,8 +56,10 @@ const STEP = 0.92;
  */
 export function createPraiseBoard(opts = {}) {
   const {
-    title = "⭐ Bra jobbat!",
-    titleIcon = "",
+    title = "Bra jobbat",
+    // SVG-stjärna i guld i stället för emoji (#75, #78) — ser likadan ut överallt.
+    titleIcon = STAR,
+    rule = "",
     clearable = false,
     onClear = null,
     maxWidth = () => Infinity,
@@ -71,6 +76,7 @@ export function createPraiseBoard(opts = {}) {
       <h2 class="praise-board__title">${titleIcon}${escapeHtml(title)}</h2>
       ${clearable ? `<button class="praise-board__clear teacher-only btn btn--ghost btn--icon" title="Töm namntavlan" aria-label="Töm namntavlan">${icon("trash")}</button>` : ""}
     </header>
+    ${rule === false ? "" : `<hr class="praise-board__rule ${rule}">`}
     <ul class="praise-board__names"></ul>`;
   const list = el.querySelector(".praise-board__names");
   if (clearable && onClear) el.querySelector(".praise-board__clear").addEventListener("click", onClear);
