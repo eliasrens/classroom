@@ -18,8 +18,12 @@
  * Range, och varje synlig rad blir ett eget element med sin linje på den
  * uppmätta baslinjen. En rad kan då aldrig klippas mellan två A4-sidor.
  *
- * Sidhuvudet (klass, datum, valfri rubrik) ligger i en <thead>, som
- * webbläsaren upprepar överst på varje utskrivet A4-ark.
+ * Marginalerna (issue #55): @page har marginal 0, och varje A4-ark är en
+ * EGEN box (.skr-print__sheet, 209 × 296,5 mm) med ~15 mm vit padding runt
+ * om. Därför blir det alltid vitt runt linjerna, vad läraren än väljer
+ * under "Marginaler" i utskriftsdialogen ("Standard", "Minimum", "Inga").
+ * Arken delas upp här, inte av webbläsaren: varje ark får sitt eget
+ * sidhuvud (klass, datum, valfri rubrik) och ett helt antal rader.
  */
 
 /** 15 pt = 20 px. Radavstånd som på skärmen (skriv.js LINE_HEIGHT). */
@@ -27,16 +31,30 @@ const PRINT_FONT_PX = 20;
 const LINE_HEIGHT = 1.75;
 const PRINT_LH = Math.round(PRINT_FONT_PX * LINE_HEIGHT); // 35 px ≈ 9,3 mm
 const RULE_W = 1.5;
-/** Textytans höjd på ett A4: 297 mm − 2 × 15 mm (@page skriv i css/modes/skriv.css). */
-const PAGE_CONTENT_PX = ((297 - 2 * 15) * 96) / 25.4;
+/**
+ * Arkets inre höjd: 296,5 mm (en halv mm under A4, så att avrundning
+ * aldrig ger en tom extrasida) − 2 × 15 mm padding. Samma mått som
+ * .skr-print__sheet i css/modes/skriv.css.
+ */
+const SHEET_INNER_PX = ((296.5 - 2 * 15) * 96) / 25.4;
 
-let current = null; // { root, onAfter, prevTitle }
+/**
+ * Sidans marginal under utskriften. Appens övriga utskrifter har en egen
+ * @page utan namn (css/modes/rapport.css, 12 mm) och Chrome lägger ut hela
+ * dokumentet i DEN sidans bredd — då skulle arken (209 mm) krympas.
+ * Därför, bara medan arket finns: A4 utan marginal (arkens padding är
+ * marginalen). Läggs sist i <head> så att den vinner.
+ */
+const PAGE_CSS = "@page { size: A4 portrait; margin: 0; }";
+
+let current = null; // { root, pageStyle, onAfter, prevTitle }
 
 /** Ta bort arket och återställ sidan (efter utskrift, eller vid unmount). */
 export function closeSkrivPrint() {
   if (!current) return;
   window.removeEventListener("afterprint", current.onAfter);
   current.root.remove();
+  current.pageStyle.remove();
   document.documentElement.classList.remove("skr-printing");
   document.body.classList.remove("skr-printing");
   document.title = current.prevTitle;
@@ -82,36 +100,26 @@ function visualLines(rowEl) {
   return out;
 }
 
-/** Ett ark per sida: <table> med sidhuvud i <thead> + raderna i <tbody>. */
-function pageSection({ text, at }, head) {
-  const section = el("section", "skr-print__page");
-  const table = el("table", "skr-print__table");
-  const thead = el("thead");
-  const th = el("th");
+/** Sidhuvudet överst på varje A4-ark. */
+function sheetHead({ at }, head) {
   const header = el("div", "skr-print__head");
   const left = el("span", "skr-print__who");
   left.append(el("strong", "skr-print__class", head.className));
   if (head.title) left.append(el("span", "skr-print__title", head.title));
   header.append(left, el("span", "skr-print__date", longDate(new Date(at || Date.now()))));
-  th.append(header);
-  const headRow = el("tr");
-  headRow.append(th);
-  thead.append(headRow);
-  const tbody = el("tbody");
-  const td = el("td");
+  return header;
+}
+
+/** Ett A4-ark: sidhuvud + textyta. */
+function sheet(header) {
+  const section = el("section", "skr-print__sheet");
   const body = el("div", "skr-print__text");
-  for (const row of text.replace(/\s+$/, "").split("\n")) body.append(el("div", "skr-print__row", row));
-  td.append(body);
-  const bodyRow = el("tr");
-  bodyRow.append(td);
-  tbody.append(bodyRow);
-  table.append(thead, tbody);
-  section.append(table);
-  return section;
+  section.append(header, body);
+  return { section, body };
 }
 
 /**
- * Bygg arket (synkront — typsnittet måste redan vara laddat, se
+ * Bygg arken (synkront — typsnittet måste redan vara laddat, se
  * printSkrivPages) och byt varje textrad mot sina synliga rader.
  */
 export function buildSkrivPrint({ pages, className, title }) {
@@ -128,10 +136,18 @@ export function buildSkrivPrint({ pages, className, title }) {
   probe.append(probeLine);
   root.append(probe);
   const head = { className: className || "", title: (title || "").trim() };
-  for (const p of pages) root.append(pageSection(p, head));
+  // Först ett ark per sida av Skrivtavlan, med textraderna — för mätningen.
+  const firsts = pages.map((p) => {
+    const s = sheet(sheetHead(p, head));
+    for (const row of p.text.replace(/\s+$/, "").split("\n")) s.body.append(el("div", "skr-print__row", row));
+    root.append(s.section);
+    return s;
+  });
   document.body.append(root);
+  const pageStyle = el("style", null, PAGE_CSS);
+  document.head.append(pageStyle);
   const onAfter = () => closeSkrivPrint();
-  current = { root, onAfter, prevTitle: document.title }; // closeSkrivPrint städar även vid fel
+  current = { root, pageStyle, onAfter, prevTitle: document.title }; // closeSkrivPrint städar även vid fel
 
   // Baslinjen: linjens överkant där bokstäverna står.
   const baseY = base.getBoundingClientRect().bottom - probeLine.getBoundingClientRect().top;
@@ -140,22 +156,28 @@ export function buildSkrivPrint({ pages, className, title }) {
   probe.remove();
 
   // Mät alla rader först, byt sedan (en layout i stället för en per rad).
-  const rows = [...root.querySelectorAll(".skr-print__row")];
-  const split = rows.map(visualLines);
-  rows.forEach((row, i) => {
-    row.replaceWith(...split[i].map((t) => el("div", "skr-print__line", t)));
-  });
+  const split = firsts.map((s) => [...s.body.children].flatMap(visualLines));
 
-  // Linjerat ända ner, som ett riktigt skrivpapper: fyll varje utskriven
-  // sidas sista A4 med tomma linjer. Varje A4 rymmer sidhuvudet (<thead>
-  // upprepas) + ett helt antal rader.
-  for (const section of root.querySelectorAll(".skr-print__page")) {
-    const headH = section.querySelector("thead").getBoundingClientRect().height;
-    const perSheet = Math.max(1, Math.floor((PAGE_CONTENT_PX - headH - 1) / PRINT_LH));
-    const text = section.querySelector(".skr-print__text");
-    const pad = (perSheet - (text.children.length % perSheet)) % perSheet;
-    for (let i = 0; i < pad; i++) text.append(el("div", "skr-print__line skr-print__line--blank"));
-  }
+  // Dela varje sida i A4-ark. Ett ark rymmer sidhuvudet + ett helt antal
+  // rader; det sista fylls med tomma linjer — linjerat ända ner, som ett
+  // riktigt skrivpapper (#50).
+  firsts.forEach((first, i) => {
+    const headH = first.body.getBoundingClientRect().top - first.section.firstChild.getBoundingClientRect().top;
+    const perSheet = Math.max(1, Math.floor((SHEET_INNER_PX - headH - 1) / PRINT_LH));
+    const lines = split[i];
+    const n = Math.max(1, Math.ceil(lines.length / perSheet));
+    first.body.replaceChildren();
+    let at = first.section;
+    for (let k = 0; k < n; k++) {
+      const s = k === 0 ? first : sheet(first.section.firstChild.cloneNode(true));
+      if (k > 0) { at.after(s.section); at = s.section; }
+      for (let j = k * perSheet; j < (k + 1) * perSheet; j++) {
+        s.body.append(j < lines.length
+          ? el("div", "skr-print__line", lines[j])
+          : el("div", "skr-print__line skr-print__line--blank"));
+      }
+    }
+  });
 
   // Dokumenttiteln = PDF:ens förslag på filnamn. Utan elevnamn.
   document.title = `Skrivtavla ${head.className} ${isoDate(new Date())}`.replace(/\s+/g, " ").trim();
