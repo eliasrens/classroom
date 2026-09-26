@@ -26,9 +26,13 @@
  * sync-bussen (`skriv:state`); lagringen sker med debounce så att en
  * omladdad elevskärm visar rätt text. `rev` ordnar bussen mot
  * storage-eventet så att en sen sparning aldrig skriver över nyare text.
+ *
+ * Skriv ut (issue #50): lärarvyn kan skriva ut aktuell sida eller valda
+ * sparade sidor på linjerat A4 — se js/modes/skriv/print.js.
  */
 
 import { icon } from "../lib/icons.js";
+import { printSkrivPages, buildSkrivPrint, closeSkrivPrint, hasSkrivPrint } from "./skriv/print.js";
 
 const DOC_ID = "board";
 const EVENT = "skriv:state";
@@ -264,6 +268,12 @@ export default {
       const nextBtn = el.querySelector('[data-act="page-next"]');
       const newBtn = el.querySelector('[data-act="new-page"]');
       const confirmEl = el.querySelector(".skr-confirm");
+      const printBtn = el.querySelector('[data-act="print"]');
+      const printPanel = el.querySelector(".skr-printpanel");
+      const printList = printPanel.querySelector(".skr-printpanel__list");
+      const printAll = printPanel.querySelector("[data-print-all]");
+      const printTitle = printPanel.querySelector('input[name="skr-print-title"]');
+      const printGo = printPanel.querySelector('[data-act="print-go"]');
 
       let board = normalizeBoard(null);
       let loaded = false;
@@ -346,9 +356,11 @@ export default {
         pageLabel.textContent = `Sida ${board.cur + 1} av ${n}`;
         prevBtn.disabled = board.cur === 0;
         nextBtn.disabled = board.cur === n - 1;
+        drawPrintBtn();
       }
 
       function showPage(i, caret = null) {
+        closePrintPanel();
         board.pages[board.cur].text = ta.value;
         board.cur = i;
         ta.value = board.pages[i].text;
@@ -383,6 +395,8 @@ export default {
       ta.addEventListener("input", () => {
         syncMirror();
         closeConfirm();
+        closePrintPanel();
+        drawPrintBtn();
         onCaret();
       });
       for (const type of ["keyup", "click", "select"]) ta.addEventListener(type, () => {
@@ -470,6 +484,99 @@ export default {
       });
       confirmEl.querySelector('[data-act="confirm-new"]').addEventListener("click", newPage);
       confirmEl.querySelector('[data-act="cancel-new"]').addEventListener("click", () => { closeConfirm(); ta.focus(); });
+      // ---- Skriv ut: aktuell sida som standard, eller valda sparade sidor ----
+
+      /** Sidorna med text (index i board.pages), aktuell sida med textareans text. */
+      function printable() {
+        board.pages[board.cur].text = ta.value;
+        return board.pages.map((p, i) => ({ ...p, i })).filter((p) => p.text.trim() !== "");
+      }
+
+      function drawPrintBtn() {
+        const empty = printable().length === 0;
+        printBtn.setAttribute("aria-disabled", String(empty));
+        printBtn.title = empty
+          ? "Inget att skriva ut — sidan är tom"
+          : "Skriv ut på linjerat A4, t.ex. till elever som varit borta (eller spara som PDF)";
+      }
+
+      function closePrintPanel() {
+        if (printPanel.hidden) return;
+        printPanel.hidden = true;
+        printBtn.setAttribute("aria-expanded", "false");
+      }
+
+      const printChecks = () => [...printList.querySelectorAll("input[data-page]")];
+
+      function drawPrintAll() {
+        const boxes = printChecks();
+        const n = boxes.filter((b) => b.checked).length;
+        printAll.checked = n > 0 && n === boxes.length;
+        printAll.indeterminate = n > 0 && n < boxes.length;
+        printGo.disabled = n === 0;
+      }
+
+      function openPrintPanel() {
+        const pages = printable();
+        if (pages.length === 0) return;
+        closeConfirm();
+        // Förval: den aktuella sidan — eller, om den är tom, den senaste med text.
+        const pre = pages.some((p) => p.i === board.cur) ? board.cur : pages[pages.length - 1].i;
+        const frag = document.createDocumentFragment();
+        for (const p of pages) {
+          const label = document.createElement("label");
+          const box = document.createElement("input");
+          box.type = "checkbox";
+          box.dataset.page = String(p.i);
+          box.checked = p.i === pre;
+          const meta = document.createElement("span");
+          meta.className = "skr-printpanel__meta";
+          const day = new Date(p.at || Date.now()).toLocaleDateString("sv-SE", { day: "numeric", month: "short" });
+          meta.textContent = `Sida ${p.i + 1}${p.i === board.cur ? " (den här)" : ""} · ${day}`;
+          const snip = document.createElement("span");
+          snip.className = "skr-printpanel__snip";
+          snip.textContent = p.text.trim().replace(/\s+/g, " ").slice(0, 80);
+          label.append(box, meta, snip);
+          frag.append(label);
+        }
+        printList.replaceChildren(frag);
+        printAll.closest("label").hidden = pages.length < 2;
+        drawPrintAll();
+        printPanel.hidden = false;
+        printBtn.setAttribute("aria-expanded", "true");
+        printTitle.focus();
+      }
+
+      printBtn.addEventListener("click", () => {
+        if (!printPanel.hidden) { closePrintPanel(); return; }
+        openPrintPanel();
+      });
+      printList.addEventListener("change", drawPrintAll);
+      printAll.addEventListener("change", () => {
+        for (const b of printChecks()) b.checked = printAll.checked;
+        drawPrintAll();
+      });
+      printPanel.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") { e.preventDefault(); closePrintPanel(); printBtn.focus(); }
+        if (e.key === "Enter" && e.target === printTitle && !printGo.disabled) { e.preventDefault(); printGo.click(); }
+      });
+      printPanel.querySelector('[data-act="print-cancel"]').addEventListener("click", () => { closePrintPanel(); ta.focus(); });
+      printGo.addEventListener("click", () => {
+        const chosen = new Set(printChecks().filter((b) => b.checked).map((b) => Number(b.dataset.page)));
+        const pages = printable().filter((p) => chosen.has(p.i));
+        if (pages.length === 0) return;
+        closePrintPanel();
+        void printSkrivPages({ pages, className: activeClass.name ?? "", title: printTitle.value });
+      });
+
+      // Ctrl+P direkt i lärarvyn: skriv ut den aktuella sidan, inte appen.
+      const onBeforePrint = () => {
+        if (hasSkrivPrint() || ta.value.trim() === "") return;
+        buildSkrivPrint({ pages: [board.pages[board.cur]], className: activeClass.name ?? "", title: printTitle.value });
+      };
+      window.addEventListener("beforeprint", onBeforePrint);
+      offs.push(() => { window.removeEventListener("beforeprint", onBeforePrint); closeSkrivPrint(); });
+
       prevBtn.addEventListener("click", () => { closeConfirm(); if (board.cur > 0) showPage(board.cur - 1); });
       nextBtn.addEventListener("click", () => { closeConfirm(); if (board.cur < board.pages.length - 1) showPage(board.cur + 1); });
 
@@ -536,9 +643,29 @@ function teacherMarkup() {
             <button type="button" class="btn btn--ghost" data-act="cancel-new">Avbryt</button>
           </span>
         </div>
+        <button type="button" class="btn skr-printbtn" data-act="print" aria-expanded="false" aria-disabled="true"
+          title="Inget att skriva ut — sidan är tom">${icon("printer")}<span>Skriv ut</span></button>
         <button type="button" class="btn skr-follow" data-act="follow" aria-pressed="true"
           title="Papperet rullar så att raden du skriver på syns högt upp">${icon("pen")}<span>Följ skrivandet</span></button>
       </header>
+
+      <div class="skr-printpanel teacher-only" role="group" aria-label="Skriv ut" hidden>
+        <label class="skr-printpanel__field"><span>Rubrik (valfri)</span>
+          <input type="text" name="skr-print-title" maxlength="80" autocomplete="off" placeholder="t.ex. Matte — bråk"></label>
+        <fieldset class="skr-printpanel__pages">
+          <legend>Vilka sidor?</legend>
+          <label class="skr-printpanel__all"><input type="checkbox" data-print-all> Alla</label>
+          <div class="skr-printpanel__list"></div>
+        </fieldset>
+        <div class="skr-printpanel__foot">
+          <p class="skr-printpanel__note">A4 med linjer. Klass och datum står överst på varje sida, inga elevnamn läggs till.
+            Välj <strong>Spara som PDF</strong> i utskriftsrutan för en fil.</p>
+          <div class="skr-printpanel__actions">
+            <button type="button" class="btn btn--primary" data-act="print-go">${icon("printer")}<span>Skriv ut…</span></button>
+            <button type="button" class="btn btn--ghost" data-act="print-cancel">Avbryt</button>
+          </div>
+        </div>
+      </div>
 
       <div class="skr-paper" tabindex="-1">
         <div class="skr-sheet">
