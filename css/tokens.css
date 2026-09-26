@@ -25,19 +25,21 @@
   --color-light-yellow: #ddb43c;
   --color-light-red: #cf5348;
 
-  /* ---- Ämnespalett (dämpade, vuxna toner; textfärg räknas fram
-         automatiskt i js/lib/color.js via luminans) ---- */
-  --subject-ma: #5577b5;   /* Matematik */
-  --subject-sv: #b05f7d;   /* Svenska */
-  --subject-en: #7a63a8;   /* Engelska */
-  --subject-no: #4e8f72;   /* NO */
-  --subject-so: #b88540;   /* SO */
-  --subject-idh: #b3564e;  /* Idrott & hälsa */
-  --subject-bl: #a86d94;   /* Bild */
-  --subject-mu: #4f93a8;   /* Musik */
-  --subject-sl: #937a45;   /* Slöjd */
-  --subject-tk: #6b7f93;   /* Teknik */
-  --subject-rast: #85905f; /* Rast/övrigt */
+  /* ---- Ämnespalett (följer skolans veckoschema i mjukare toner;
+         textfärg räknas fram automatiskt i js/lib/color.js via luminans.
+         Hålls i synk med SUBJECTS i js/lib/color.js.) ---- */
+  --subject-ma: #3a63a6;     /* Matematik — blå */
+  --subject-sv: #ad3a30;     /* Svenska/SVA — tegelröd */
+  --subject-en: #7463ad;     /* Engelska — blålila */
+  --subject-no: #2f6b4f;     /* NO — mörkgrön */
+  --subject-so: #e2bc3f;     /* SO — citrongul */
+  --subject-idh: #eb9d8e;    /* Idrott & hälsa — laxrosa */
+  --subject-bl: #84573f;     /* Bild — rödbrun */
+  --subject-mu: #7d6e5f;     /* Musik — gråbrun/taupe */
+  --subject-sl: #a9c8a4;     /* Slöjd — ljusgrön/salvia */
+  --subject-tk: #2f6b4f;     /* Teknik — samma mörkgröna som NO */
+  --subject-mentor: #9aa0a8; /* Mentorstid — grå */
+  --subject-rast: #d7d3cb;   /* Rast/övrigt — neutral ljus */
 
   /* ---- Radier: återhållsamma. --radius-round endast för punkter/prickar. ---- */
   --radius-s: 4px;

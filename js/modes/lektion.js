@@ -42,7 +42,7 @@
  */
 
 import { icon } from "../lib/icons.js";
-import { readableTextColor, SUBJECTS } from "../lib/color.js";
+import { deepTextColor, readableTextColor, SUBJECTS } from "../lib/color.js";
 import {
   plansPath as plansPathFor, currentUid,
   lessonSettingsPath, LESSON_SETTINGS_DOC, getEditingPlanId, setEditingPlanId,
@@ -269,7 +269,7 @@ function boardHTML(rawPlan, subjects, { praise = false } = {}) {
     ? `<div class="lb-bottom">${bottomKeys.map((k) => fieldHTML(part(k), plan)).join("")}</div>`
     : "";
 
-  return `<div class="lesson-board" style="--subj:${st.color};--subj-ink:${st.textColor}">
+  return `<div class="lesson-board" style="--subj:${st.color};--subj-ink:${st.textColor};--subj-deep:${deepTextColor(st.color)}">
     ${top}${mid}${bottom}
   </div>`;
 }
