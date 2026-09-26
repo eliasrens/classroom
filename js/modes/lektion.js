@@ -34,6 +34,14 @@
  *   veckogrupp i listan (standard: bara aktuell vecka öppen), "Om lektionen"
  *   och "Fält" (standard: infällda, med sammanfattning). Läget sparas per
  *   dator i localStorage. Innehållet i blocken är oförändrat.
+ * - Städad verktygsrad + flikar (issue #82): rad 1 är "+ Ny planering" och
+ *   en ⋯-meny (Kopiera/Ta bort/Välj flera, js/ui/menu-button.js), rad 2
+ *   sök + ämnesfilter. Under dem en flikrad Denna vecka · Kommande · Arkiv
+ *   (vald flik sparas per dator i localStorage). Sök/filter gäller inom
+ *   fliken; träffar i andra flikar visas som en diskret rad. Lärarvyn
+ *   begär bred sida (.view--wide, css/app.css) och tavlan ligger direkt
+ *   under statusraden med en förhandsmarkering när den öppna planeringen
+ *   inte är den som visas för eleverna.
  *
  * Kontrakt: docs/MODULKONTRAKT.md. Data: DATAMODELL.md.
  * Planeringar OCH presentedPlanId är PRIVATA per lärare
@@ -57,6 +65,7 @@ import { studentLabel } from "../lib/names.js";
 import { serverNow } from "../lib/clock.js";
 import { openClassActionDialog } from "../ui/class-actions.js";
 import { collapsibleHTML, mountCollapsibles } from "../ui/collapsible.js";
+import { createMenuButton } from "../ui/menu-button.js";
 
 /* De nio av-/påslagbara delarna, i den ordning kryssrutorna visas.
    `slot` säger var i tavlan de bor; `list` = flerradsfält. */
@@ -446,6 +455,16 @@ export default {
     this._offs = [];
     const { data, activeClass, view } = ctx;
 
+    // Bred sida (issue #82): lektionsläget använder mer av skärmbredden än
+    // standardramen (#61) via .view--wide (css/app.css). Bara lärarvyn —
+    // elevvyn (data-theme="student") har sin egen .view-regel. Klassen tas
+    // bort vid avmontering så andra lärarsidor behåller ramen.
+    const viewEl = el.closest(".view");
+    if (viewEl && view !== "student") {
+      viewEl.classList.add("view--wide");
+      this._offs.push(() => viewEl.classList.remove("view--wide"));
+    }
+
     if (!activeClass) {
       el.innerHTML = `<div class="lesson-empty">
         ${icon("book", { size: 40, strokeWidth: 1.4 })}
@@ -588,11 +607,16 @@ export default {
         <aside class="lesson-panel teacher-only">
           <section class="lesson-panel__group">
             <h2>Planeringar</h2>
-            <div class="btn-row">
+            <div class="plan-toolbar">
               <button class="btn btn--primary" data-act="new">${icon("plus")} Ny planering</button>
-              <button class="btn" data-act="dup" title="Kopiera den valda planeringen till samma veckodag, idag eller framåt">${icon("copy")} Kopiera</button>
-              <button class="btn" data-act="del" title="Ta bort den valda planeringen">${icon("trash")} Ta bort</button>
-              <button class="btn" data-act="select" aria-pressed="false" title="Markera flera planeringar och ta bort dem på en gång">${icon("check")} Välj flera</button>
+              <div class="plan-more" data-el="more">
+                <button type="button" class="btn btn--icon plan-more__btn" data-el="more-btn" title="Fler åtgärder" aria-label="Fler åtgärder">${icon("more")}</button>
+                <div class="plan-more__menu" data-el="more-menu" aria-label="Fler åtgärder">
+                  <button type="button" role="menuitem" class="plan-more__item" data-act="dup" title="Kopiera den valda planeringen till samma veckodag, idag eller framåt">${icon("copy")} Kopiera</button>
+                  <button type="button" role="menuitem" class="plan-more__item" data-act="del" title="Ta bort den valda planeringen">${icon("trash")} Ta bort</button>
+                  <button type="button" role="menuitem" class="plan-more__item" data-act="select" aria-pressed="false" title="Markera flera planeringar och ta bort dem på en gång">${icon("check")} Välj flera</button>
+                </div>
+              </div>
             </div>
             <div class="plan-filter">
               <label class="plan-filter__search">${icon("search", { size: 16 })}
@@ -600,6 +624,12 @@ export default {
               </label>
               <select data-filter="subject" aria-label="Filtrera på ämne"></select>
             </div>
+            <div class="plan-tabs" role="tablist" aria-label="Visa planeringar för" data-el="tabs">
+              <button type="button" class="plan-tab" role="tab" data-tab="week" aria-selected="false" tabindex="-1">Denna vecka</button>
+              <button type="button" class="plan-tab" role="tab" data-tab="upcoming" aria-selected="false" tabindex="-1">Kommande</button>
+              <button type="button" class="plan-tab" role="tab" data-tab="archive" aria-selected="false" tabindex="-1">Arkiv</button>
+            </div>
+            <div class="plan-tab-hits" data-el="tab-hits" hidden></div>
             <div class="plan-bulk" data-el="bulk" hidden></div>
             <div class="plan-confirm" data-el="confirm" role="alertdialog" aria-live="assertive" hidden></div>
             <p class="plan-status" data-el="status" aria-live="polite" hidden></p>
@@ -653,14 +683,72 @@ export default {
     const statusEl = el.querySelector('[data-el="status"]');
     const subjectFilterEl = el.querySelector('[data-filter="subject"]');
     const selectBtn = el.querySelector('[data-act="select"]');
+    const tabsEl = el.querySelector('[data-el="tabs"]');
+    const tabHitsEl = el.querySelector('[data-el="tab-hits"]');
     const metaInputs = () => [...el.querySelectorAll("[data-meta]")];
     const panel = el.querySelector(".lesson-panel");
+
+    // ⋯-menyn (issue #82) — samma menykomponent som toppmenyns rullgardiner
+    // (tangentbord + ARIA, js/ui/menu-button.js). Valen bubblar som vanliga
+    // [data-act]-klick till panelens delegering nedan.
+    const moreRoot = el.querySelector('[data-el="more"]');
+    const moreMenu = createMenuButton({
+      root: moreRoot,
+      button: moreRoot.querySelector('[data-el="more-btn"]'),
+      menu: moreRoot.querySelector('[data-el="more-menu"]'),
+    });
+    this._offs.push(() => moreMenu.close());
 
     // Listans vy-tillstånd (inte data — sparas inte)
     const filter = { q: "", subject: "" };
     let selecting = false;
     const selected = new Set();
     let pendingDelete = null; // [ids] som väntar på bekräftelse
+
+    // -- Flikar: Denna vecka · Kommande · Arkiv (issue #82). Vald flik
+    // sparas per dator (bara UI-tillstånd, ingen elevdata).
+    const TABS = ["week", "upcoming", "archive"];
+    const TAB_LABELS = { week: "Denna vecka", upcoming: "Kommande", archive: "Arkiv" };
+    const TAB_STORE = "classroom:ui:lektion:planTab";
+    let listTab = (() => {
+      try { const v = localStorage.getItem(TAB_STORE); return TABS.includes(v) ? v : "week"; }
+      catch { return "week"; }
+    })();
+    /** Fliken en planering hör hemma i ("utan datum" → Denna vecka). */
+    const tabOf = (p) => {
+      const k = weekKeyOf(p);
+      if (!k) return "week";
+      const tw = thisWeekKey();
+      return k === tw ? "week" : k > tw ? "upcoming" : "archive";
+    };
+    function applyTabUI() {
+      for (const b of tabsEl.querySelectorAll("[data-tab]")) {
+        const sel = b.dataset.tab === listTab;
+        b.setAttribute("aria-selected", String(sel));
+        b.tabIndex = sel ? 0 : -1;
+      }
+    }
+    function setListTab(tab, { render = true } = {}) {
+      if (!TABS.includes(tab)) return;
+      listTab = tab;
+      try { localStorage.setItem(TAB_STORE, tab); } catch { /* ok */ }
+      applyTabUI();
+      if (render) renderList();
+    }
+    applyTabUI();
+    tabsEl.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-tab]");
+      if (b) setListTab(b.dataset.tab);
+    });
+    // Pilarna flyttar OCH väljer flik (segmenterad kontroll — ett tabbstopp).
+    tabsEl.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      e.preventDefault();
+      const i = TABS.indexOf(listTab);
+      const next = TABS[(i + (e.key === "ArrowRight" ? 1 : -1) + TABS.length) % TABS.length];
+      setListTab(next);
+      tabsEl.querySelector(`[data-tab="${next}"]`)?.focus();
+    });
 
     // -- Fällbara block (issue #72). Standard: bara aktuell vecka öppen,
     // "Om lektionen" och "Fält" infällda. Lärarens egna klick sparas per
@@ -817,11 +905,27 @@ export default {
     }
 
     // -- Sparade planeringar-lista --
-    function visiblePlans() {
+    /** Matchar sök + ämnesfilter (oavsett flik). */
+    function matchesFilter(p) {
       const q = filter.q.trim().toLocaleLowerCase("sv");
-      return plans.filter((p) =>
-        (!filter.subject || p.subjectId === filter.subject) &&
-        (!q || searchText(p, subjects).includes(q)));
+      return (!filter.subject || p.subjectId === filter.subject) &&
+        (!q || searchText(p, subjects).includes(q));
+    }
+    /** Planeringarna i den valda fliken som matchar sök + filter. */
+    function visiblePlans() {
+      return plans.filter((p) => tabOf(p) === listTab && matchesFilter(p));
+    }
+
+    /** Diskret rad under flikraden vid sökning: "3 träffar i Arkiv" → byt flik. */
+    function renderTabHits() {
+      if (!filter.q.trim()) { tabHitsEl.hidden = true; tabHitsEl.innerHTML = ""; return; }
+      const counts = { week: 0, upcoming: 0, archive: 0 };
+      for (const p of plans) if (matchesFilter(p)) counts[tabOf(p)]++;
+      const parts = TABS.filter((t) => t !== listTab && counts[t] > 0).map((t) =>
+        `<button type="button" class="plan-tab-hits__link" data-goto-tab="${t}">${
+          counts[t] === 1 ? "1 träff" : `${counts[t]} träffar`} i ${TAB_LABELS[t]}</button>`);
+      tabHitsEl.hidden = parts.length === 0;
+      tabHitsEl.innerHTML = parts.join(`<span aria-hidden="true"> · </span>`);
     }
 
     function rowHTML(p, curId, shownId) {
@@ -848,12 +952,28 @@ export default {
 
     function renderList() {
       fillSubjectFilter();
+      // Väljs en planering i en annan flik (t.ex. "Gå dit" till Arkiv, eller
+      // en kopia till kommande vecka) byter listan flik så att den syns.
+      if (revealEditing && editingPlan() && tabOf(editingPlan()) !== listTab) {
+        setListTab(tabOf(editingPlan()), { render: false });
+      }
+      renderTabHits();
       if (plans.length === 0) { listEl.innerHTML = `<p class="field-edit__hint">Inga planeringar ännu — tryck på "Ny planering".</p>`; renderBulk(); return; }
       const vis = visiblePlans();
-      if (vis.length === 0) { listEl.innerHTML = `<p class="field-edit__hint">Inga planeringar matchar sökningen.</p>`; renderBulk(); return; }
+      if (vis.length === 0) {
+        // Tomt läge: kort och neutralt — vid sökning/filter en matchningstext.
+        const empty = (filter.q.trim() || filter.subject)
+          ? "Inga planeringar matchar sökningen."
+          : { week: "Inga planeringar denna vecka.", upcoming: "Inga kommande planeringar.", archive: "Inga planeringar i arkivet." }[listTab];
+        listEl.innerHTML = `<p class="field-edit__hint">${empty}</p>`;
+        renderBulk();
+        return;
+      }
       const curId = editingId;
       const shownId = presentedPlan()?.id;
+      // Nyaste vecka först (som i Arkiv); i Kommande ligger närmaste vecka först.
       const groups = groupByWeek(vis);
+      if (listTab === "upcoming") groups.reverse();
       listEl.innerHTML = groups.map((g) => {
         const allSel = selecting && g.plans.every((p) => selected.has(p.id));
         const check = selecting
@@ -940,6 +1060,9 @@ export default {
       const shown = presentedPlan();
       const isShown = !!p && p.id === shown?.id;
       presentEl.classList.toggle("present-bar--live", isShown);
+      // Förhandsmarkering (issue #82): streckad ram + etikett på tavlan när
+      // den öppna planeringen INTE är den som visas för eleverna.
+      stageEl.classList.toggle("lesson__stage--preview", !!p && !isShown);
       if (!p) {
         presentEl.innerHTML = `<span class="present-bar__seen">Eleverna ser: <strong>${shown ? esc(planLabel(shown)) : "ingen planering"}</strong></span>`;
         return;
@@ -1045,6 +1168,9 @@ export default {
     // ---- Händelser (event delegation på panelen) ----
 
     panel.addEventListener("click", async (e) => {
+      const hit = e.target.closest("[data-goto-tab]");
+      if (hit) { setListTab(hit.dataset.gotoTab); return; }
+
       const copyBtn = e.target.closest("[data-copy]");
       if (copyBtn) { await copyPlan(plans.find((p) => p.id === copyBtn.dataset.copy)); return; }
 

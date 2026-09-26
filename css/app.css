@@ -244,6 +244,13 @@ html[data-theme="teacher"] .view {
   padding: var(--page-top) var(--page-gutter);
 }
 
+/* Bred variant (issue #82): ett läge kan begära mer av skärmbredden än
+   standardramen — samma sidopadding som ramen (--page-gutter), men
+   ingen maxbredd. Läget sätter klassen på .view vid montering och tar
+   bort den vid avmontering, så alla andra lärarsidor behåller ramen.
+   Används i dag bara av Lektionsplaneringen (js/modes/lektion.js). */
+html[data-theme="teacher"] .view.view--wide { max-width: none; }
+
 /* Standardsida: rubrik/flikrad överst, block under med samma rytm. */
 .page {
   display: flex;

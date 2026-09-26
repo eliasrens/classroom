@@ -78,6 +78,8 @@ const PATHS = {
   reel: `<rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M4 9h16M4 15h16M2 12h1.5M20.5 12H22"/>`,
   note: `<path d="M5 6.5 16.5 4l2.5 13.5L7.5 20z"/><path d="M8.5 9.5l6.5-1.3M9.2 13l6.5-1.3"/>`,
   bolt: `<path d="M13 2.5 5 13.5h6l-1 8 8-11h-6z"/>`,
+  // "⋯ Fler åtgärder" (issue #82) — verktygsradens lilla meny
+  more: `<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>`,
 };
 
 /**
