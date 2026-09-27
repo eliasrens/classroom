@@ -61,7 +61,7 @@ export function typingInField(t) {
 export function initShortcuts({ store, openStudentWindow, openHelp }) {
   const dialogOpen = () =>
     document.querySelector(
-      ".quick-note[data-open], .help[data-open], .ca-modal, .ms-modal, .rap-modal, .pwchange, .rp-print"
+      ".quick-note[data-open], .help[data-open], .ca-modal, .ms-modal, .mc-modal, .rap-modal, .pwchange, .rp-print"
     ) != null;
 
   function onKeydown(e) {

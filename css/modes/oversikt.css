@@ -65,6 +65,8 @@
   color: var(--color-accent-text);
 }
 .ov-chip--add { color: var(--color-ink-soft); font-weight: 500; }
+/* Mina klasser (issue #102): diskret länk till de dolda klasserna. */
+.ov-classes .ov-classes__more { align-self: center; margin-left: var(--space-1); color: var(--color-ink-soft); font-size: var(--text-s); }
 
 /* ---- Lägeskort: stor, lugn ingång ---- */
 .ov-modes {
@@ -135,7 +137,8 @@
 
 /* Mina ämnen (issue #81): sammanfattning + knapp i Inställningar. */
 .ov-mine-summary { margin: 0; font-size: var(--text-s); }
-section[aria-label="Mina ämnen"] .btn { align-self: flex-start; }
+section[aria-label="Mina ämnen"] .btn,
+section[aria-label="Mina klasser"] .btn { align-self: flex-start; }
 
 .ov-danger {
   display: flex;

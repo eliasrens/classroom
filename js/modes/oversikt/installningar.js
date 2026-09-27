@@ -13,6 +13,8 @@ import { setActiveClass } from "../../ui/class-picker.js";
 import { mergedSubjects } from "../../lib/trafikljus-stats.js";
 import { MY_SUBJECTS_DOC, mySubjectsPath, myIds } from "../../lib/my-subjects.js";
 import { openMySubjectsDialog } from "../../ui/my-subjects-dialog.js";
+import { MY_CLASSES_DOC, myClassesPath, myClassIds } from "../../lib/my-classes.js";
+import { openMyClassesDialog } from "../../ui/my-classes-dialog.js";
 import {
   savePrivacy, runRetention, parsePrivacy, RETENTION_OPTIONS, DEFAULT_RETENTION_WEEKS, deleteAllClassData,
 } from "../../lib/privacy.js";
@@ -31,6 +33,7 @@ export function mountInstallningar(el, { data, store }) {
   let localNotes = [];     // LOKALA noteringar — bara för påminnelsen före gallring (issue #33)
   let reportLog = null;    // lokal exportlogg (classes/{cid}/reports → log)
   let myDoc = null;        // Mina ämnen — lärarens privata val (issue #81)
+  let myClassesDoc = null; // Mina klasser — lärarens privata val (issue #102)
   let settingsDocs = [];   // klassens delade settings (egna ämnen)
   const activeId = () => store.get().classId ?? null;
 
@@ -131,7 +134,27 @@ export function mountInstallningar(el, { data, store }) {
       ? "Inget val — alla ämnen visas i ämnesväljaren."
       : `${mineNames.length} valda: ${mineNames.join(", ")}.`;
 
+    // Mina klasser (issue #102): privat per lärare, styr klassväljaren och
+    // Översiktens klasslista. Inget val = alla klasser visas. Borttagna
+    // klasser (okända id:n) räknas inte.
+    const myClasses = myClassIds(myClassesDoc);
+    const myClassNames = (myClasses ?? [])
+      .map((id) => classes.find((c) => c.id === id)?.name)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, "sv"));
+    const myClassesSummary = myClassNames.length === 0
+      ? "Inget val — alla klasser visas."
+      : `${myClassNames.length} ${myClassNames.length === 1 ? "vald" : "valda"}: ${myClassNames.join(", ")}.`;
+
     el.innerHTML = `
+      <section class="ov-section card" aria-label="Mina klasser">
+        <h2 class="ov-section__title">${icon("users")} Mina klasser</h2>
+        <p class="ov-field__hint">Välj klasserna du undervisar i, så visar klassväljaren bara dem.
+          Valet är ditt eget och följer dig mellan datorer.</p>
+        <p class="ov-mine-summary">${esc(myClassesSummary)}</p>
+        <button class="btn" data-my-classes>${icon("check")} Välj mina klasser…</button>
+      </section>
+
       <section class="ov-section card" aria-label="Mina ämnen">
         <h2 class="ov-section__title">${icon("book")} Mina ämnen</h2>
         <p class="ov-field__hint">Välj ämnena du undervisar i, så visar ämnesväljaren i
@@ -190,7 +213,10 @@ export function mountInstallningar(el, { data, store }) {
     if (e.target.matches("[data-retention]")) void setRetention(e.target.value);
   });
   el.addEventListener("click", (e) => {
-    if (e.target.closest("[data-my-subjects]")) {
+    if (e.target.closest("[data-my-classes]")) {
+      void openMyClassesDialog({ data, classes, mine: myClassIds(myClassesDoc) });
+    }
+    else if (e.target.closest("[data-my-subjects]")) {
       void openMySubjectsDialog({ data, subjects: mergedSubjects(settingsDocs), mine: myIds(myDoc) });
     }
     else if (e.target.closest("[data-confirm-retention]")) void setRetention(retentionWeeks);
@@ -206,6 +232,13 @@ export function mountInstallningar(el, { data, store }) {
   // eller på en annan enhet (issue #81).
   offs.push(data.watch(mySubjectsPath(), (docs) => {
     myDoc = docs.find((d) => d.id === MY_SUBJECTS_DOC) ?? null;
+    render();
+  }));
+
+  // Mina klasser — privat per lärare (issue #102). Samma settings-samling
+  // som Mina ämnen, men egen watch så att var sektion läser sitt dokument.
+  offs.push(data.watch(myClassesPath(), (docs) => {
+    myClassesDoc = docs.find((d) => d.id === MY_CLASSES_DOC) ?? null;
     render();
   }));
 
