@@ -374,7 +374,8 @@ teachers/{uid}/settings/classes         — Mina klasser (issue #102,
                        tysthet, #31). Saknas dokumentet eller är listan tom visas
                        ALLA klasser, som innan valet fanns. Okända id (borttagna
                        klasser) ignoreras vid visning; finns ingen av dem kvar
-                       visas alla. "+ Ny klass…" lägger till den nya klassen här
+                       visas alla. "+ Ny klass" (dialogen Klasser, #108, och
+                       Översiktens klasslista) lägger till den nya klassen här
                        när läraren har gjort ett val. Statistik, Veckor och
                        klassåtgärder filtreras aldrig (de visar bara vald klass).
 

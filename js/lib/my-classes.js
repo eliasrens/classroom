@@ -68,3 +68,17 @@ export function withMyClass(mine, id) {
 export async function saveMyClasses(data, mine) {
   await data.put(myClassesPath(), { id: MY_CLASSES_DOC, mine: mine ?? [] });
 }
+
+/** Klasser sorterade på namn (svensk ordning) — ny lista, originalet orört. */
+export function sortClasses(classes) {
+  return [...classes].sort((a, b) => String(a.name).localeCompare(String(b.name), "sv"));
+}
+
+/**
+ * Klasserna i klassväljarens rullista (issue #108): mina klasser — eller
+ * alla om inget val är gjort — plus den aktiva klassen, som alltid syns.
+ * Sorterade på namn.
+ */
+export function pickerClasses(classes, mine, activeId) {
+  return sortClasses(filterClasses(classes, mine, { keep: [activeId] }));
+}

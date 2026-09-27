@@ -214,7 +214,7 @@ export function mountInstallningar(el, { data, store }) {
   });
   el.addEventListener("click", (e) => {
     if (e.target.closest("[data-my-classes]")) {
-      void openMyClassesDialog({ data, classes, mine: myClassIds(myClassesDoc) });
+      void openMyClassesDialog({ data, store, classes, mine: myClassIds(myClassesDoc) });
     }
     else if (e.target.closest("[data-my-subjects]")) {
       void openMySubjectsDialog({ data, subjects: mergedSubjects(settingsDocs), mine: myIds(myDoc) });

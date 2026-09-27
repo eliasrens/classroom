@@ -91,3 +91,62 @@
   justify-content: flex-end;
   gap: var(--space-2);
 }
+
+/* ============================================================
+   KLASSER (issue #108, js/ui/my-classes-dialog.js) — bygger på .ms-*:
+   en rad per klass med kryssruta, namn och "Öppna"/"Vald" till höger,
+   inline-fält för ny klass och "+ Ny klass" längst ner till vänster.
+   ============================================================ */
+
+.mc-row { cursor: default; padding-block: 1px; }
+.mc-row__pick {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+.mc-row__name { overflow-wrap: anywhere; }
+.mc-row__open {
+  flex: none;
+  padding: 0 var(--space-2);
+  min-height: 1.8rem;
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+}
+.mc-row__open:hover, .mc-row__open:focus-visible { color: var(--color-ink); }
+.mc-row__active {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.8rem;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent; /* samma mått som knappen "Öppna" */
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+}
+
+.mc-status:empty { display: none; }
+
+.mc-new {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: var(--space-2);
+}
+.mc-new[hidden] { display: none; }
+.mc-new input {
+  flex: 1;
+  min-width: 0;
+  padding: calc(var(--space-1) + 2px) var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+.mc-actions { justify-content: space-between; }
+/* "Klar" stannar till höger även när "+ Ny klass" är dold (inline-fältet öppet). */
+.mc-actions [data-done] { margin-left: auto; }
+.mc-add[hidden] { display: none; }
