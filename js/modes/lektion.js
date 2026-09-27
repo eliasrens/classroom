@@ -18,7 +18,7 @@
  *   innehållet inte ryms (fitBoard) — tavlan scrollar aldrig.
  * - Valfri "Bra jobbat"-ruta i högerkolumnen (show.praise), samma
  *   komponent och data som morgonskärmen (js/ui/praise-board.js,
- *   classes/{id}/settings/morningScreen → praise).
+ *   LOKALA classes/{id}/praise/board — elevdata, aldrig i molnet).
  * - Ämnesfärg + automatisk läsbar text (luminans, js/lib/color.js);
  *   läraren kan lägga till egna ämnen/färger utan oläslig text.
  * - "Redigerar nu" och "Visas för eleverna" är två skilda saker (issue #39):

@@ -94,5 +94,3 @@ export function icon(name, { size = null, strokeWidth = 1.8 } = {}) {
     stroke="currentColor" stroke-width="${strokeWidth}"
     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
 }
-
-export const iconNames = Object.keys(PATHS);

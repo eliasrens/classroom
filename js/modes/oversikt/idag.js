@@ -79,7 +79,7 @@ export function mountIdag(el, { data, store }, { tabHref }) {
   function goMode(id) { location.hash = `#/${id}`; }
 
   // Öppnar planeringen i redigeraren — ändrar INTE vad elevskärmen
-  // visar (det gör bara "Visa för eleverna", issue #39).
+  // visar (det gör bara elevskärmspanelens "Visa på elevskärm", issue #88).
   function openPlan(planId) {
     const cid = activeId();
     if (!cid) return;

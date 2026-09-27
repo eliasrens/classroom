@@ -62,7 +62,6 @@ export function seedStudentText(id) {
 
 // Bakgrundsbilderna (kategorier per årstid + Platser i världen) och
 // slumplogiken ligger i js/lib/backgrounds.js (issue #64).
-export { UNSPLASH_IDS, unsplashUrl } from "./backgrounds.js";
 
 /** Ger giltig, ifylld inställningsstruktur oavsett vad som fanns sparat. */
 export function normalize(value) {
