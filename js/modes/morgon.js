@@ -13,13 +13,13 @@
 import { icon } from "../lib/icons.js";
 import { studentLabel } from "../lib/names.js";
 import { createPraiseBoard } from "../ui/praise-board.js";
+import { praiseEditorHTML, mountPraiseEditor } from "../ui/praise-editor.js";
 import {
   WEEKDAYS,
   normalize, loadMorning, saveMorning, saveBackground, watchMorning,
   studentTextFor, seedStudentText, orderedTasks, greetingText, currentPraise, praiseIsStale,
 } from "../lib/morning.js";
-import { rolloverPraise } from "../lib/week-rhythm.js";
-import { weekKey } from "../lib/week.js";
+import { editPraise as editPraiseShared } from "../lib/praise-edit.js";
 import { serverNow } from "../lib/clock.js";
 import {
   categoryById, seasonFor, pickSeasonBg, shouldAutoRandomize, dayKey, findImage, thumbUrl,
@@ -176,17 +176,10 @@ export default {
     }
     const clone = () => structuredClone(settings);
 
-    // Ändring i Bra jobbat-listan. Hör listan fortfarande till förra
-    // veckan (tömningen har inte hunnit ske, t.ex. offline) arkiveras och
-    // töms den FÖRST — annars hamnar nya namn i förra veckans lista.
-    async function editPraise(fn) {
-      if (praiseIsStale(settings)) await rolloverPraise(data, classId, { allowLocal: true });
-      const next = clone();
-      if (praiseIsStale(next)) next.praise = []; // rollover misslyckades helt — börja ändå rent
-      next.weekOf = weekKey();
-      fn(next);
-      await commit(next);
-    }
+    // Ändring i Bra jobbat-listan — samma regel som i Lektionsplaneringen
+    // (js/lib/praise-edit.js): en lista från förra veckan arkiveras och
+    // töms FÖRST, annars hamnar nya namn i förra veckans lista.
+    const editPraise = (fn) => editPraiseShared({ data, classId, get: () => settings, commit }, fn);
 
     function applyExternal(value) {
       const next = normalize(value);
@@ -380,34 +373,14 @@ export default {
       $(".morgon__show-nt").addEventListener("change", (e) => {
         const next = clone(); next.showNametavla = e.target.checked; commit(next);
       });
-      const ntStudents = $(".morgon__ntstudents");
-      ntStudents.addEventListener("change", (e) => {
-        const cb = e.target.closest("input[data-student]");
-        if (!cb) return;
-        const id = cb.dataset.student;
-        void editPraise((next) => {
-          const has = next.praise.some((p) => p.kind === "student" && p.studentId === id);
-          next.praise = has
-            ? next.praise.filter((p) => !(p.kind === "student" && p.studentId === id))
-            : [...next.praise, { id, kind: "student", studentId: id }];
-          if (!has) next.showNametavla = true;
-        });
+      // Elevlista, fritext och Töm: delad redigerare (issue #112, samma som
+      // i Lektionsplaneringen). Ett tillagt namn slår på tavlan.
+      const praiseEditor = mountPraiseEditor(panel.querySelector('[data-collapsible="praise"]'), {
+        edit: editPraise,
+        onAdded: (next) => { next.showNametavla = true; },
       });
-      const ntFree = $(".morgon__ntfree-input");
-      const addFree = () => {
-        const text = ntFree.value.trim();
-        if (!text) return;
-        ntFree.value = "";
-        void editPraise((next) => {
-          next.praise.push({ id: crypto.randomUUID?.() ?? String(Date.now()), kind: "free", text });
-          next.showNametavla = true;
-        });
-        ntFree.focus();
-      };
-      $(".morgon__ntfree-btn").addEventListener("click", addFree);
-      ntFree.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addFree(); } });
-      clearNt = () => void editPraise((next) => { next.praise = []; });
-      $(".morgon__ntclear").addEventListener("click", clearNt);
+      this._praiseEditor = praiseEditor;
+      clearNt = () => void praiseEditor.clear();
       // Töm-knappen på själva namntavlan (teacher-only) går via onClear ovan.
 
       // ---- Bakgrund ----
@@ -520,22 +493,11 @@ export default {
       };
 
       function syncNtStudents() {
-        ntStudents.querySelectorAll("input[data-student]").forEach((cb) => {
-          cb.checked = currentPraise(settings).some((p) => p.kind === "student" && p.studentId === cb.dataset.student);
-        });
+        praiseEditor.setPraise(currentPraise(settings));
       }
       function renderNtStudents() {
         if (!mounted()) return;
-        if (!students.length) {
-          ntStudents.innerHTML = `<p class="morgon__hint">Inga elever i klassen ännu — lägg till dem i Elevlista, eller skriv fritext nedan.</p>`;
-          return;
-        }
-        ntStudents.innerHTML = students.map((s) => `
-          <label class="morgon__ntstudent">
-            <input type="checkbox" data-student="${escapeAttr(s.id)}">
-            <span>${escapeHtml(studentLabel(s))}</span>
-          </label>`).join("");
-        syncNtStudents();
+        praiseEditor.setStudents(students);
       }
       // exponera för students-watch nedan
       this._renderNtStudents = () => { renderNtStudents(); syncSummaries(); };
@@ -601,6 +563,8 @@ export default {
     for (const stop of this._stops ?? []) { try { stop(); } catch { /* ok */ } }
     this._stops = null;
     this._renderNtStudents = null;
+    this._praiseEditor?.destroy();
+    this._praiseEditor = null;
     this._sections?.destroy();
     this._sections = null;
     this._closePicker?.();
@@ -666,12 +630,7 @@ function renderPanel() {
 
       ${collapsibleHTML({ key: "praise", className: "morgon__section", icon: icon("star"), title: "Bra jobbat", body: `
         <label class="morgon__show"><input type="checkbox" class="morgon__show-nt"> Visa Bra jobbat-tavlan</label>
-        <div class="morgon__ntstudents" role="group" aria-label="Elever"></div>
-        <div class="morgon__addtask">
-          <input class="morgon__ntfree-input" type="text" placeholder="Fritext, t.ex. hela bordsgrupp 3…" autocomplete="off" aria-label="Fritext till Bra jobbat">
-          <button class="btn btn--icon morgon__ntfree-btn" title="Lägg till" aria-label="Lägg till fritext">${icon("plus")}</button>
-        </div>
-        <button class="btn btn--ghost morgon__ntclear">${icon("trash")}<span>Töm Bra jobbat</span></button>` })}
+        ${praiseEditorHTML()}` })}
 
       ${collapsibleHTML({ key: "background", className: "morgon__section", icon: icon("image"), title: "Bakgrund", body: `
         <div class="morgon__bg-buttons">

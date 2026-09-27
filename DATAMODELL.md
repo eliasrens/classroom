@@ -145,6 +145,10 @@ classes/{classId}/praise/board          — Bra jobbat-listan — ENDAST LOKALT
   weekOf: "2026-W39" — veckan listan hör till (veckorytmen nedan).
                        Flyttad hit från settings/morningScreen (issue #32):
                        listan innehåller elevdata och delas inte längre.
+                       Redigeras från Morgonskärmens panel OCH från
+                       Lektionsplaneringens "Visa Bra jobbat" (issue #112) —
+                       samma lista, samma regler (js/lib/praise-edit.js).
+                       Test: node docs/test-praise-edit.mjs
 
 classes/{classId}/privacy/privacy       — lokal gallring — ENDAST LOKALT
   value: { noteRetentionWeeks,          — standard 20 (ca en termin, #60), min 1.

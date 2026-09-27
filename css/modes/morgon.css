@@ -301,16 +301,13 @@ html[data-theme="teacher"]:has(.morgon) { scrollbar-gutter: auto; }
 
 .morgon__variant { display: flex; gap: var(--space-3); }
 .morgon__variant label,
-.morgon__show,
-.morgon__ntstudent {
+.morgon__show {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   cursor: pointer;
 }
 .morgon__show { font-weight: 600; }
-.morgon__ntstudent { min-width: 0; overflow-wrap: anywhere; }
-.morgon__ntstudent input { flex: none; }
 
 .morgon__panel input[type="text"],
 .morgon__panel input[type="url"] {
@@ -464,17 +461,7 @@ html[data-theme="teacher"]:has(.morgon) { scrollbar-gutter: auto; }
 .morgon__addtask input { flex: 1; min-width: 0; }
 .morgon__addtask .btn { flex: none; }
 
-.morgon__ntstudents {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-1);
-  max-height: 12rem;
-  overflow: auto;
-  padding: var(--space-1);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-m);
-  background: var(--color-surface);
-}
+/* Bra jobbat-redigeraren (elevlista, fritext, Töm): css/ui/praise-editor.css */
 
 .morgon__bg-upload { position: relative; justify-content: center; }
 .morgon__bg-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }

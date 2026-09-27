@@ -1,0 +1,35 @@
+/* ============================================================
+   "BRA JOBBAT"-REDIGERAREN — delad komponent (js/ui/praise-editor.js)
+   Elevlista med kryssrutor, fritext med +-knapp och "Töm Bra jobbat".
+   Används i Morgonskärmens panel och i Lektionsplaneringens fält
+   "Visa Bra jobbat". Textfältets ram/färg kommer från värdens panel.
+   ============================================================ */
+
+.praise-editor__students {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-1);
+  max-height: 12rem;
+  overflow: auto;
+  padding: var(--space-1);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+}
+
+.praise-editor__student {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.praise-editor__student input { flex: none; }
+
+.praise-editor__empty { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); }
+
+/* fritext + plus-knapp på rad */
+.praise-editor__add { display: flex; gap: var(--space-2); }
+.praise-editor__add input { flex: 1; min-width: 0; }
+.praise-editor__add .btn { flex: none; }
