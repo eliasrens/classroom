@@ -109,14 +109,26 @@
   pointer-events: none;
 }
 
-/* ---- Dra en lapp ---- */
+/* ---- Dra en lapp ----
+   Lapparna ritas i sin STORA storlek (den dragna, uppvända lappen) och skalas
+   NED i högen med 1/--lot-k (stage.js place()). Då rastreras lagret i full
+   upplösning och den förstorade lappen blir knivskarp — att rita litet och
+   skala upp gav en pixlig ikon och text. Alla mått nedan är högens mått × k. */
 
-.lot-pile { position: absolute; inset: 0; }
+.lot-pile {
+  position: absolute;
+  inset: 0;
+  --lot-k: 2.7; /* = BIG_NOTE i stage.js */
+  --lot-shadow-c: rgb(0 0 0 / 12%); /* = färgen i --shadow-s per tema (tokens.css) */
+}
+html[data-theme="teacher"][data-scheme="light"] .lot-pile { --lot-shadow-c: rgb(30 33 38 / 8%); }
+html[data-theme="student"] .lot-pile,
+.theme-student .lot-pile { --lot-shadow-c: rgb(36 40 46 / 8%); }
 .lot-note {
   position: absolute;
-  width: 22cqmin;
-  height: 16cqmin;
-  perspective: 90cqmin;
+  width: calc(22cqmin * var(--lot-k));
+  height: calc(16cqmin * var(--lot-k));
+  perspective: calc(90cqmin * var(--lot-k));
   will-change: transform;
 }
 .lot-note.is-drawn { z-index: 5; }
@@ -133,18 +145,18 @@
   display: grid;
   place-items: center;
   backface-visibility: hidden;
-  border: 1px solid rgb(0 0 0 / 14%);
-  border-radius: var(--radius-m);
-  box-shadow: var(--shadow-s);
+  border: calc(1px * var(--lot-k)) solid rgb(0 0 0 / 14%);
+  border-radius: calc(var(--radius-m) * var(--lot-k));
+  box-shadow: 0 calc(1px * var(--lot-k)) calc(2px * var(--lot-k)) var(--lot-shadow-c);
 }
 .lot-note__back { background: #f4ecd4; color: #b3a172; }
-.lot-note__back .icon { width: 8cqmin; height: 8cqmin; }
+.lot-note__back .icon { width: calc(8cqmin * var(--lot-k)); height: calc(8cqmin * var(--lot-k)); }
 .lot-note__front {
   transform: rotateY(180deg);
-  padding: 1.4cqmin;
+  padding: calc(1.4cqmin * var(--lot-k));
   background: #fffdf6;
   color: #1f2328;
-  font-size: var(--lot-note-size, 3.6cqmin);
+  font-size: calc(var(--lot-note-size, 3.6cqmin) * var(--lot-k));
   font-weight: 700;
   line-height: 1.1;
   text-align: center;
