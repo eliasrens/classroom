@@ -100,10 +100,25 @@
 .lesson-fold[data-open="false"] .ca-add { display: none; }
 .lesson-panel .btn-row { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 
+/* ---- Huvudet ovanför planeringslistan (issue #109) ----
+   Rubrik, knapprad, sök/filter och flikar: samma höjd på alla kontroller,
+   ett och samma radavstånd (gruppens gap, var(--space-2)) och samma
+   vänster- och högerkant. Rubrikens egen marginal skulle annars ge ett
+   större glapp just under den. */
+.lesson-panel__group:has(> .plan-toolbar) { --plan-control-h: 32px; }
+.lesson-panel__group:has(> .plan-toolbar) > h2 { margin-bottom: 0; }
+
 /* ---- Verktygsrad (issue #82): "+ Ny planering" + ⋯-meny ---- */
 .plan-toolbar { display: flex; align-items: center; gap: var(--space-2); }
+.plan-toolbar > .btn { height: var(--plan-control-h); padding-block: 0; }
 .plan-more { position: relative; margin-left: auto; }
-.plan-more__btn { color: var(--color-ink-soft); }
+.plan-more__btn {
+  width: var(--plan-control-h);
+  height: var(--plan-control-h);
+  padding: 0;
+  justify-content: center;
+  color: var(--color-ink-soft);
+}
 .plan-more__btn[aria-expanded="true"] { background: var(--color-surface-alt); color: var(--color-ink); }
 /* Samma utseende som toppmenyns rullgardiner (.mode-nav__popup, css/app.css). */
 .plan-more__menu {
@@ -144,23 +159,28 @@
 .plan-more__item[aria-pressed="true"] { background: var(--color-accent-soft); color: var(--color-accent-text); font-weight: 600; }
 
 /* ---- Flikar: Denna vecka · Kommande · Arkiv (issue #82) ----
-   Liten, lugn segmenterad kontroll under sök och filter. */
+   Lugn segmenterad kontroll under sök och filter, lika hög som fälten
+   (issue #109). Inaktiv text blandas mot --color-ink så att den håller
+   tydlig AA-kontrast mot den tonade botten även i ljust tema. */
 .plan-tabs {
   display: flex;
   gap: 2px;
+  height: var(--plan-control-h);
   padding: 2px;
   background: var(--color-surface-alt);
   border-radius: var(--radius-m);
 }
 .plan-tab {
   flex: 1 1 0;
-  padding: 2px var(--space-2);
+  min-width: 0;
+  padding: 0 var(--space-2);
   border: 0;
   border-radius: var(--radius-s);
   background: none;
   font: inherit;
-  font-size: 0.8rem;
-  color: var(--color-ink-soft);
+  font-size: var(--text-s);
+  line-height: 1;
+  color: color-mix(in srgb, var(--color-ink-soft) 70%, var(--color-ink));
   white-space: nowrap;
   cursor: pointer;
 }
@@ -169,7 +189,7 @@
   background: var(--color-surface);
   color: var(--color-ink);
   font-weight: 600;
-  box-shadow: var(--shadow-s);
+  box-shadow: var(--shadow-s), inset 0 0 0 1px var(--color-line);
 }
 
 /* "3 träffar i Arkiv" — diskret rad vid sökning med träffar i andra flikar. */
@@ -219,7 +239,9 @@
   color: var(--color-ink-soft);
 }
 
-/* Sök + ämnesfilter */
+/* Sök + ämnesfilter. Sökrutan får samma ram, radie, bakgrund och höjd
+   som panelens select (issue #109) — annars ritar webbläsaren sin egen
+   ljusa sökruta. Sökfältet tar resten av bredden. */
 .plan-filter { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 8.5rem); gap: var(--space-2); }
 .plan-filter__search {
   position: relative;
@@ -228,10 +250,30 @@
   align-items: center;
   color: var(--color-ink-soft);
 }
-.plan-filter__search svg { position: absolute; left: var(--space-2); pointer-events: none; }
+.plan-filter__search svg {
+  position: absolute;
+  left: var(--space-2);
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
 /* Sökrutan ärver annars panelens dämpade ikonfärg — för låg kontrast för
    inskriven text (WCAG AA, issue #95). */
-.lesson-panel .plan-filter__search input { min-width: 0; padding-left: calc(var(--space-2) + 20px); color: var(--color-ink); }
+.lesson-panel .plan-filter__search input {
+  appearance: none;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  height: var(--plan-control-h);
+  margin: 0;
+  padding: 0 var(--space-2) 0 calc(var(--space-2) + 20px);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+.lesson-panel .plan-filter__search input::placeholder { color: var(--color-ink-soft); opacity: 1; }
+.lesson-panel .plan-filter select { height: var(--plan-control-h); padding-block: 0; }
 
 /* Välj flera + bekräftelse + kvittens */
 .plan-bulk,
