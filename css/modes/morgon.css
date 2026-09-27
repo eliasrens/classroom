@@ -326,8 +326,8 @@ html[data-theme="teacher"]:has(.morgon) { scrollbar-gutter: auto; }
 /* Uppgiftsrader. Kolumnen är minmax(0, 1fr): en lång uppgiftstext får inte
    bestämma listans bredd (issue #85 — en auto-kolumn växte till den längsta
    etikettens nowrap-bredd, alla rader blev bredare än panelen och Startens
-   veckodagsväljare trycktes ut). Etiketten trunkeras med ellips; väljaren
-   och pennorna krymper aldrig och syns alltid hela. */
+   veckodagsväljare trycktes ut). Etiketten trunkeras med ellips; pennorna
+   krymper aldrig och veckodagen ligger på egen rad (.morgon__days). */
 .morgon__tasklist { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
 .morgon__task {
   min-width: 0;
@@ -341,7 +341,48 @@ html[data-theme="teacher"]:has(.morgon) { scrollbar-gutter: auto; }
 }
 .morgon__task-main { display: flex; align-items: center; gap: var(--space-2); flex: 1; cursor: pointer; min-width: 0; }
 .morgon__task-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.morgon__weekday { flex: none; max-width: 100%; padding: 2px var(--space-1); }
+.morgon__task:has(.morgon__days) { flex-wrap: wrap; row-gap: var(--space-1); }
+/* Startens veckodag som dag-chips på egen rad (issue #85): fem lika breda
+   knappar som delar radens bredd — ryms alltid, ett klick per byte. */
+.morgon__days {
+  flex: 1 0 100%;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-m);
+  background: var(--color-bg);
+  /* Panelen är alltid mörk — accenten följer med även i ljust lärarschema. */
+  --color-accent: #c79a4e;
+  --color-accent-text: #d5ab61;
+  --color-accent-ink: #17130a;
+}
+.morgon__day { position: relative; min-width: 0; }
+.morgon__day input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.morgon__day span {
+  display: block;
+  padding: 3px 0;
+  border-radius: var(--radius-s);
+  text-align: center;
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.morgon__day:hover span { background: var(--color-surface-alt); color: var(--color-ink); }
+.morgon__day input:checked + span {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-weight: 700;
+}
+.morgon__day input:focus-visible + span { outline: 2px solid var(--color-accent-text, var(--color-accent)); outline-offset: 1px; }
 .morgon__task-actions { display: inline-flex; gap: 2px; flex: none; }
 .morgon__task-btn {
   display: inline-grid;

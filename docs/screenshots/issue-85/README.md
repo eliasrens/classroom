@@ -31,31 +31,41 @@ har `white-space: nowrap`, så en enda lång uppgift ("Läs i läseboken och skr
 …") gjorde kolumnen, och därmed alla rader, bredare än panelen. Startens
 veckodagsväljare hamnade då utanför panelens kant (`fore-1280-panel.png`).
 
-**Åtgärd** (`css/modes/morgon.css`): Listan, elevlistan under Bra jobbat och
-panelens scrollbehållare har kolumnen `minmax(0, 1fr)`. Etiketten trunkeras
-med ellips och visar hela texten som tooltip (`title`). Väljaren, pennorna
-och plusknapparna krymper aldrig. Inmatningsfälten har `min-width: 0`.
-Scrollbehållaren har `overflow-x: hidden` som skyddsnät. Panelens bredd och
-fällbara sektioner är oförändrade.
+**Åtgärd** (`js/modes/morgon.js`, `css/modes/morgon.css`):
+
+- **Veckodagen väljs med dag-chips** (Mån · Tis · Ons · Tor · Fre) på en egen
+  rad under "Starten", i stället för en select. Det är ett klick per byte,
+  alla dagar syns, och vald dag är markerad med accentfärgen. De fem chipsen
+  delar radens bredd lika, så de får alltid plats. Tekniskt är det en
+  radiogroup med riktiga radioknappar (piltangenter och skärmläsare fungerar,
+  aria-label "Måndag" …). Jag valde detta framför en smalare select eller
+  en bredare panel eftersom det är enklast för läraren och inte kräver
+  någon breddning.
+- **Uppgiftslistan följer panelens bredd:** listan, elevlistan under Bra
+  jobbat och panelens scrollbehållare har kolumnen `minmax(0, 1fr)`. Långa
+  uppgiftsnamn kortas med ellips och visar hela texten som tooltip. Pennorna
+  och plusknapparna krymper aldrig, och inmatningsfälten har
+  `min-width: 0`. `overflow-x: hidden` är ett skyddsnät.
+- Panelens bredd och de fällbara sektionerna är oförändrade.
 
 Uppmätt med alla fyra sektioner utfällda, en lång egen uppgift och en lång
 fritext i Bra jobbat. "Utanför" är antalet element vars högerkant ligger
 utanför `clientWidth`:
 
-| Viewport | scrollWidth | clientWidth | Utanför | Väljarens högerkant (px) |
+| Viewport | scrollWidth | clientWidth | Utanför | Dag-chips (x) |
 |---|---|---|---|---|
-| 1920×1080 | 336 | 336 | 0 | 304 |
-| 1366×768 | 314 | 314 | 0 | 282 |
-| 1280×720 | 314 | 314 | 0 | 282 |
-| Före, 1280×720 | 314* | 314 | 15+ | 522 |
+| 1920×1080 | 336 | 336 | 0 | 24–312 |
+| 1366×768 | 314 | 314 | 0 | 24–290 |
+| 1280×720 | 314 | 314 | 0 | 24–290 |
+| Före, 1280×720 | 314* | 314 | 15+ | select högerkant 522 |
 
 \* Före klipptes raderna i stället för att ge scroll, så `scrollWidth` visade
-inte felet. Stresstest efter åtgärden, med rotstorlek 20 px och en
-bredare väljare (monospace, extra padding), gav också 0 element utanför.
+inte felet. Med rotstorlek 20 px låg fortfarande 0 element utanför, och
+ingen chip-text trunkerades.
 
-Veckodagsväljaren gick att byta från Fredag till Måndag. Elevskärmen
-(`#/elev/morgon`) visade sedan "Starten – Måndag"
-(`efter-elevskarm-starten-mandag.png`).
+Klick på "Fre" gav "Starten – Fredag" på elevskärmen (`#/elev/morgon`).
+Klick på "Mån" gav sedan "Starten – Måndag"
+(`efter-elevskarm-starten-fredag.png`, `efter-elevskarm-starten-mandag.png`).
 
 - `fore-1280-panel.png`: FÖRE. Väljaren är utanför och raderna är klippta.
-- `efter-1920-panel.png`, `efter-1366-panel.png`, `efter-1280-panel.png`: EFTER
+- `efter-1920-panel.png`, `efter-1366-panel.png`, `efter-1280-panel.png`: EFTER, med dag-chips
