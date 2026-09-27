@@ -99,7 +99,7 @@ function pageOverview(r) {
   }
   const share = r.counts.green / r.count;
   const cheer = share >= 0.75 ? "Riktigt fina övergångar!"
-    : share >= 0.5 ? "Bra jobbat — mer än hälften gröna!"
+    : share > 0.5 ? "Bra jobbat — mer än hälften gröna!"
     : r.counts.green > 0 ? "Bra kämpat! Varje gång är en ny chans."
     : "Nästa vecka tar vi nya tag tillsammans.";
   const tile = (c) => `
