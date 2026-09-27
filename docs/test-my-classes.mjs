@@ -12,10 +12,13 @@
  *     räknas det som inget val
  *   - withMyClass lägger till utan dubbletter
  *   - saveMyClasses skriver teachers/{uid}/settings/classes
+ *   - sortClasses / pickerClasses (issue #108): klassväljarens rullista =
+ *     mina klasser (eller alla) + aktiv klass, sorterade på namn
  */
 
 const {
   MY_CLASSES_DOC, myClassesPath, myClassIds, isMyClass, filterClasses, withMyClass, saveMyClasses,
+  sortClasses, pickerClasses,
 } = await import("../js/lib/my-classes.js");
 
 let failed = 0;
@@ -93,6 +96,23 @@ await saveMyClasses(fakeData, null);
 ok(puts[0]?.path.startsWith("teachers/") && puts[0]?.path.endsWith("/settings"), "sparas under teachers/{uid}/settings");
 ok(puts[0]?.doc.id === "classes" && puts[0]?.doc.mine.join(",") === "qa-test-a", "sparar { id: classes, mine }");
 ok(Array.isArray(puts[1]?.doc.mine) && puts[1].doc.mine.length === 0, "null sparas som tom lista (= inget val)");
+
+// --- sortClasses / pickerClasses (issue #108) ------------------------------
+const MIXED = [
+  { id: "qa-test-ö", name: "QA-TEST-Ö" },
+  { id: "qa-test-c", name: "QA-TEST-C" },
+  { id: "qa-test-å", name: "QA-TEST-Å" },
+  { id: "qa-test-a", name: "QA-TEST-A" },
+];
+ok(ids(sortClasses(MIXED)) === "qa-test-a,qa-test-c,qa-test-å,qa-test-ö", "sortClasses: svensk ordning (Å före Ö)");
+ok(MIXED[0].id === "qa-test-ö", "sortClasses muterar inte originalet");
+ok(ids(pickerClasses(MIXED, null, "qa-test-c")) === "qa-test-a,qa-test-c,qa-test-å,qa-test-ö",
+  "pickerClasses utan val → alla klasser, sorterade");
+ok(ids(pickerClasses(MIXED, ["qa-test-ö", "qa-test-a"], null)) === "qa-test-a,qa-test-ö",
+  "pickerClasses med val → bara mina, sorterade");
+ok(ids(pickerClasses(MIXED, ["qa-test-ö", "qa-test-a"], "qa-test-c")) === "qa-test-a,qa-test-c,qa-test-ö",
+  "pickerClasses: aktiv klass som inte är min syns ändå");
+ok(pickerClasses([], ["qa-test-a"], "qa-test-a").length === 0, "pickerClasses: tom klasslista kraschar inte");
 
 console.log(`\n${passed} OK, ${failed} fel`);
 if (failed > 0) process.exit(1);
