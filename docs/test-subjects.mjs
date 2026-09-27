@@ -1,5 +1,5 @@
 /**
- * TEST — Ämnespaletten (issue #77 + #81), js/lib/color.js + css/tokens.css.
+ * TEST — Ämnespaletten (issue #77 + #81 + #85), js/lib/color.js + css/tokens.css.
  *
  *   node docs/test-subjects.mjs
  *
@@ -9,9 +9,9 @@
  *     åt båda hållen (samma id:n, samma hexvärden)
  *   - färgfamiljerna följer skolans schema (Sv röd, So gul, Ma blå, No/Tk
  *     mörkgrön och samma färg, En lila, Idh rosa, Sl ljusgrön, Mentorstid grå)
- *   - SO-delämnena (re, hi, ge, sh) ligger i den gula SO-familjen och
- *     NO-delämnena (bi, ke, fy) i den mörkgröna NO-familjen (issue #81),
- *     med nyanser som går att skilja åt sida vid sida
+ *   - SO-delämnena (re, hi, ge, sh) har EXAKT samma färg som SO och
+ *     NO-delämnena (bi, ke, fy) samma som NO (issue #85) — i CSS genom att
+ *     --subject-re m.fl. refererar till huvudämnets token (var(--subject-so))
  *   - `group` binder delämnena till sina huvudämnen och groupedSubjects
  *     grupperar dem under rubriker
  *   - `rast` ligger sist (fallback i subjectStyle) och `mentor` finns
@@ -47,8 +47,17 @@ for (const s of SUBJECTS) {
 // --- SUBJECTS ↔ CSS-tokens i synk -----------------------------------------
 const css = await readFile(new URL("../css/tokens.css", import.meta.url), "utf8");
 const tokens = {};
+const tokenRefs = {};
 for (const m of css.matchAll(/--subject-([a-z]+):\s*(#[0-9a-fA-F]{3,6})/g)) {
   tokens[m[1]] = m[2].toLowerCase();
+}
+// Delämnen refererar till huvudämnets token: --subject-hi: var(--subject-so);
+for (const m of css.matchAll(/--subject-([a-z]+):\s*var\(--subject-([a-z]+)\)/g)) {
+  tokenRefs[m[1]] = m[2];
+}
+for (const [id, ref] of Object.entries(tokenRefs)) {
+  ok(tokens[ref] !== undefined, `--subject-${id} refererar till --subject-${ref} som saknar hexvärde`);
+  tokens[id] = tokens[ref];
 }
 for (const s of SUBJECTS) {
   ok(tokens[s.id] !== undefined, `token --subject-${s.id} saknas i tokens.css`);
@@ -82,7 +91,7 @@ const mentor = rgb("mentor");
 ok(Math.abs(mentor.r - mentor.g) < 20 && Math.abs(mentor.g - mentor.b) < 20,
   "mentor ska vara grå (R≈G≈B)");
 
-// --- Delämnen (issue #81): rätt familj, rätt grupp, lagom olika nyanser ----
+// --- Delämnen (issue #81 + #85): rätt grupp, EXAKT huvudämnets färg ------
 const SO_FAMILY = ["so", "re", "hi", "ge", "sh"];
 const NO_FAMILY = ["no", "bi", "ke", "fy"];
 const NAMES = {
@@ -92,31 +101,25 @@ const NAMES = {
 for (const [id, name] of Object.entries(NAMES)) {
   ok(get(id)?.name === name, `ämnet ${id}/${name} ska finnas`);
 }
-for (const id of SO_FAMILY) {
-  ok(get(id)?.group === "so", `${id} ska ha group "so"`);
-  const c = rgb(id);
-  ok(c.r > c.b && c.g > c.b, `${id} ska ligga i den gula SO-familjen (R och G över B)`);
-}
-for (const id of NO_FAMILY) {
-  ok(get(id)?.group === "no", `${id} ska ha group "no"`);
-  const c = rgb(id);
-  ok(c.g >= c.r && c.g > c.b, `${id} ska ligga i den gröna NO-familjen (G dominerar)`);
+for (const [main, fam] of [["so", SO_FAMILY], ["no", NO_FAMILY]]) {
+  for (const id of fam) {
+    ok(get(id)?.group === main, `${id} ska ha group "${main}"`);
+    ok(get(id).color === get(main).color,
+      `${id} (${get(id).color}) ska ha exakt samma färg som ${main} (${get(main).color})`);
+    ok(deepTextColor(get(id).color) === deepTextColor(get(main).color),
+      `${id} ska ha samma --subj-deep som ${main}`);
+    ok(readableTextColor(get(id).color) === readableTextColor(get(main).color),
+      `${id} ska ha samma textfärg som ${main}`);
+    if (id !== main) {
+      ok(tokenRefs[id] === main,
+        `--subject-${id} ska referera till var(--subject-${main}) i tokens.css, inte kopiera hexkoden`);
+      ok(get(id).name !== get(main).name, `${id} ska ha ett eget namn (skiljer sig från ${main})`);
+    }
+  }
 }
 ok(SUBJECTS.every((s) => !s.group || SO_FAMILY.includes(s.id) || NO_FAMILY.includes(s.id)),
   "bara SO- och NO-familjerna har group");
 ok(SUBJECT_GROUPS.map((g) => g.id).join(",") === "so,no", "SUBJECT_GROUPS = so, no");
-
-// Nyanserna ska gå att skilja åt bredvid varandra i planeringslistan.
-const dist = (a, b) => {
-  const A = hexToRgb(get(a).color); const B = hexToRgb(get(b).color);
-  return Math.hypot(A.r - B.r, A.g - B.g, A.b - B.b);
-};
-for (const fam of [SO_FAMILY, NO_FAMILY]) {
-  for (let i = 0; i < fam.length; i++) for (let j = i + 1; j < fam.length; j++) {
-    ok(dist(fam[i], fam[j]) >= 25,
-      `${fam[i]} och ${fam[j]} ska gå att skilja åt (RGB-avstånd ${dist(fam[i], fam[j]).toFixed(0)} < 25)`);
-  }
-}
 
 // groupedSubjects: delämnena samlas under sin rubrik, ordningen bevaras.
 const groups = groupedSubjects(SUBJECTS);
@@ -138,12 +141,14 @@ ok(typeof subjectStyle("ma").textColor === "string", "subjectStyle ger textColor
 
 // --- Kontrasttabell (för rapporten) -----------------------------------------
 console.log("\nKontrasttabell (WCAG AA kräver ≥ 4,5):");
-console.log("| Ämne | Färg | Textfärg | Kvot | AA |");
-console.log("|---|---|---|---|---|");
+console.log("| Ämne | Färg | Textfärg | Kvot | AA | Etikett (--subj-deep) | Kvot mot vitt |");
+console.log("|---|---|---|---|---|---|---|");
 for (const s of SUBJECTS) {
   const text = readableTextColor(s.color);
   const ratio = contrastRatio(s.color, text);
-  console.log(`| ${s.name} (${s.id}) | ${s.color} | ${text} | ${ratio.toFixed(2)} | ${ratio >= 4.5 ? "✅" : "❌"} |`);
+  const deep = deepTextColor(s.color);
+  const color = s.group && s.id !== s.group ? `${s.color} (= ${s.group.toUpperCase()})` : s.color;
+  console.log(`| ${s.name} (${s.id}) | ${color} | ${text} | ${ratio.toFixed(2)} | ${ratio >= 4.5 ? "✅" : "❌"} | ${deep} | ${contrastRatio(deep, "#ffffff").toFixed(2)} |`);
 }
 
 console.log(`\n${passed} OK, ${failed} fel`);

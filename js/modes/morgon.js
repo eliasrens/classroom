@@ -252,11 +252,11 @@ export default {
           commit(next);
           return;
         }
-        const sel = e.target.closest("select[data-weekday]");
-        if (sel) {
+        const day = e.target.closest("input[data-weekday]");
+        if (day?.checked) {
           const next = clone();
-          const t = next.tasks.find((x) => x.id === sel.dataset.weekday);
-          if (t) t.weekday = sel.value;
+          const t = next.tasks.find((x) => x.id === day.dataset.weekday);
+          if (t) t.weekday = day.value;
           commit(next);
         }
       });
@@ -390,9 +390,9 @@ export default {
           const t = settings.tasks.find((x) => x.id === cb.dataset.task);
           if (t) cb.checked = t.checked;
         });
-        taskList.querySelectorAll("select[data-weekday]").forEach((sel) => {
-          const t = settings.tasks.find((x) => x.id === sel.dataset.weekday);
-          if (t && sel !== document.activeElement) sel.value = t.weekday;
+        taskList.querySelectorAll("input[data-weekday]").forEach((day) => {
+          const t = settings.tasks.find((x) => x.id === day.dataset.weekday);
+          if (t) day.checked = day.value === t.weekday;
         });
         syncNtStudents();
         syncBgHint();
@@ -612,10 +612,15 @@ function bgSummaryHTML(bg) {
 }
 
 function taskRow(t) {
+  // Startens veckodag: dag-chips (Mån–Fre) på egen rad under namnet
+  // (issue #85) — ett klick, alltid synliga, får alltid plats i panelen.
   const control = t.kind === "starten"
-    ? `<select data-weekday="${escapeAttr(t.id)}" class="morgon__weekday" aria-label="Veckodag för Starten">
-         ${WEEKDAYS.map((d) => `<option value="${d}"${d === t.weekday ? " selected" : ""}>${d}</option>`).join("")}
-       </select>`
+    ? `<div class="morgon__days" role="radiogroup" aria-label="Veckodag för Starten">
+         ${WEEKDAYS.map((d) => `<label class="morgon__day" title="${d}">
+           <input type="radio" name="weekday-${escapeAttr(t.id)}" value="${d}" data-weekday="${escapeAttr(t.id)}" aria-label="${d}"${d === t.weekday ? " checked" : ""}>
+           <span aria-hidden="true">${d.slice(0, 3)}</span>
+         </label>`).join("")}
+       </div>`
     : "";
   const actions = t.kind === "custom"
     ? `<button class="morgon__task-btn" data-edit="${escapeAttr(t.id)}" title="Ändra elevtext" aria-label="Ändra elevtext">${icon("pencil")}</button>
@@ -627,7 +632,7 @@ function taskRow(t) {
     <div class="morgon__task">
       <label class="morgon__task-main">
         <input type="checkbox" data-task="${escapeAttr(t.id)}">
-        <span class="morgon__task-label">${escapeHtml(t.label)}</span>
+        <span class="morgon__task-label" title="${escapeAttr(t.label)}">${escapeHtml(t.label)}</span>
       </label>
       ${control}
       <span class="morgon__task-actions">${actions}</span>
