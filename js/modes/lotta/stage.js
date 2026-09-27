@@ -31,7 +31,7 @@ import {
 const SVG_NS = "http://www.w3.org/2000/svg";
 const PILE_MAX = 12;
 const PILE_SEED = 4711; // lapparnas viloläge — samma i alla fönster
-const BIG_NOTE = 2.7;   // den dragna lappens förstoring
+const BIG_NOTE = 2.7;   // den dragna lappens förstoring (= --lot-k i lotta.css)
 
 /** Dämpade tårtbitsfärger (ur ämnespaletten) för listor utan egna färger. */
 const PALETTE = ["#5577b5", "#b05f7d", "#4e8f72", "#b88540", "#7a63a8", "#4f93a8", "#b3564e", "#85905f"];
@@ -418,10 +418,12 @@ function buildPile(show, items, kind) {
       <div class="lot-note__front"><span></span></div></div></div>`;
   wrap.innerHTML = base.map(() => noteHtml).join("");
   const notes = [...wrap.children];
+  // Lapparna ritas i stor storlek (lotta.css) — scale 1 i högen blir 1/BIG_NOTE,
+  // BIG_NOTE blir 1. Skarpt i slutläget i stället för en uppskalad bitmapp.
   const place = (el, x, y, r, scale = 1, flip = 0, opacity = 1) => {
     el.style.left = `${x}%`;
     el.style.top = `${y}%`;
-    el.style.transform = `translate(-50%, -50%) rotate(${r.toFixed(2)}deg) scale(${scale.toFixed(3)})`;
+    el.style.transform = `translate(-50%, -50%) rotate(${r.toFixed(2)}deg) scale(${(scale / BIG_NOTE).toFixed(4)})`;
     el.style.opacity = String(opacity);
     el.firstElementChild.style.transform = `rotateY(${flip.toFixed(1)}deg)`;
   };
