@@ -17,6 +17,9 @@
 
   /* ---- Statusfärger (dämpade) ---- */
   --color-ok: #5d9c76;
+  /* Grön YTA med vit text (t.ex. "Visas för eleverna"): mörkare variant —
+     vit text på --color-ok når bara 3,2:1, WCAG AA kräver 4,5:1 (issue #95). */
+  --color-ok-bg: #47805e;
   --color-warn: #c0913e;
   --color-danger: #c2655c;
 

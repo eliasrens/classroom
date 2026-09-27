@@ -142,7 +142,7 @@
   font-size: var(--text-l);
   font-weight: 700;
 }
-.tl-kind-limits { font-size: var(--text-s); font-variant-numeric: tabular-nums; opacity: 0.85; }
+.tl-kind-limits { font-size: var(--text-s); font-variant-numeric: tabular-nums; }
 .tl-kind-hint { margin: 0; color: var(--color-ink-soft); font-size: var(--text-s); }
 
 /* ---- Kontroller ---- */
