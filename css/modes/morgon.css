@@ -16,9 +16,10 @@ html[data-theme="teacher"]:has(.morgon) { scrollbar-gutter: auto; }
      min-bredd, padding) multipliceras alla med denna via calc(). Ändra
      BARA här för att göra skärmen större/mindre — proportionerna följer
      med. 1 = storleken före #38; 0.896 = 0.8 × 1.12 (#42, 12 % större
-     än #38:s 0.8). Gäller endast inom .morgon, så
+     än #38:s 0.8); 0.842 = 0.896 × 0.94 (#104, 6 % mindre
+     än #42). Gäller endast inom .morgon, så
      lektionsplaneringens Bra jobbat-ruta påverkas inte. */
-  --morgon-scale: 0.896;
+  --morgon-scale: 0.842;
   --morgon-fallback: #2b3a34; /* lugn djupgrön om bilden inte laddar */
   position: relative;
   width: 100%;
