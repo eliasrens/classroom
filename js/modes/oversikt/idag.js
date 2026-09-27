@@ -13,6 +13,9 @@ import { SUBJECTS } from "../../lib/color.js";
 import { setActiveClass } from "../../ui/class-picker.js";
 import { plansPath as plansPathFor, setEditingPlanId } from "../../data/plans.js";
 import { createClass } from "../../data/classes.js";
+import {
+  MY_CLASSES_DOC, myClassesPath, myClassIds, filterClasses, withMyClass, saveMyClasses,
+} from "../../lib/my-classes.js";
 import { startOfWeek, inWeek, weekLabel, weekRangeLabel } from "../../lib/week.js";
 import { KIND_KEYS, KINDS, computeStats, mergedSubjects } from "../../lib/trafikljus-stats.js";
 import { PRAISE_DOC, praisePath, normalize as normalizeMorning, currentPraise } from "../../lib/morning.js";
@@ -60,6 +63,8 @@ export function mountIdag(el, { data, store }, { tabHref }) {
   let sessions = [];
   let actions = [];        // klassåtgärder (moln, delade — issue #34)
   let replies = [];
+  let myClassesDoc = null; // Mina klasser — lärarens privata val (issue #102)
+  let showAllClasses = false; // "Visa alla klasser (N till)" — tills nästa klassval
   const activeId = () => store.get().classId ?? null;
 
   // ---- Klassbyte från startvyn (persistas + speglas till elevskärm) ----
@@ -73,6 +78,9 @@ export function mountIdag(el, { data, store }, { tabHref }) {
     if (!name) return;
     // Dubblettsäkert: samma namn återanvänder befintlig klass (data/classes.js).
     const id = await createClass(data, name);
+    // Har läraren valt sina klasser kommer den nya klassen med automatiskt.
+    const mine = myClassIds(myClassesDoc);
+    if (id && mine) await saveMyClasses(data, withMyClass(mine, id));
     chooseClass(id);
   }
 
@@ -138,6 +146,10 @@ export function mountIdag(el, { data, store }, { tabHref }) {
   function render() {
     const cid = activeId();
     const cls = classes.find((c) => c.id === cid) ?? null;
+    // Mina klasser (issue #102): bara mina + den aktiva klassen.
+    const myClasses = filterClasses(classes, myClassIds(myClassesDoc), { keep: [cid] });
+    const hiddenClasses = classes.length - myClasses.length;
+    const shownClasses = showAllClasses ? classes : myClasses;
     const todaysPlans = plans
       .filter((p) => (p.date ?? "") === todayISO())
       .sort((a, b) => (a.start ?? "").localeCompare(b.start ?? "") ||
@@ -158,10 +170,14 @@ export function mountIdag(el, { data, store }, { tabHref }) {
       <section class="ov-section" aria-label="Klass">
         <h2 class="ov-section__title">Klass</h2>
         <div class="ov-classes">
-          ${[...classes].sort((a, b) => a.name.localeCompare(b.name, "sv")).map((c) => `
+          ${[...shownClasses].sort((a, b) => a.name.localeCompare(b.name, "sv")).map((c) => `
             <button class="ov-chip${c.id === cid ? " is-active" : ""}" data-class="${esc(c.id)}"
               aria-pressed="${c.id === cid}">${esc(c.name)}</button>`).join("")}
           <button class="ov-chip ov-chip--add" data-add>${icon("plus")} Ny klass</button>
+          ${hiddenClasses > 0 ? `
+          <button class="ov-link ov-classes__more" data-all-classes>${showAllClasses
+            ? "Visa bara mina klasser"
+            : `Visa alla klasser (${hiddenClasses} till)`}</button>` : ""}
         </div>
       </section>
 
@@ -205,9 +221,10 @@ export function mountIdag(el, { data, store }, { tabHref }) {
   el.addEventListener("click", (e) => {
     const cid = activeId();
     if (cid && handleClassActionClick(e, { data, cid, actions, replies })) return;
-    const t = e.target.closest("[data-class],[data-add],[data-mode],[data-plan]");
+    const t = e.target.closest("[data-class],[data-add],[data-mode],[data-plan],[data-all-classes]");
     if (!t) return;
-    if (t.dataset.class) chooseClass(t.dataset.class);
+    if (t.hasAttribute("data-all-classes")) { showAllClasses = !showAllClasses; render(); }
+    else if (t.dataset.class) chooseClass(t.dataset.class);
     else if (t.hasAttribute("data-add")) void addClass();
     else if (t.dataset.mode) goMode(t.dataset.mode);
     else if (t.dataset.plan) openPlan(t.dataset.plan);
@@ -215,6 +232,10 @@ export function mountIdag(el, { data, store }, { tabHref }) {
 
   // ---- Datakällor (live) ----
   offs.push(data.watch("classes", (docs) => { classes = docs; render(); }));
+  offs.push(data.watch(myClassesPath(), (docs) => {
+    myClassesDoc = docs.find((d) => d.id === MY_CLASSES_DOC) ?? null;
+    render();
+  }));
 
   const cid = activeId();
   if (cid) {

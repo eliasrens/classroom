@@ -65,6 +65,7 @@ js/
   lib/class-actions.js  klassåtgärder (#34): modell, namnspärr, koppling till klasstatistiken
   lib/color.js          ämnespalett + automatisk luminans/kontrast-uträkning
   lib/my-subjects.js    Mina ämnen (#81): lärarens privata ämnesval + filtrering
+  lib/my-classes.js     Mina klasser (#102): lärarens privata klassval + filtrering
   lib/icons.js          linje-ikoner (inline-SVG) — inga emoji i gränssnittet
   lib/names.js          elevnamn: endast förnamn, valfri tag
   lib/privacy.js        integritet: auto-radering av noteringar + radera all klassdata

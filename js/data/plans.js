@@ -53,6 +53,37 @@ export function lessonSettingsPath(cid, uid = currentUid()) {
   return `teachers/${uid}/classes/${cid}/settings`;
 }
 
+const pad2 = (n) => String(n).padStart(2, "0");
+const isoLocal = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const minutesOf = (hhmm) => {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm ?? ""));
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+};
+
+/**
+ * Planeringen elevskärmen visar, eller null (tomläge).
+ * `doc` = lärarens privata settings/lektion (null = finns inte ännu).
+ *  - Dokumentet finns → exakt presentedPlanId. Saknas planeringen (t.ex.
+ *    borttagen) blir det tomläge — aldrig ett tyst byte till en annan.
+ *  - Dokumentet finns inte (första användningen) → dagens planering som
+ *    förval: den som senast började, annars dagens första.
+ * (Flyttad hit från lektion.js i issue #103 — "Skicka kopia till klass"
+ * behöver samma regel för målklassen.)
+ */
+export function presentedPlanOf(plans, doc, now) {
+  if (doc) {
+    const id = doc.value?.presentedPlanId ?? null;
+    return id ? plans.find((p) => p.id === id) ?? null : null;
+  }
+  const d = new Date(now);
+  const today = isoLocal(d);
+  const nowMin = d.getHours() * 60 + d.getMinutes();
+  const todays = plans.filter((p) => p.date === today).sort((a, b) =>
+    (a.start ?? "").localeCompare(b.start ?? "") || (a.name ?? "").localeCompare(b.name ?? "", "sv"));
+  const started = todays.filter((p) => (minutesOf(p.start) ?? Infinity) <= nowMin);
+  return started.at(-1) ?? todays[0] ?? null;
+}
+
 /**
  * Planeringen som är öppen i redigeraren — bara UI-tillstånd för just
  * den här fliken (sessionStorage), aldrig datalagret. Översikten sätter
