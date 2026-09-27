@@ -16,7 +16,7 @@ import { createPraiseBoard } from "../ui/praise-board.js";
 import {
   WEEKDAYS,
   normalize, loadMorning, saveMorning, saveBackground, watchMorning,
-  studentTextFor, orderedTasks, greetingText, currentPraise, praiseIsStale,
+  studentTextFor, seedStudentText, orderedTasks, greetingText, currentPraise, praiseIsStale,
 } from "../lib/morning.js";
 import { rolloverPraise } from "../lib/week-rhythm.js";
 import { weekKey } from "../lib/week.js";
@@ -262,23 +262,101 @@ export default {
       });
       taskList.addEventListener("click", (e) => {
         const editBtn = e.target.closest("button[data-edit]");
-        if (editBtn) {
-          const t = settings.tasks.find((x) => x.id === editBtn.dataset.edit);
-          if (!t) return;
-          const val = prompt("Text som visas för eleverna:", studentTextFor(t));
-          if (val == null) return;
-          const next = clone();
-          const nt = next.tasks.find((x) => x.id === t.id);
-          if (nt) nt.studentText = val.trim() || nt.label;
-          commit(next);
-          return;
-        }
+        if (editBtn) { startEdit(editBtn.dataset.edit); return; }
+        if (e.target.closest("button[data-edit-save]")) { saveEdit(); return; }
+        if (e.target.closest("button[data-edit-cancel]")) { cancelEdit(); return; }
+        const resetBtn = e.target.closest("button[data-reset]");
+        if (resetBtn) { resetText(resetBtn.dataset.reset); return; }
         const delBtn = e.target.closest("button[data-del]");
         if (delBtn) {
           const next = clone();
           next.tasks = next.tasks.filter((x) => x.id !== delBtn.dataset.del);
           commit(next).then(renderTaskControls); // rad borta ur listan
         }
+      });
+
+      // ---- Redigera elevtexten direkt i raden (issue #87, ingen prompt()) ----
+      // Fast uppgift: raden "Eleverna ser" blir ett textfält. Egen uppgift:
+      // namnet (= elevtexten) redigeras i raden. Enter/✓ sparar, Esc/✕
+      // avbryter, klick utanför sparar. Tom text sparas aldrig.
+      let editing = null; // { id } medan ett textfält är öppet
+      let rebuilding = false;
+      const editInput = () => taskList.querySelector(".morgon__task-edit");
+
+      function startEdit(id) {
+        const t = settings.tasks.find((x) => x.id === id);
+        if (!t || t.kind === "starten") return;
+        editing = { id };
+        renderTaskControls();
+        const input = editInput();
+        input?.focus();
+        input?.select();
+      }
+      function endEdit({ focusPen }) {
+        const id = editing?.id;
+        editing = null;
+        renderTaskControls();
+        if (focusPen && id) taskList.querySelector(`button[data-edit="${CSS.escape(id)}"]`)?.focus();
+      }
+      function cancelEdit({ fromBlur = false } = {}) {
+        if (editing) endEdit({ focusPen: !fromBlur });
+      }
+      function saveEdit({ fromBlur = false } = {}) {
+        const input = editInput();
+        if (!editing || !input) return;
+        const val = input.value.trim();
+        if (!val) {
+          // Tom text: klick utanför avbryter, Enter/✓ visar en diskret hint.
+          if (fromBlur) { cancelEdit({ fromBlur }); return; }
+          input.setAttribute("aria-invalid", "true");
+          taskList.querySelector(".morgon__task-edithint")?.removeAttribute("hidden");
+          input.focus();
+          return;
+        }
+        const next = clone();
+        const t = next.tasks.find((x) => x.id === editing.id);
+        if (t && val !== studentTextFor(t)) {
+          if (t.kind === "custom") t.label = val;
+          t.studentText = val;
+          void commit(next);
+        } else if (t?.kind === "custom" && t.label !== val) {
+          t.label = val; // äldre data där namn och elevtext skilde sig
+          void commit(next);
+        }
+        endEdit({ focusPen: !fromBlur });
+      }
+      function resetText(id) {
+        const original = seedStudentText(id);
+        if (original == null) return;
+        const next = clone();
+        const t = next.tasks.find((x) => x.id === id);
+        if (t) t.studentText = original;
+        editing = null;
+        void commit(next);
+        renderTaskControls();
+        taskList.querySelector(`button[data-edit="${CSS.escape(id)}"]`)?.focus();
+      }
+      // Knapparna i redigeringsläget tar inte fokus från textfältet — annars
+      // hinner "klick utanför sparar" köra innan ✕ (i webbläsare där knappar
+      // inte får fokus vid klick blir relatedTarget null).
+      taskList.addEventListener("pointerdown", (e) => {
+        if (e.target.closest("[data-edit-save], [data-edit-cancel], .morgon__task-editfoot [data-reset]")) e.preventDefault();
+      });
+      taskList.addEventListener("keydown", (e) => {
+        if (!e.target.matches(".morgon__task-edit")) return;
+        if (e.key === "Enter") { e.preventDefault(); saveEdit(); }
+        else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); cancelEdit(); }
+      });
+      taskList.addEventListener("input", (e) => {
+        if (!e.target.matches(".morgon__task-edit")) return;
+        e.target.removeAttribute("aria-invalid");
+        taskList.querySelector(".morgon__task-edithint")?.setAttribute("hidden", "");
+      });
+      taskList.addEventListener("focusout", (e) => {
+        if (rebuilding || !editing || !e.target.matches(".morgon__task-edit")) return;
+        const row = e.target.closest(".morgon__task");
+        if (e.relatedTarget && row?.contains(e.relatedTarget)) return; // ✓/✕ i samma rad
+        saveEdit({ fromBlur: true });
       });
 
       const addInput = $(".morgon__addtask-input");
@@ -424,7 +502,20 @@ export default {
 
       renderTaskControls = () => {
         if (!mounted()) return;
-        taskList.innerHTML = settings.tasks.map(taskRow).join("");
+        // Uppgiften som redigeras kan ha tagits bort (t.ex. från en annan dator).
+        if (editing && !settings.tasks.some((t) => t.id === editing.id)) editing = null;
+        // Ett öppet textfält överlever ombyggnaden (ändring från annat fönster).
+        const open = editing && editInput();
+        const keep = open && { value: open.value, start: open.selectionStart, end: open.selectionEnd, focused: open === document.activeElement };
+        rebuilding = true;
+        try {
+          taskList.innerHTML = settings.tasks.map((t) => taskRow(t, editing?.id === t.id)).join("");
+        } finally { rebuilding = false; }
+        const input = keep && editInput();
+        if (input) {
+          input.value = keep.value;
+          if (keep.focused) { input.focus(); input.setSelectionRange(keep.start, keep.end); }
+        }
         syncPanel();
       };
 
@@ -611,31 +702,78 @@ function bgSummaryHTML(bg) {
     + `<img class="morgon__bg-thumb" src="${escapeAttr(thumbUrl(url))}" alt="" loading="lazy">`;
 }
 
-function taskRow(t) {
+function taskRow(t, isEditing = false) {
+  const id = escapeAttr(t.id);
+  const shown = studentTextFor(t);
   // Startens veckodag: dag-chips (Mån–Fre) på egen rad under namnet
   // (issue #85) — ett klick, alltid synliga, får alltid plats i panelen.
   const control = t.kind === "starten"
     ? `<div class="morgon__days" role="radiogroup" aria-label="Veckodag för Starten">
          ${WEEKDAYS.map((d) => `<label class="morgon__day" title="${d}">
-           <input type="radio" name="weekday-${escapeAttr(t.id)}" value="${d}" data-weekday="${escapeAttr(t.id)}" aria-label="${d}"${d === t.weekday ? " checked" : ""}>
+           <input type="radio" name="weekday-${id}" value="${d}" data-weekday="${id}" aria-label="${d}"${d === t.weekday ? " checked" : ""}>
            <span aria-hidden="true">${d.slice(0, 3)}</span>
          </label>`).join("")}
        </div>`
     : "";
-  const actions = t.kind === "custom"
-    ? `<button class="morgon__task-btn" data-edit="${escapeAttr(t.id)}" title="Ändra elevtext" aria-label="Ändra elevtext">${icon("pencil")}</button>
-       <button class="morgon__task-btn" data-del="${escapeAttr(t.id)}" title="Ta bort" aria-label="Ta bort uppgift">${icon("x")}</button>`
-    : t.kind === "fixed"
-      ? `<button class="morgon__task-btn" data-edit="${escapeAttr(t.id)}" title="Ändra elevtext" aria-label="Ändra elevtext">${icon("pencil")}</button>`
-      : "";
-  return `
-    <div class="morgon__task">
+  const checkbox = `<input type="checkbox" data-task="${id}">`;
+  const pen = (title) => `<button class="morgon__task-btn" data-edit="${id}" title="${title}" aria-label="${title}">${icon("pencil")}</button>`;
+  const editButtons = `
+    <button class="morgon__task-btn" data-edit-save title="Spara (Enter)" aria-label="Spara">${icon("check")}</button>
+    <button class="morgon__task-btn" data-edit-cancel title="Avbryt (Esc)" aria-label="Avbryt">${icon("x")}</button>`;
+  const editField = (label) => `<input class="morgon__task-edit" type="text" value="${escapeAttr(shown)}" autocomplete="off" aria-label="${label}">`;
+  const original = t.kind === "fixed" ? seedStudentText(t.id) : null;
+  const modified = original != null && t.studentText !== original;
+  const resetBtn = modified
+    ? `<button class="morgon__task-link" data-reset="${id}" title="Tillbaka till: ${escapeAttr(original)}">Återställ</button>`
+    : "";
+  const editFoot = (extra = "") => `
+    <div class="morgon__task-editfoot">
+      <span class="morgon__task-edithint" role="alert" hidden>Texten kan inte vara tom.</span>
+      ${extra}
+    </div>`;
+
+  let main = `
       <label class="morgon__task-main">
-        <input type="checkbox" data-task="${escapeAttr(t.id)}">
+        ${checkbox}
         <span class="morgon__task-label" title="${escapeAttr(t.label)}">${escapeHtml(t.label)}</span>
-      </label>
+      </label>`;
+  let actions = t.kind === "custom"
+    ? `${pen("Ändra uppgiften")}
+       <button class="morgon__task-btn" data-del="${id}" title="Ta bort" aria-label="Ta bort uppgift">${icon("x")}</button>`
+    : t.kind === "fixed" ? pen("Ändra elevtext") : "";
+  // "Eleverna ser: …" — bara när elevtexten skiljer sig från namnet.
+  let sub = shown !== t.label || modified
+    ? `<div class="morgon__task-sub">
+         <span class="morgon__task-student" title="${escapeAttr(shown)}">Eleverna ser: ${escapeHtml(shown)}</span>
+         ${resetBtn}
+       </div>`
+    : "";
+
+  if (isEditing && t.kind === "fixed") {
+    actions = "";
+    sub = `
+      <div class="morgon__task-sub morgon__task-editor">
+        <span class="morgon__task-sublabel">Eleverna ser:</span>
+        ${editField(`Text som eleverna ser för ${t.label}`)}
+        ${editButtons}
+      </div>
+      ${editFoot(resetBtn)}`;
+  } else if (isEditing && t.kind === "custom") {
+    main = `
+      <div class="morgon__task-main morgon__task-editor">
+        ${checkbox}
+        ${editField("Uppgiftens text")}
+      </div>`;
+    actions = editButtons;
+    sub = editFoot();
+  }
+
+  return `
+    <div class="morgon__task${isEditing ? " is-editing" : ""}">
+      ${main}
       ${control}
       <span class="morgon__task-actions">${actions}</span>
+      ${sub}
     </div>`;
 }
 
