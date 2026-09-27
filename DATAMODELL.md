@@ -403,7 +403,9 @@ teachers/{uid}/classes/{classId}/lessonPlans/{planId}
                        lärares egna ämnen skrivs aldrig över). Målklassens
                        settings/lektion rörs inte; finns det inte ännu låses
                        elevskärmens förval på det som visas nu, så att
-                       kopian aldrig tar över elevskärmen.
+                       kopian aldrig tar över elevskärmen (data.once utan
+                       allowLocal — offline hoppas låsningen över hellre än
+                       att skriva över ett val gjort på en annan dator).
 
 teachers/{uid}/classes/{classId}/settings/lektion
                      — vad elevskärmen visar i Läge 2 (issue #39). PRIVAT

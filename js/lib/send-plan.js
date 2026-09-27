@@ -100,7 +100,11 @@ export function findDuplicates(targetPlans, copies, uid = currentUid()) {
 
 /**
  * Lås målklassens elevskärmsförval (se huvudkommentaren). Finns
- * settings/lektion redan rörs det inte.
+ * settings/lektion redan rörs det inte. Bara mot SERVERNS version (eller
+ * lokalt läge) — inte allowLocal: offline på en dator där målklassen aldrig
+ * öppnats saknas dokumentet i cachen även om läraren valt något på en annan
+ * dator, och en köad låsning skulle då skriva över det valet (elevskärmen
+ * kunde bli tom). Offline hoppas låsningen hellre över.
  */
 async function pinTargetDefault(data, cid, now) {
   const path = lessonSettingsPath(cid);
@@ -108,7 +112,7 @@ async function pinTargetDefault(data, cid, now) {
   await data.once(path, LESSON_SETTINGS_DOC, (doc) => doc ? null : [{
     path,
     doc: { id: LESSON_SETTINGS_DOC, value: { presentedPlanId: presentedPlanOf(plans, null, now)?.id ?? null } },
-  }], { allowLocal: true });
+  }]);
 }
 
 /**
