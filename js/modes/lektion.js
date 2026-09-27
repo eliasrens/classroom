@@ -14,6 +14,14 @@
  *   kommande vecka), ta bort en eller flera (med bekräftelse). En sparad
  *   lektion öppnas med exakt samma kryssval. Planeringar raderas ALDRIG
  *   automatiskt — bara när läraren själv tar bort dem.
+ * - "Skicka kopia till klass…" (issue #103, ⋯-menyn direkt efter Kopiera,
+ *   och "Skicka markerade till klass…" i Välj flera): en oberoende kopia
+ *   till en ANNAN klass, med datum/tid inställda direkt i dialogen
+ *   (js/ui/send-plan-dialog.js, logik i js/lib/send-plan.js). Eget ämne
+ *   följer med till målklassens settings/subjects; målklassens elevskärm
+ *   rörs inte. Läraren står kvar i sin klass och planering — statusraden
+ *   visar "Kopia skickad till 4B · …" med knappen "Öppna i 4B"
+ *   (setActiveClass + setEditingPlanId).
  * - Tavlans text skalas mot tavlans bredd och krymps stegvis BARA när
  *   innehållet inte ryms (fitBoard) — tavlan scrollar aldrig.
  * - Valfri "Bra jobbat"-ruta i högerkolumnen (show.praise), samma
@@ -36,7 +44,8 @@
  *   och "Fält" (standard: infällda, med sammanfattning). Läget sparas per
  *   dator i localStorage. Innehållet i blocken är oförändrat.
  * - Städad verktygsrad + flikar (issue #82): rad 1 är "+ Ny planering" och
- *   en ⋯-meny (Kopiera/Ta bort/Välj flera, js/ui/menu-button.js), rad 2
+ *   en ⋯-meny (Kopiera/Skicka kopia till klass…/Ta bort/Välj flera,
+ *   js/ui/menu-button.js), rad 2
  *   sök + ämnesfilter. Under dem en flikrad Denna vecka · Kommande · Arkiv
  *   (vald flik sparas per dator i localStorage). Sök/filter gäller inom
  *   fliken; träffar i andra flikar visas som en diskret rad. Lärarvyn
@@ -62,7 +71,7 @@ import {
 import { openMySubjectsDialog } from "../ui/my-subjects-dialog.js";
 import {
   plansPath as plansPathFor, currentUid,
-  lessonSettingsPath, LESSON_SETTINGS_DOC, getEditingPlanId, setEditingPlanId,
+  lessonSettingsPath, LESSON_SETTINGS_DOC, getEditingPlanId, setEditingPlanId, presentedPlanOf,
 } from "../data/plans.js";
 import { createPraiseBoard } from "../ui/praise-board.js";
 import { normalize as normalizeMorning, PRAISE_DOC, praisePath } from "../lib/morning.js";
@@ -71,6 +80,8 @@ import { serverNow } from "../lib/clock.js";
 import { openClassActionDialog } from "../ui/class-actions.js";
 import { collapsibleHTML, mountCollapsibles } from "../ui/collapsible.js";
 import { createMenuButton } from "../ui/menu-button.js";
+import { openSendPlanDialog } from "../ui/send-plan-dialog.js";
+import { setActiveClass } from "../ui/class-picker.js";
 
 /* De nio av-/påslagbara delarna, i den ordning kryssrutorna visas.
    `slot` säger var i tavlan de bor; `list` = flerradsfält. */
@@ -122,35 +133,6 @@ function nextSameWeekday(iso) {
   let x = d;
   while (x < today) x = addDays(x, 7);
   return isoLocal(x);
-}
-
-/* ---- Vilken planering visas för eleverna? ---- */
-
-const minutesOf = (hhmm) => {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm ?? ""));
-  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
-};
-
-/**
- * Planeringen elevskärmen visar, eller null (tomläge).
- * `doc` = lärarens privata settings/lektion (null = finns inte ännu).
- *  - Dokumentet finns → exakt presentedPlanId. Saknas planeringen (t.ex.
- *    borttagen) blir det tomläge — aldrig ett tyst byte till en annan.
- *  - Dokumentet finns inte (första användningen) → dagens planering som
- *    förval: den som senast började, annars dagens första.
- */
-function presentedPlanOf(plans, doc, now) {
-  if (doc) {
-    const id = doc.value?.presentedPlanId ?? null;
-    return id ? plans.find((p) => p.id === id) ?? null : null;
-  }
-  const d = new Date(now);
-  const today = isoLocal(d);
-  const nowMin = d.getHours() * 60 + d.getMinutes();
-  const todays = plans.filter((p) => p.date === today).sort((a, b) =>
-    (a.start ?? "").localeCompare(b.start ?? "") || (a.name ?? "").localeCompare(b.name ?? "", "sv"));
-  const started = todays.filter((p) => (minutesOf(p.start) ?? Infinity) <= nowMin);
-  return started.at(-1) ?? todays[0] ?? null;
 }
 
 /** "Matte · tis 22 sep · 10:15" — kort etikett för raden "Eleverna ser". */
@@ -618,6 +600,7 @@ export default {
                 <button type="button" class="btn btn--icon plan-more__btn" data-el="more-btn" title="Fler åtgärder" aria-label="Fler åtgärder">${icon("more")}</button>
                 <div class="plan-more__menu" data-el="more-menu" aria-label="Fler åtgärder">
                   <button type="button" role="menuitem" class="plan-more__item" data-act="dup" title="Kopiera den valda planeringen till samma veckodag, idag eller framåt">${icon("copy")} Kopiera</button>
+                  <button type="button" role="menuitem" class="plan-more__item" data-act="send" title="Skicka en kopia av den valda planeringen till en annan klass — du ställer in datum och tid direkt">${icon("copy")} Skicka kopia till klass…</button>
                   <button type="button" role="menuitem" class="plan-more__item" data-act="del" title="Ta bort den valda planeringen">${icon("trash")} Ta bort</button>
                   <button type="button" role="menuitem" class="plan-more__item" data-act="select" aria-pressed="false" title="Markera flera planeringar och ta bort dem på en gång">${icon("check")} Välj flera</button>
                 </div>
@@ -1038,6 +1021,7 @@ export default {
       bulkEl.innerHTML = `
         <span class="plan-bulk__count">${n} markerade</span>
         <button class="btn" data-act="select-all">Markera alla synliga</button>
+        <button class="btn" data-act="send-selected" ${n ? "" : "disabled"}>${icon("copy")} Skicka markerade till klass…</button>
         <button class="btn plan-danger" data-act="del-selected" ${n ? "" : "disabled"}>${icon("trash")} Ta bort markerade</button>
         <button class="btn btn--ghost" data-act="select-done">Klar</button>`;
     }
@@ -1057,11 +1041,16 @@ export default {
     }
 
     let statusTimer = 0;
-    function flash(msg) {
+    // `action` = { act, label } — en knapp i statusraden (t.ex. "Öppna i 4B").
+    // Raden står då kvar lite längre så att läraren hinner trycka.
+    function flash(msg, action = null) {
       statusEl.textContent = msg;
+      if (action) {
+        statusEl.insertAdjacentHTML("beforeend", ` <button type="button" class="plan-status__act" data-act="${esc(action.act)}">${esc(action.label)}</button>`);
+      }
       statusEl.hidden = false;
       clearTimeout(statusTimer);
-      statusTimer = setTimeout(() => { statusEl.hidden = true; }, 5000);
+      statusTimer = setTimeout(() => { statusEl.hidden = true; }, action ? 12000 : 5000);
     }
     this._offs.push(() => clearTimeout(statusTimer));
 
@@ -1178,6 +1167,41 @@ export default {
       flash(`Kopierad till ${d ? fmtDay(d) : copy.date} — byt datum under "Om lektionen" om det behövs`);
     }
 
+    // -- Skicka kopia till klass (issue #103) --
+    // Kopian hamnar i en ANNAN klass (js/lib/send-plan.js); läraren står
+    // kvar i sin klass och sin planering. "Öppna i 4B" i statusraden byter
+    // klass och öppnar kopian i redigeraren.
+    let lastSent = null; // { cid, id } — målet för "Öppna i …"
+    async function sendPlans(list) {
+      if (!list.length) return;
+      const result = await openSendPlanDialog({
+        data, currentCid: activeClass.id, plans: list.map(normalizePlan), subjects, now: serverNow(),
+      });
+      if (!result) return;
+      const { cid, className, ids, copies } = result;
+      // Vid flera öppnar "Öppna i …" den tidigaste kopian.
+      const first = copies.map((c, i) => ({ c, id: ids[i] })).sort((a, b) =>
+        (a.c.date ?? "").localeCompare(b.c.date ?? "") || (a.c.start ?? "").localeCompare(b.c.start ?? ""))[0];
+      lastSent = { cid, id: first.id };
+      let msg;
+      if (copies.length === 1) {
+        const c = copies[0];
+        const d = parseISO(c.date);
+        const t = c.start ? `${c.start}${c.end ? "–" + c.end : ""}` : "";
+        // "Kopia skickad till 4B · tis 29 sep. 10:10–11:00"
+        const when = [d ? fmtDay(d) : c.date, t].filter(Boolean).join(" ");
+        msg = `Kopia skickad till ${className}${when ? ` · ${when}` : ""}`;
+      } else {
+        msg = `${copies.length} kopior skickade till ${className}`;
+      }
+      flash(msg, { act: "open-sent", label: `Öppna i ${className}` });
+    }
+    function openSent() {
+      if (!lastSent) return;
+      setEditingPlanId(lastSent.cid, lastSent.id);
+      setActiveClass(store, lastSent.cid); // klassbytet monterar om läget
+    }
+
     async function removePlans(ids) {
       // Tas den visade planeringen bort blir elevskärmen tom ("Ingen
       // planering visas") — den byter aldrig i tysthet till en annan.
@@ -1235,6 +1259,8 @@ export default {
         if (id && mine()) await saveMine(data, withMine(mine(), id));
       }
       else if (act === "dup") await copyPlan(editingPlan());
+      else if (act === "send") { const p = editingPlan(); if (p) await sendPlans([p]); }
+      else if (act === "open-sent") openSent();
       else if (act === "del") {
         const p = editingPlan();
         if (!p) return;
@@ -1253,6 +1279,9 @@ export default {
         selecting = false;
         selected.clear();
         renderList();
+      } else if (act === "send-selected") {
+        if (!selected.size) return;
+        await sendPlans(sortedPlans().filter((p) => selected.has(p.id)));
       } else if (act === "del-selected") {
         if (!selected.size) return;
         pendingDelete = [...selected];

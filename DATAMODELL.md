@@ -393,6 +393,19 @@ teachers/{uid}/classes/{classId}/lessonPlans/{planId}
                      — planeringar skapas och raderas aldrig automatiskt
                        (ingen testdata/auto-seed, ingen veckostädning);
                        bara läraren själv skapar, kopierar och tar bort
+                     — "Skicka kopia till klass…" (issue #103,
+                       js/lib/send-plan.js) skriver en OBEROENDE kopia (nytt
+                       id, samma ownerUid) till lärarens egen
+                       teachers/{uid}/classes/{annanKlass}/lessonPlans. Är
+                       ämnet ett eget ämne som saknas i målklassens DELADE
+                       classes/{annanKlass}/settings/subjects läggs det
+                       (id, namn, färg) först till där (data.once — andra
+                       lärares egna ämnen skrivs aldrig över). Målklassens
+                       settings/lektion rörs inte; finns det inte ännu låses
+                       elevskärmens förval på det som visas nu, så att
+                       kopian aldrig tar över elevskärmen (data.once utan
+                       allowLocal — offline hoppas låsningen över hellre än
+                       att skriva över ett val gjort på en annan dator).
 
 teachers/{uid}/classes/{classId}/settings/lektion
                      — vad elevskärmen visar i Läge 2 (issue #39). PRIVAT
