@@ -395,6 +395,11 @@
 .field-edit input[type="checkbox"] { width: 1.05em; height: 1.05em; accent-color: var(--color-accent); cursor: pointer; }
 .field-edit textarea, .field-edit input[type="text"] { margin-top: var(--space-2); }
 .field-edit__hint { font-size: 0.72rem; color: var(--color-ink-soft); margin-top: 2px; }
+/* Bra jobbat: samma redigerare som på morgonskärmen (css/ui/praise-editor.css),
+   bara synlig när "Visa Bra jobbat" är ikryssad (issue #112). */
+.field-edit__praise { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); margin-top: var(--space-2); }
+.field-edit__praise[hidden] { display: none; }
+.field-edit .praise-editor__add input[type="text"] { margin-top: 0; }
 
 /* ============================================================
    TAVLAN — 6-fältslayout. Delas av lärarförhandsvisning och elevvy.

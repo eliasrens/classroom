@@ -96,6 +96,8 @@ js/
   ui/class-actions.js   klassåtgärder: dialoger (ny/ändra, "Testade också") + listan
   ui/help.js            genvägslista under "?" · ui/shortcuts.js  globala tangentgenvägar
   ui/praise-board.js    "Bra jobbat"-tavlan (växer i kolumner, scrollar aldrig) — morgonskärm, lektion
+  ui/praise-editor.js   "Bra jobbat"-redigeraren (elevkryssrutor, fritext, Töm) — morgonskärm, lektion
+  lib/praise-edit.js    Bra jobbat-ändringar: kryssa i/ur, fritext, ny lista när den gamla hör till förra veckan
 fonts/andika/           Andika (SIL, OFL.txt) — självhostat för Skrivtavlan, fungerar offline
 firestore.rules         Firestore-säkerhetsregler: inloggning krävs för all läs/skriv
 firebase.json           pekar firebase-CLI:t på firestore.rules (för deploy av regler)

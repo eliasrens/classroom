@@ -27,6 +27,8 @@
  * - Valfri "Bra jobbat"-ruta i högerkolumnen (show.praise), samma
  *   komponent och data som morgonskärmen (js/ui/praise-board.js,
  *   LOKALA classes/{id}/praise/board — elevdata, aldrig i molnet).
+ *   När "Visa Bra jobbat" är ikryssad väljs namnen direkt i fältet med
+ *   samma redigerare som på morgonskärmen (js/ui/praise-editor.js, #112).
  * - Ämnesfärg + automatisk läsbar text (luminans, js/lib/color.js);
  *   läraren kan lägga till egna ämnen/färger utan oläslig text.
  * - "Redigerar nu" och "Visas för eleverna" är två skilda saker (issue #39):
@@ -74,7 +76,9 @@ import {
   lessonSettingsPath, LESSON_SETTINGS_DOC, getEditingPlanId, setEditingPlanId, presentedPlanOf,
 } from "../data/plans.js";
 import { createPraiseBoard } from "../ui/praise-board.js";
-import { normalize as normalizeMorning, PRAISE_DOC, praisePath } from "../lib/morning.js";
+import { praiseEditorHTML, mountPraiseEditor } from "../ui/praise-editor.js";
+import { normalize as normalizeMorning, PRAISE_DOC, praisePath, currentPraise } from "../lib/morning.js";
+import { editPraise } from "../lib/praise-edit.js";
 import { studentLabel } from "../lib/names.js";
 import { serverNow } from "../lib/clock.js";
 import { openClassActionDialog } from "../ui/class-actions.js";
@@ -484,7 +488,10 @@ export default {
     // "Bra jobbat"-namnen: samma LOKALA data som morgonskärmen (issue #32) —
     // listan innehåller elevdata och lagras bara på den här datorn.
     let praiseItems = [];
+    let praiseWeekOf = null;
     let students = [];
+    // Listan som ska VISAS nu — tom om den hör till förra veckan (som på morgonskärmen).
+    const shownPraise = () => currentPraise({ praise: praiseItems, weekOf: praiseWeekOf });
 
     const settingDoc = (id) => this._settings?.find((d) => d.id === id) ?? null;
 
@@ -518,7 +525,7 @@ export default {
     this._offs.push(() => praiseBoard.destroy());
 
     function praiseNames() {
-      return praiseItems.map((p) => {
+      return shownPraise().map((p) => {
         if (p.kind === "free") return p.text;
         const s = students.find((x) => x.id === p.studentId);
         return s ? studentLabel(s) : null;
@@ -528,7 +535,7 @@ export default {
       board: praiseBoard,
       names: praiseNames(),
       // Elevvyn visar aldrig en tom ruta; läraren får en ledtråd i förhandsvisningen.
-      emptyText: isTeacher ? "Inga namn ännu — kryssa i elever på Morgonskärmen" : "",
+      emptyText: isTeacher ? "Inga namn ännu — kryssa i elever under Visa Bra jobbat" : "",
     });
 
     function applySharedSettings(docs) {
@@ -540,7 +547,9 @@ export default {
     const watchPraise = (onChange) => {
       this._offs.push(data.watch(praisePath(activeClass.id), (docs) => {
         const board = docs.find((d) => d.id === PRAISE_DOC);
-        praiseItems = normalizeMorning({ praise: board?.praise }).praise;
+        const norm = normalizeMorning({ praise: board?.praise, weekOf: board?.weekOf });
+        praiseItems = norm.praise;
+        praiseWeekOf = norm.weekOf;
         onChange();
       }));
     };
@@ -894,19 +903,40 @@ export default {
           ${input}
         </div>`;
       });
-      // Bra jobbat: bara en kryssruta — namnen väljs på morgonskärmen (delad data).
-      const n = praiseNames().length;
+      // Bra jobbat: kryssrutan + (bara när den är ikryssad) samma redigerare
+      // som på morgonskärmen — samma LOKALA lista (issue #112).
       rows.push(`<div class="field-edit${plan.show.praise ? "" : " field-edit--off"}" data-fieldwrap="praise">
         <div class="field-edit__head">
           <label><input type="checkbox" data-show="praise" ${plan.show.praise ? "checked" : ""}> Visa Bra jobbat</label>
         </div>
-        <p class="field-edit__hint" data-el="praise-hint">${praiseHint(n)}</p>
+        <p class="field-edit__hint">Visas i högerkolumnen (delar plats med "När du är klar"). Samma lista som på Morgonskärmen — ändringar syns på båda.</p>
+        <div class="field-edit__praise" data-el="praise-editor"${plan.show.praise ? "" : " hidden"}>${praiseEditorHTML()}</div>
       </div>`);
       return rows.join("");
     }
-    function praiseHint(n) {
-      const count = n === 0 ? "Inga namn just nu" : n === 1 ? "1 namn just nu" : `${n} namn just nu`;
-      return `Visas i högerkolumnen (delar plats med "När du är klar"). Samma namn som på Morgonskärmen — ${count}.`;
+
+    // -- Bra jobbat-redigeraren i fältet (monteras om med fälten) --
+    let praiseEditor = null;
+    this._offs.push(() => praiseEditor?.destroy());
+    function mountFieldPraise() {
+      praiseEditor?.destroy();
+      praiseEditor = null;
+      const root = fieldsEl.querySelector('[data-el="praise-editor"]');
+      if (!root) return;
+      praiseEditor = mountPraiseEditor(root, {
+        // Bara listan skrivs (lokalt) — morgonskärmens övriga inställningar rörs inte.
+        edit: (fn) => editPraise({
+          data, classId: activeClass.id,
+          get: () => ({ praise: praiseItems, weekOf: praiseWeekOf }),
+          commit: (next) => data.put(praisePath(activeClass.id), { id: PRAISE_DOC, praise: next.praise, weekOf: next.weekOf }),
+        }, fn),
+      });
+      syncFieldPraise({ students: true });
+    }
+    function syncFieldPraise({ students: withStudents = false } = {}) {
+      if (!praiseEditor) return;
+      if (withStudents) praiseEditor.setStudents(students);
+      praiseEditor.setPraise(shownPraise());
     }
 
     // -- Sparade planeringar-lista --
@@ -1111,7 +1141,7 @@ export default {
       const disabled = !p;
       for (const inp of metaInputs()) inp.disabled = disabled;
       editorFor = p?.id ?? null;
-      if (!p) { fieldsEl.innerHTML = ""; return; }
+      if (!p) { fieldsEl.innerHTML = ""; mountFieldPraise(); return; }
       const np = normalizePlan(p);
       el.querySelector('[data-meta="name"]').value = np.name;
       el.querySelector('[data-meta="date"]').value = np.date;
@@ -1120,6 +1150,7 @@ export default {
       fillSubjectSelect(el.querySelector('[data-meta="subjectId"]'), np.subjectId);
       renderSubjectHint();
       fieldsEl.innerHTML = fieldsHTML(np);
+      mountFieldPraise();
     }
     function syncEditor() {
       if ((editingPlan()?.id ?? null) !== editorFor) renderEditor();
@@ -1346,6 +1377,10 @@ export default {
         const show = { ...normalizePlan(p).show, [showKey]: e.target.checked };
         await patchEditing({ show });
         e.target.closest("[data-fieldwrap]")?.classList.toggle("field-edit--off", !e.target.checked);
+        if (showKey === "praise") {
+          const editor = fieldsEl.querySelector('[data-el="praise-editor"]');
+          if (editor) editor.hidden = !e.target.checked;
+        }
         renderPreview();
       }
     });
@@ -1376,8 +1411,7 @@ export default {
     // ---- Watchers: håll listan/förhandsvisningen live ----
     // (även vid ändringar från elevfönster/annan flik via storage-event)
     const refreshPraise = () => {
-      const hint = fieldsEl.querySelector('[data-el="praise-hint"]');
-      if (hint) hint.textContent = praiseHint(praiseNames().length);
+      syncFieldPraise();
       renderPreview();
     };
 
@@ -1387,7 +1421,7 @@ export default {
       applySharedSettings.call(this, docs);
       refreshPraise();
     }));
-    watchStudents(refreshPraise);
+    watchStudents(() => { syncFieldPraise({ students: true }); refreshPraise(); });
     watchPraise(refreshPraise);
     // Mina ämnen (issue #81) — lärarens privata val, kan ändras från
     // dialogen här, från Översikt › Inställningar eller en annan enhet.
