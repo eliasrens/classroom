@@ -90,6 +90,12 @@ export function renderCard(el, api) {
       api.cardStudentId = btn.dataset.open;
       api._cardSearch = "";
       api._cardFollowOnly = false;
+      // Uttaget, insatsformuläret och en pågående radredigering hör till
+      // FÖRRA eleven — en annan elevs uttag får aldrig stå kvar under
+      // det nya kortet (QA #94).
+      api._cardExport = null;
+      api._cardInsats = false;
+      api._cardEditingNote = null;
       api.refresh();
     }
   });

@@ -113,7 +113,14 @@ export function openMySubjectsDialog({ data, subjects, mine = null }) {
     if (busy) return;
     busy = true;
     try {
-      await saveMine(data, boxes().filter((b) => b.checked).map((b) => b.dataset.subject));
+      // Egna ämnen från ANDRA klasser har ingen kryssruta här — de får
+      // inte tyst försvinna ur lärarens val bara för att dialogen
+      // öppnades från en klass som saknar dem (QA #94).
+      // Inget ikryssat betyder fortfarande "inget val" (alla visas).
+      const known = new Set(boxes().map((b) => b.dataset.subject));
+      const checked = boxes().filter((b) => b.checked).map((b) => b.dataset.subject);
+      const kept = (mine ?? []).filter((id) => !known.has(id));
+      await saveMine(data, checked.length ? [...checked, ...kept] : []);
       closeMySubjectsDialog();
     } catch (err) {
       busy = false;
