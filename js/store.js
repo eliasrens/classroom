@@ -17,6 +17,11 @@
  *   presentedMode — modeId som JUST NU visas på elevskärmen (det läge
  *                 läraren aktivt skickat ut). Frikopplat från modeId
  *                 (lärarens egen flik). Bara meningsfullt i lärarvyn.
+ *   presentSpot — det monterade lägets rapport om sin "sak" (vilken
+ *                 planering/karta läraren tittar på och vilken som är
+ *                 utskickad): { modeId, current, presented } eller null.
+ *                 Sätts av lägen med "flera saker" i lärarvyn, läses av
+ *                 elevskärmspanelen. Se js/lib/present.js (issue #88).
  */
 
 export function createStore(initial = {}) {
@@ -69,4 +74,5 @@ export const store = createStore({
   syncState: "local",
   studentOpen: false,
   presentedMode: null,
+  presentSpot: null,
 });

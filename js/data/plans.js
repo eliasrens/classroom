@@ -42,7 +42,8 @@ export function plansPath(cid, uid = currentUid()) {
  *   teachers/{uid}/classes/{cid}/settings/lektion
  *     value: { presentedPlanId }   — planeringen som elevskärmen visar
  *
- * Ändras BARA när läraren trycker "Visa för eleverna". Elevskärmen delar
+ * Ändras BARA när läraren trycker "Visa på elevskärm" (issue #88,
+ * lägets onPresent). Elevskärmen delar
  * lärarens session (samma uid) och läser samma dokument; en annan lärare
  * i klassen kan varken läsa eller skriva det. (Den gamla DELADE
  * classes/{cid}/settings/lektion → activePlanId läses inte längre.)

@@ -18,9 +18,10 @@ Tumregel: **innehåll** går via datalagret (elevskärmen ser ändringen
 via `ctx.data.watch`); **händelser** ("nu startade timern", "byt läge")
 går via sync-bussen.
 
-Exempel: "Visa på elevskärm" i topbaren skickar ut *läget* (bussen),
-medan "Visa för eleverna" i Lektionsplanering väljer *vilken planering*
-läget visar — det är innehåll och skrivs till lärarens privata
+Exempel: "Visa på elevskärm" i elevskärmspanelen skickar ut *läget*
+(bussen) och — via lägets `onPresent()` (issue #88, se nedan) — *vilken
+sak* läget visar. För Lektionsplanering är saken vilken planering:
+innehåll, som skrivs till lärarens privata
 `teachers/{uid}/classes/{cid}/settings/lektion` i datalagret (issue #39).
 Elevskärmen delar lärarens uid och ser bytet via `watch`; vilken
 planering läraren redigerar når aldrig elevskärmen. Ska något överleva en omladdning av elevskärmen
@@ -60,6 +61,33 @@ på det senast utskickade läget. Läraren trycker aktivt ut ett läge med
 med `modeId`; elevskärmen byter då hash och routern remountar läget.
 **Lägen behöver ingen egen följ-läraren-logik** — de blir remountade
 med rätt `ctx`.
+
+### En enda regel: knappen skickar ut EXAKT det läraren tittar på (issue #88)
+
+"Visa på elevskärm" är den ENDA utskicksknappen. Den skickar ut läget
+OCH — för lägen med "flera saker" (Lektionsplanering: vilken planering;
+Tankekarta: vilken karta) — den sak läraren har öppen. Ingenting ändras
+för eleverna förrän läraren trycker igen: byte av flik, planering eller
+karta rör aldrig elevskärmen.
+
+Ett läge med flera saker implementerar det så här (js/lib/present.js):
+
+- **`onPresent()`** (valfri metod på modulen, sätts i mount i lärarvyn,
+  nollas i unmount): panelen anropar den FÖRE `present`-publiceringen.
+  Läget persistar då sin öppna sak som utskickad — Lektionsplanering
+  skriver `presentedPlanId` (privat, datalagret), Tankekartan skriver
+  `presented` i sitt lokala `state`-dokument — så att en elevskärm som
+  byter läge eller laddas om läser rätt sak.
+- **`store.presentSpot`** = `{ modeId, current, presented }` (`current`/
+  `presented` = `{ id, label }` eller null): lägets levande rapport om
+  vad som är öppet och vad som är utskickat. Panelen räknar ut sin färg
+  ur den: **grön** ("Visas för eleverna") bara när eleverna ser exakt
+  samma sak (samma läge OCH samma sak), annars **guld**; raden
+  "Eleverna ser:" visar sakens namn ("Lektionsplanering · Bråk intro").
+  Lägen utan flera saker (Trafikljus, Skrivtavla, Lottning, Veckan) rör
+  varken `onPresent` eller `presentSpot` — samma läge räcker för grönt.
+- Ändringar i den UTSKICKADE saken syns fortfarande live (innehåll via
+  datalagret respektive `karta:state` på bussen).
 
 `state` bär numera bara **klassvalet**, som alltid följer med automatiskt
 (samma aktiva klass överallt). Vid `state:request` (nyöppnad elevskärm
@@ -117,9 +145,10 @@ resultatet direkt. Scenen sparas även i den ENDAST LOKALA
 mot storage-eventet som hos Skrivtavlan. Elevskärmen får bara scenens
 alternativ och resultat — aldrig listorna, frånvaron eller "Redan dragna".
 
-Tankekartan (`js/modes/karta.js`, issue #53) skickar kartan som visas vid
-varje ändring (ny/borttagen/flyttad/ändrad bubbla, rubriken medan läraren
-skriver, byte av karta):
+Tankekartan (`js/modes/karta.js`, issue #53) skickar den UTSKICKADE
+kartan (issue #88 — inte nödvändigtvis den läraren har öppen) vid varje
+ändring (ny/borttagen/flyttad/ändrad bubbla, rubriken medan läraren
+skriver, "Visa på elevskärm"):
 
 ```js
 ctx.sync.publish("karta:state", { cid, cur, map: { id, title, cloud, bubbles }, rev });
@@ -130,7 +159,10 @@ ctx.sync.publish("karta:state", { cid, cur, map: { id, title, cloud, bubbles }, 
 Elevskärmen ritar samma karta (`js/modes/karta/scene.js`) och
 räknar layouten själv i sitt eget bildformat. Kartorna sparas i den ENDAST
 LOKALA `classes/{cid}/karta` (bubblorna kan innehålla elevnamn → aldrig
-Firestore); en omladdad elevskärm läser `state.cur` och kartan därifrån.
+Firestore); en omladdad elevskärm läser `state.presented` (den utskickade
+kartan, issue #88; äldre state utan nyckeln faller tillbaka på `state.cur`)
+och kartan därifrån. Lärarens kartbyte ändrar alltså inget för eleverna —
+bara "Visa på elevskärm" gör det.
 `rev` ordnar bussen mot storage-eventet som hos Skrivtavlan. Elevskärmen
 får bara rubriken och bubblorna — aldrig kartlistan eller namnen i den.
 

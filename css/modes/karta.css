@@ -406,6 +406,8 @@
   font-weight: 600;
 }
 .kt-mapbtn__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Utskickad karta (issue #88): liten skärm-markör efter namnet. */
+.kt-mapbtn__live { flex: none; display: inline-flex; align-items: center; color: var(--color-accent-text); }
 .kt-mapbtn.is-unnamed .kt-mapbtn__name { font-style: italic; }
 .kt-mapbtn__n { flex: none; font-size: var(--text-s); color: var(--color-ink-soft); font-variant-numeric: tabular-nums; font-weight: 400; }
 .kt-newmap { align-self: flex-start; }

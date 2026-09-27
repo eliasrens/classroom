@@ -25,8 +25,9 @@
  *   • editingId — planeringen som är öppen i redigeraren. Bara UI-tillstånd
  *     för fliken (minnet + sessionStorage, se data/plans.js).
  *   • presentedPlanId — planeringen som elevskärmen visar. Ändras BARA när
- *     läraren trycker "Visa för eleverna"; skapa/kopiera/ta bort rör den
- *     aldrig. Tas den visade bort visar elevvyn ett tomläge.
+ *     läraren trycker "Visa på elevskärm" i elevskärmspanelen (issue #88,
+ *     lägets onPresent nedan); skapa/kopiera/ta bort rör den aldrig.
+ *     Tas den visade bort visar elevvyn ett tomläge.
  * - Elevvyn visar planeringen ren (inga kontroller), synkad via
  *   datalagret (presentedPlanId + planeringens innehåll).
  *
@@ -39,9 +40,13 @@
  *   sök + ämnesfilter. Under dem en flikrad Denna vecka · Kommande · Arkiv
  *   (vald flik sparas per dator i localStorage). Sök/filter gäller inom
  *   fliken; träffar i andra flikar visas som en diskret rad. Lärarvyn
- *   begär bred sida (.view--wide, css/app.css) och tavlan ligger direkt
- *   under statusraden med en förhandsmarkering när den öppna planeringen
- *   inte är den som visas för eleverna.
+ *   begär bred sida (.view--wide, css/app.css).
+ * - Ingen statusrad över tavlan (issue #88): tavlan börjar direkt överst.
+ *   När den öppna planeringen INTE är den som visas för eleverna får den
+ *   den streckade förhandsramen (#82) med etiketten "Förhandsvisning ·
+ *   Eleverna ser: … · Gå dit"; visas exakt samma sak finns ingen ram alls
+ *   ("Visas nu"-brickan i listan räcker). Utskicket görs av
+ *   elevskärmspanelens enda knapp via lägets onPresent (js/lib/present.js).
  *
  * Kontrakt: docs/MODULKONTRAKT.md. Data: DATAMODELL.md.
  * Planeringar OCH presentedPlanId är PRIVATA per lärare
@@ -453,7 +458,7 @@ export default {
 
   async mount(el, ctx) {
     this._offs = [];
-    const { data, activeClass, view } = ctx;
+    const { data, activeClass, view, store } = ctx;
 
     // Bred sida (issue #82): lektionsläget använder mer av skärmbredden än
     // standardramen (#61) via .view--wide (css/app.css). Bara lärarvyn —
@@ -669,7 +674,6 @@ export default {
         </aside>
 
         <div class="lesson__main">
-          <div class="present-bar teacher-only" data-el="present" aria-live="polite"></div>
           <div class="lesson__stage" data-el="stage"></div>
         </div>
       </div>`;
@@ -677,7 +681,6 @@ export default {
     const listEl = el.querySelector('[data-el="list"]');
     const fieldsEl = el.querySelector('[data-el="fields"]');
     const stageEl = el.querySelector('[data-el="stage"]');
-    const presentEl = el.querySelector('[data-el="present"]');
     const bulkEl = el.querySelector('[data-el="bulk"]');
     const confirmEl = el.querySelector('[data-el="confirm"]');
     const statusEl = el.querySelector('[data-el="status"]');
@@ -779,6 +782,25 @@ export default {
     async function present(id) {
       presentedDoc = { id: LESSON_SETTINGS_DOC, value: { presentedPlanId: id ?? null } };
       await data.put(privatePath, presentedDoc);
+    }
+    // "Visa på elevskärm" i elevskärmspanelen (issue #88): skicka ut exakt
+    // den planering läraren tittar på (tomläge om ingen är öppen).
+    this.onPresent = async () => { await present(editingPlan()?.id ?? null); };
+    this._offs.push(() => { this.onPresent = null; store?.set({ presentSpot: null }); });
+
+    // Rapportera lägets "sak" till elevskärmspanelen (js/lib/present.js):
+    // vilken planering som är öppen och vilken som är utskickad.
+    function updateSpot() {
+      const p = editingPlan();
+      const shown = presentedPlan();
+      const spot = {
+        modeId: "lektion",
+        current: p ? { id: p.id, label: p.name || "Namnlös planering" } : null,
+        presented: shown ? { id: shown.id, label: shown.name || "Namnlös planering" } : null,
+      };
+      if (JSON.stringify(store?.get().presentSpot) !== JSON.stringify(spot)) {
+        store?.set({ presentSpot: spot });
+      }
     }
     // Utan sparat val visas dagens planering som förval (presentedPlanOf).
     // Innan läraren ändrar i planeringarna låses förvalet fast, så att en
@@ -1044,44 +1066,51 @@ export default {
     this._offs.push(() => clearTimeout(statusTimer));
 
     // Förhandsvisningen visar planeringen som REDIGERAS — inte nödvändigtvis
-    // den som eleverna ser (raden ovanför säger vilken).
+    // den som eleverna ser (förhandsramens etikett säger vilken).
     function renderPreview() {
       if (!stageEl.isConnected) return;
       const p = editingPlan();
       if (p) renderBoard(stageEl, p, subjects, praise());
       else stageEl.innerHTML = `<div class="lesson-empty"><h1>Ingen planering</h1><p>Skapa en ny planering för att börja.</p></div>`;
-      renderPresentBar();
+      renderPresentState();
       renderSummaries();
     }
 
-    // "Visa för eleverna" + vad eleverna ser just nu.
-    function renderPresentBar() {
+    // Förhandsmarkeringen (issue #82 + #88): när den öppna planeringen INTE
+    // är den som visas för eleverna får tavlan den streckade ramen med
+    // etiketten "Förhandsvisning · Eleverna ser: … · Gå dit". Visas exakt
+    // samma sak finns ingenting ovanför eller på tavlan — panelens gröna
+    // status och "Visas nu"-brickan i listan räcker (ingen statusrad, #88).
+    function renderPresentState() {
       const p = editingPlan();
       const shown = presentedPlan();
-      const isShown = !!p && p.id === shown?.id;
-      presentEl.classList.toggle("present-bar--live", isShown);
-      // Förhandsmarkering (issue #82): streckad ram + etikett på tavlan när
-      // den öppna planeringen INTE är den som visas för eleverna.
-      stageEl.classList.toggle("lesson__stage--preview", !!p && !isShown);
-      if (!p) {
-        presentEl.innerHTML = `<span class="present-bar__seen">Eleverna ser: <strong>${shown ? esc(planLabel(shown)) : "ingen planering"}</strong></span>`;
-        return;
+      const sameId = (p?.id ?? null) === (shown?.id ?? null);
+      stageEl.classList.toggle("lesson__stage--preview", !!p && !sameId);
+      stageEl.querySelector(".lesson-preview-tag")?.remove();
+      updateSpot();
+      if (sameId) return;
+      const seen = shown
+        ? `Eleverna ser: <strong>${esc(shown.name || "Namnlös planering")}</strong><span aria-hidden="true"> · </span>
+           <button type="button" class="lesson-preview-tag__jump" data-act="goto-presented"
+             title="Öppna planeringen som eleverna ser (${esc(planLabel(shown))})">Gå dit</button>`
+        : `Eleverna ser: <strong>ingen planering</strong>`;
+      if (p) {
+        stageEl.querySelector(".lb-fit")?.insertAdjacentHTML("beforeend",
+          `<div class="lesson-preview-tag teacher-only" aria-live="polite">Förhandsvisning<span aria-hidden="true"> · </span>${seen}</div>`);
+      } else {
+        // Tomläge ("Ingen planering"): samma information som en vanlig rad.
+        stageEl.querySelector(".lesson-empty")?.insertAdjacentHTML("beforeend",
+          `<p class="lesson-empty__seen teacher-only">${seen}</p>`);
       }
-      if (isShown) {
-        presentEl.innerHTML = `<span class="present-bar__state present-bar__state--live">${icon("monitor", { size: 18 })}Visas för eleverna</span>`;
-        return;
-      }
-      presentEl.innerHTML = `
-        <span class="present-bar__state">Förhandsvisning — visas inte för eleverna</span>
-        <button class="btn btn--primary" data-act="present">${icon("monitor")} Visa för eleverna</button>
-        <span class="present-bar__seen">Eleverna ser:
-          ${shown
-            ? `<strong>${esc(planLabel(shown))}</strong>
-               <button class="btn btn--ghost present-bar__jump" data-act="goto-presented" title="Öppna planeringen som eleverna ser">Gå dit</button>`
-            : `<strong>ingen planering</strong>`}
-        </span>`;
     }
     observeStage(stageEl);
+
+    // "Gå dit" i förhandsramens etikett — öppna planeringen som eleverna ser.
+    stageEl.addEventListener("click", (e) => {
+      if (!e.target.closest('[data-act="goto-presented"]')) return;
+      const p = presentedPlan();
+      if (p) { setEditing(p.id); renderAll(); }
+    });
 
     // Bygger om redigerarens fält. ANROPA BARA när den aktiva
     // planeringen byter identitet — annars förstörs fältet läraren
@@ -1236,18 +1265,6 @@ export default {
       }
     });
 
-    // "Visa för eleverna" / "Gå dit" — raden över förhandsvisningen
-    presentEl.addEventListener("click", async (e) => {
-      const act = e.target.closest("[data-act]")?.dataset.act;
-      if (act === "present") {
-        const p = editingPlan();
-        if (p) { await present(p.id); renderList(); renderPresentBar(); }
-      } else if (act === "goto-presented") {
-        const p = presentedPlan();
-        if (p) { setEditing(p.id); renderAll(); }
-      }
-    });
-
     // Metadata (namn/datum/tid/ämne), kryssrutor och filter
     panel.addEventListener("change", async (e) => {
       const weekKey = e.target.dataset.week;
@@ -1349,9 +1366,10 @@ export default {
       myDoc = docs.find((d) => d.id === MY_SUBJECTS_DOC) ?? null;
       refreshSubjectUI();
     }));
-    // Visas för eleverna — även ändringar från lärarens andra fönster.
-    watchPresented(() => { renderList(); renderPresentBar(); });
-    tickUntilChosen(() => { renderList(); renderPresentBar(); });
+    // Visas för eleverna — även ändringar från lärarens andra fönster
+    // (och elevskärmspanelens "Visa på elevskärm" via onPresent).
+    watchPresented(() => { renderList(); renderPresentState(); });
+    tickUntilChosen(() => { renderList(); renderPresentState(); });
 
     this._offs.push(data.watch(plansPath, async (docs) => {
       plans = docs;

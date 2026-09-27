@@ -31,14 +31,18 @@
  *
  * Data (DATAMODELL.md): ENDAST LOKALT i classes/{cid}/karta (bubblorna kan
  * innehålla elevnamn — js/data/local-only.js, aldrig Firestore):
- *   state      { cur, paper, rev }        — kartan som visas, valt papper
+ *   state      { cur, presented, paper, rev } — öppen karta, UTSKICKAD
+ *              karta (issue #88), valt papper. Äldre state utan
+ *              `presented`-nyckel (före #88) migreras till presented = cur.
  *   map-<id>   { name, title, cloud, autoColor,
  *                bubbles: [{ id, text, color, parentId, pin? }], nextColor, rev }
  *     color: index i palette.js, eller null för en gren = ärv förälderns
  *     parentId: null = huvudnivå. Kartor från #53 saknar parentId → huvudnivå.
- * Varje ändring går direkt ut på sync-bussen (`karta:state`
- * { cid, cur, map, rev }) och sparas (rubriken med debounce), så att en
- * omladdad elevskärm visar samma karta. `rev` ordnar bussen mot
+ * Eleverna ser den karta som senast SKICKADES UT med "Visa på elevskärm"
+ * (issue #88, lägets onPresent) — lärarens kartbyte följer de aldrig med
+ * i. Bussen (`karta:state` { cid, cur, map, rev }) bär alltid den
+ * utskickade kartan, vid varje ändring, så nya bubblor i den syns live;
+ * en omladdad elevskärm läser `state.presented`. `rev` ordnar bussen mot
  * storage-eventet som hos Skrivtavlan.
  *
  * Skriv ut: A3/A4, liggande/stående — js/modes/karta/print.js.
@@ -125,8 +129,9 @@ export default {
   async mount(el, ctx) {
     const offs = [];
     this._offs = offs; // städning registreras innan något startas
+    const mode = this; // för onPresent (elevskärmspanelen, issue #88)
 
-    const { view, activeClass, data, sync } = ctx;
+    const { view, activeClass, data, sync, store } = ctx;
     const isStudent = view === "student";
 
     if (!activeClass) {
@@ -181,7 +186,10 @@ export default {
       offs.push(data.watch(kartaPath(cid), (docs) => {
         const byId = new Map(docs.map((d) => [d.id, d]));
         const state = byId.get(STATE_ID);
-        const map = normalizeMap(byId.get(state?.cur));
+        // Eleverna ser den UTSKICKADE kartan (issue #88). Äldre state
+        // (före #88) saknar nyckeln — då som förut lärarens öppna karta.
+        const shownId = state && "presented" in state ? state.presented : state?.cur;
+        const map = normalizeMap(byId.get(shownId));
         const rev = Math.max(Number(state?.rev) || 0, map?.rev ?? 0);
         apply({ cid, cur: map?.id ?? null, map: publicMap(map), rev }, { animate: shown !== undefined });
       }));
@@ -218,6 +226,7 @@ export default {
       /** @type {Array<ReturnType<typeof normalizeMap>>} */
       let maps = [];
       let cur = null;
+      let presented = null; // kart-id som är UTSKICKAT till elevskärmen (issue #88)
       let paper = DEFAULT_PAPER;
       let rev = 0;
       let loaded = false;
@@ -276,16 +285,20 @@ export default {
       offs.push(() => scene.destroy());
 
       const curMap = () => maps.find((m) => m.id === cur) ?? null;
+      const presentedMap = () => maps.find((m) => m.id === presented) ?? null;
       const nextRev = () => (rev = Math.max(Date.now(), rev + 1));
 
       // ---- Tillstånd ut: bussen direkt, lagringen ----
 
+      // Bussen bär alltid den UTSKICKADE kartan (issue #88): ändringar i
+      // den syns live på elevskärmen, medan lärarens kartbyte och arbete
+      // i andra kartor inte ändrar något för eleverna.
       function publish() {
         if (!loaded) return;
-        const m = curMap();
+        const m = presentedMap();
         const r = nextRev();
         if (m) m.rev = r;
-        sync.publish(EVENT, { cid, cur, map: publicMap(m), rev: r });
+        sync.publish(EVENT, { cid, cur: m?.id ?? null, map: publicMap(m), rev: r });
         return r;
       }
 
@@ -297,7 +310,7 @@ export default {
       }
 
       function saveState() {
-        void data.put(kartaPath(cid), { id: STATE_ID, cur, paper, rev });
+        void data.put(kartaPath(cid), { id: STATE_ID, cur, presented, paper, rev });
       }
 
       /** En ändring i kartan: rita, skicka ut, spara. */
@@ -597,6 +610,9 @@ export default {
         maps.splice(i, 1);
         undoStacks.delete(m.id);
         void data.remove(kartaPath(cid), m.id);
+        // Tas den utskickade kartan bort blir elevskärmen tom — den byter
+        // aldrig i tysthet till en annan karta (issue #88).
+        if (presented === m.id) presented = null;
         const next = maps[Math.min(i, maps.length - 1)] ?? null;
         cur = null; // (selectMap byter bara om id skiljer sig)
         selectMap(next?.id ?? null);
@@ -611,14 +627,46 @@ export default {
         scene.render(m ? publicMap(m) : null, { animate });
       }
 
+      // Rapportera lägets "sak" till elevskärmspanelen (js/lib/present.js):
+      // vilken karta som är öppen och vilken som är utskickad (issue #88).
+      function updateSpot() {
+        const m = curMap();
+        const pm = presentedMap();
+        const spot = {
+          modeId: "karta",
+          current: m ? { id: m.id, label: mapLabel(m) } : null,
+          presented: pm ? { id: pm.id, label: mapLabel(pm) } : null,
+        };
+        if (JSON.stringify(store?.get().presentSpot) !== JSON.stringify(spot)) {
+          store?.set({ presentSpot: spot });
+        }
+      }
+
+      // "Visa på elevskärm" (issue #88): skicka ut exakt den karta läraren
+      // tittar på (tomläge om ingen karta finns). Anropas av panelen.
+      mode.onPresent = () => {
+        if (presented !== cur) {
+          presented = cur;
+          saveState();
+          renderList();
+        }
+        publish(); // en redan öppen elevskärm får kartan direkt
+        updateSpot();
+      };
+      offs.push(() => { mode.onPresent = null; store?.set({ presentSpot: null }); });
+
       function renderList() {
         listEl.innerHTML = maps.map((m) => {
           const label = mapLabel(m);
           const n = m.bubbles.length;
+          const live = m.id === presented
+            ? `<span class="kt-mapbtn__live" title="Den här kartan visas på elevskärmen">${icon("monitor", { size: 13 })}</span>`
+            : "";
           return `<button type="button" class="btn kt-mapbtn${label === NEW_NAME && !m.name && !m.title ? " is-unnamed" : ""}"
             data-map="${escapeHtml(m.id)}" aria-pressed="${m.id === cur}">
-            <span class="kt-mapbtn__name">${escapeHtml(label)}</span><span class="kt-mapbtn__n">${n}</span></button>`;
+            <span class="kt-mapbtn__name">${escapeHtml(label)}</span>${live}<span class="kt-mapbtn__n">${n}</span></button>`;
         }).join("") || `<p class="kt-sub">Inga kartor ännu.</p>`;
+        updateSpot();
       }
 
       function drawControls() {
@@ -643,6 +691,7 @@ export default {
         scene.setSelected(selected);
         drawTarget();
         drawColors();
+        updateSpot();
         for (const r of printPanel.querySelectorAll('input[name="kt-paper"]')) r.checked = r.value === paper;
       }
 
@@ -812,6 +861,11 @@ export default {
         const state = docs.find((d) => d.id === STATE_ID);
         rev = Math.max(Number(state?.rev) || 0, ...maps.map((m) => m.rev));
         cur = maps.some((m) => m.id === state?.cur) ? state.cur : (maps.at(-1)?.id ?? null);
+        // Utskickad karta (issue #88). Äldre state utan nyckeln (före #88,
+        // då eleverna följde lärarens öppna karta) migreras till den öppna.
+        presented = state && "presented" in state
+          ? (maps.some((m) => m.id === state.presented) ? state.presented : null)
+          : cur;
         paper = isPaper(state?.paper) ? state.paper : DEFAULT_PAPER;
         renderAll({ animate: false });
         publish(); // en redan öppen elevskärm visar direkt samma sak
@@ -890,7 +944,8 @@ function teacherMarkup() {
         </div>
 
         <p class="kt-hint kt-hint--main teacher-only">Klicka på en bubbla för att lägga till grenar under den — <kbd>Esc</kbd> eller klick på molnet går tillbaka.</p>
-        <p class="kt-hint teacher-only">Skicka ut med <strong>Visa på elevskärm</strong>. Den markerade bubblan tas bort med sitt <strong>×</strong>,
+        <p class="kt-hint teacher-only">Skicka ut med <strong>Visa på elevskärm</strong> — eleverna ser den karta som senast skickades ut
+          (nya bubblor i den syns direkt), tills du trycker igen. Den markerade bubblan tas bort med sitt <strong>×</strong>,
           dubbelklick ändrar texten och du kan dra den dit du vill. Kartorna sparas bara på den här datorn, aldrig i molnet.</p>
       </div>
 
