@@ -364,6 +364,20 @@ teachers/{uid}/settings/subjects        — Mina ämnen (issue #81,
                        är listan tom visas ALLA ämnen, som innan valet fanns.
                        Statistik och Veckor filtreras aldrig.
 
+teachers/{uid}/settings/classes         — Mina klasser (issue #102,
+                       js/lib/my-classes.js). PRIVAT per lärare, ingen elevdata;
+                       följer läraren mellan datorer (i lokalt läge: uid "local").
+  id: "classes"
+  mine: [classId, …] — klasserna läraren undervisar i; klassväljaren i topbaren
+                       och Översiktens klasslista visar bara dem (plus den aktiva
+                       klassen, som alltid syns — appen byter aldrig klass i
+                       tysthet, #31). Saknas dokumentet eller är listan tom visas
+                       ALLA klasser, som innan valet fanns. Okända id (borttagna
+                       klasser) ignoreras vid visning; finns ingen av dem kvar
+                       visas alla. "+ Ny klass…" lägger till den nya klassen här
+                       när läraren har gjort ett val. Statistik, Veckor och
+                       klassåtgärder filtreras aldrig (de visar bara vald klass).
+
 teachers/{uid}/classes/{classId}/lessonPlans/{planId}
                      — lektionsplanering (Läge 2). PRIVAT per lärare:
                        ligger under lärarens uid, inte under den delade
