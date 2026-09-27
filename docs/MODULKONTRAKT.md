@@ -42,6 +42,18 @@ export default {
    * unmount anropas även för ett läge vars mount kraschade/hängde halvvägs.
    */
   async unmount() {},
+
+  /**
+   * VALFRI (issue #88) — bara för lägen med "flera saker" (t.ex. flera
+   * planeringar eller kartor). Elevskärmspanelens "Visa på elevskärm"
+   * anropar den FÖRE `present`-publiceringen: persista den öppna saken
+   * som utskickad, så att eleverna ser exakt det läraren tittar på.
+   * Sätts i mount (bara lärarvyn) och nollas i unmount. Ett sådant läge
+   * rapporterar också sitt val till store.presentSpot
+   * ({ modeId, current, presented }) — se js/lib/present.js och
+   * docs/SYNC.md ("En enda regel").
+   */
+  async onPresent() {},
 };
 ```
 
