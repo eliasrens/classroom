@@ -254,6 +254,17 @@
 .btn.plan-danger { color: var(--color-danger); border-color: var(--color-danger); }
 .btn.plan-danger:disabled { opacity: 0.5; cursor: not-allowed; }
 .plan-status { margin: 0; font-size: 0.8rem; color: var(--color-ink-soft); }
+/* Knapp i statusraden — "Öppna i 4B" efter Skicka kopia (issue #103) */
+.plan-status__act {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-accent-text);
+  text-decoration: underline;
+  cursor: pointer;
+}
 
 /* Sparade planeringar-lista — grupperad per vecka */
 .plan-list { display: flex; flex-direction: column; gap: var(--space-3); max-height: 22rem; overflow: auto; }
