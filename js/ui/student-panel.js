@@ -16,6 +16,7 @@
 
 import { icon } from "../lib/icons.js";
 import { DEFAULT_MODE_ID, isStudentMode, getMode } from "../modes/registry.js";
+import { isExactlyPresented, presentedLabel } from "../lib/present.js";
 import { SINGLESCREEN_RETURN_KEY } from "../sync.js";
 
 const COLLAPSED_KEY = "classroom:ui:studentPanelCollapsed";
@@ -77,30 +78,42 @@ export function initStudentPanel({ store, openStudentWindow, present }) {
 
   // ---- "Visa på elevskärm" + indikator för utskickat läge ----
   //
-  // Skickar ut lärarens NUVARANDE flik till elevskärmen (bara elev-
-  // visningsbara lägen). Knappen markeras som aktiv när lärarens flik
-  // redan är det som visas ute. Indikatorn visar det utskickade läget —
+  // Skickar ut EXAKT det läraren tittar på (issue #88): läget OCH — om
+  // läget har "flera saker" — den planering/karta som är öppen (lägets
+  // onPresent). Knappen är GRÖN ("Visas för eleverna") bara när eleverna
+  // ser exakt samma sak (samma läge och samma planering/karta, se
+  // js/lib/present.js); annars guld. Indikatorn visar det utskickade —
   // skilt från lärarens egen flik.
 
-  presentBtn.addEventListener("click", () => present(store.get().modeId));
+  presentBtn.addEventListener("click", async () => {
+    const { modeId } = store.get();
+    if (!isStudentMode(modeId)) return;
+    // Lägets sak först (skrivs i datalagret/lokalt), sedan läget på
+    // bussen — en elevskärm som byter läge läser då redan rätt sak.
+    try { await getMode(modeId)?.onPresent?.(); }
+    catch (err) { console.warn("[elevskärmspanelen] onPresent misslyckades:", err); }
+    present(modeId);
+  });
 
-  store.subscribe(["modeId", "presentedMode"], ({ modeId, presentedMode }) => {
+  store.subscribe(["modeId", "presentedMode", "presentSpot"], ({ modeId, presentedMode, presentSpot }) => {
     const shown = presentedMode ? getMode(presentedMode) : null;
-    shownModeEl.textContent = shown ? shown.title : "—";
+    shownModeEl.textContent = shown
+      ? presentedLabel({ presentedMode, modeTitle: shown.title, spot: presentSpot })
+      : "—";
 
     const canPresent = isStudentMode(modeId);
-    const alreadyShown = canPresent && modeId === presentedMode;
+    const exact = canPresent && isExactlyPresented({ modeId, presentedMode, spot: presentSpot });
     presentBtn.disabled = !canPresent;
-    presentBtn.dataset.active = String(alreadyShown);
+    presentBtn.dataset.active = String(exact);
     if (!canPresent) {
       presentLabel.textContent = "Visa på elevskärm";
       presentBtn.title = "Det här läget kan inte visas för eleverna";
-    } else if (alreadyShown) {
+    } else if (exact) {
       presentLabel.textContent = "Visas för eleverna";
-      presentBtn.title = "Det här läget visas redan på elevskärmen";
+      presentBtn.title = "Eleverna ser exakt det du tittar på";
     } else {
       presentLabel.textContent = "Visa på elevskärm";
-      presentBtn.title = "Skicka ut det här läget till elevskärmen";
+      presentBtn.title = "Skicka ut exakt det du tittar på till elevskärmen";
     }
   });
 
