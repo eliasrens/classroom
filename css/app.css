@@ -510,12 +510,12 @@ html[data-theme="student"] .view {
   filter: none;
 }
 .student-panel__present[data-active="true"] {
-  background: var(--color-ok);
-  border-color: var(--color-ok);
+  background: var(--color-ok-bg);
+  border-color: var(--color-ok-bg);
   color: #fff;
   cursor: default;
 }
-.student-panel__present[data-active="true"]:hover { filter: none; background: var(--color-ok); }
+.student-panel__present[data-active="true"]:hover { filter: none; background: var(--color-ok-bg); }
 
 /* ---- Lösenordsvägg / login: stram och saklig ---- */
 
