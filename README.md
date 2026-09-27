@@ -102,6 +102,11 @@ docs/
   MODULKONTRAKT.md      kontraktet varje läge implementerar — LÄS FÖRST
   AUTH.md               lösenordsväggen + säkerhetsregler
   DRIFTSATTNING.md      koppla på Firebase: config, lärarkonton, deploy av regler
+  SYNC.md               sync-kontraktet lärare → elevskärm
+  DATASKYDD.md          vad som lagras var (elevdata bara lokalt)
+  TESTRUTIN.md          regler för test mot riktig Firestore
+  BAKGRUNDER.md         morgonskärmens bakgrundsbilder
+  test-*.mjs            testsviterna (rena Node-tester, körs i CI)
 DATAMODELL.md           Firestore-datastruktur + motivering
 ```
 

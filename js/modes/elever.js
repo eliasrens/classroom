@@ -243,6 +243,7 @@ export default {
       }
       if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
       if (document.querySelector(".quick-note[data-open]")) return; // snabbanteckningsrutan äger tangenterna
+      if (e.repeat) return; // hållen tangent får inte spruta noteringar
       const key = e.key.toLowerCase();
       const hit = activeStudents(api.students).find((s) => s.hotkey && s.hotkey === key);
       if (hit) {

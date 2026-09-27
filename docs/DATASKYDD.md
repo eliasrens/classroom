@@ -14,8 +14,8 @@ Princip: **ingenting om enskilda elever lämnar lärardatorn.**
   "Matte tis 10:15 (Catalin), 4A: 20 prat · 3 stol · 5 positiva".
   Säkerhetsreglerna validerar fälten, så ett elev-id eller en text kan
   inte ens skrivas dit av misstag.
-- **Klassinställningar** — trafikljusets gränser, visningsläge,
-  morgonskärmens hälsning och att-göra-lista. Inga elevuppgifter.
+- **Klassinställningar** — trafikljusets gränser, morgonskärmens
+  hälsning och att-göra-lista. Inga elevuppgifter.
 - **Klassåtgärder** (issue #34) — lärarnas delade logg över arbetssätt
   de testat med **hela klassen** och hur det gick, t.ex. "Catalin · Matte
   tis 10:15 · Testade att låta dem arbeta i par — lugnare. → Bättre",

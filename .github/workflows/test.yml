@@ -1,0 +1,39 @@
+# Automatiska tester (issue #96).
+#
+# Körs vid varje push och vid PR mot main. Kräver inga hemligheter:
+# alla testsviter i docs/test-*.mjs är rena Node-tester (attrapper i
+# stället för Firestore/webbläsare, se docs/TESTRUTIN.md).
+name: Tester
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Syntaxkontroll — node --check på alla JS-filer
+        run: |
+          set -e
+          for f in $(git ls-files '*.js' '*.mjs'); do
+            node --check "$f"
+          done
+          echo "OK: $(git ls-files '*.js' '*.mjs' | wc -l) filer"
+
+      - name: Testsviter — docs/test-*.mjs
+        run: |
+          set -e
+          for f in docs/test-*.mjs; do
+            echo "::group::$f"
+            node "$f"
+            echo "::endgroup::"
+          done

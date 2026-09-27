@@ -16,7 +16,7 @@ förbi".
 
 Det lokala lösenordet är en vägg mot nyfikna elever vid tangentbordet
 — verklig behörighet kommer från Firebase Auth + Firestore-reglerna
-(byggs i Läge 5-objektet) så fort molnet kopplas på.
+(`firestore.rules`) så fort molnet kopplas på.
 
 ## Elevskärmen
 
@@ -74,14 +74,15 @@ inloggning (`request.auth != null`) för ALL läsning och skrivning — och
 sedan issue #32 finns det dessutom **ingen elevdata alls i molnet**:
 elevlistor, noteringar och Bra jobbat lagras enbart lokalt på varje
 lärardator (`js/data/local-only.js`), och reglerna nekar
-`classes/{id}/students/**` och `classes/{id}/notes/**` helt.
+`classes/{id}/students/**`, `/notes/**`, `/praiseArchive/**` och
+`/reports/**` helt.
 Åtkomstmodellen (se DATAMODELL.md) i korthet:
 
 ```
 // DELAT: alla inloggade lärare läser/skriver klasser, pass,
 // klassinställningar och ANONYMA noteringsräkningar (noteStats —
 // fältvalidering: studentId/text kan aldrig skrivas dit).
-// ELEVDATA (students, notes, praiseArchive): nekas helt.
+// ELEVDATA (students, notes, praiseArchive, reports): nekas helt.
 
 // PRIVAT: lärarprofil + lärarens egna lektionsplaneringar. Bara ägaren.
 match /teachers/{uid}/{document=**} {

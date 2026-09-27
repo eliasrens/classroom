@@ -215,8 +215,10 @@ classes/{classId}/lotta/{docId}         — Lottningen (issue #47) — ENDAST LO
                        sync-bussen (`lotta:stage`, `lotta:draw`, docs/SYNC.md).
 
 classes/{classId}/karta/{docId}         — Tankekartorna (issue #53) — ENDAST LOKALT
-  state:     { cur, paper, rev }
-    cur:     "map-<id>" | null          — kartan som visas (även på elevskärmen)
+  state:     { cur, presented, paper, rev }
+    cur:     "map-<id>" | null          — kartan som är öppen i lärarvyn
+    presented: "map-<id>" | null        — kartan som elevskärmen visar; sätts
+                                          bara av "Visa på elevskärm" (issue #88)
     paper:   "a3-landscape" | "a3-portrait" | "a4-landscape" | "a4-portrait"
                                         — senast valda papper för utskrift
   map-<id>:  { name, title, cloud, autoColor, bubbles, nextColor, rev }
@@ -246,7 +248,7 @@ classes/{classId}/karta/{docId}         — Tankekartorna (issue #53) — ENDAST
 
 classes/{classId}/settings/{key}        — inställningar per klass
                                           (dokument-id = inställningens namn,
-                                           t.ex. "schedule", "morningScreen")
+                                           t.ex. "morningScreen", "trafikljus")
   value: { … }
 
 classes/{classId}/settings/lektion      — OANVÄND sedan issue #39 (tidigare
@@ -372,7 +374,8 @@ teachers/{uid}/classes/{classId}/lessonPlans/{planId}
   fields: { … }      — planeringens innehåll (vad/hur/varför/…)
   show: { … }        — vilka fält som visas på tavlan; show.praise = visa
                        "Bra jobbat"-rutan i högerkolumnen (namnen läses ur
-                       den DELADE classes/{id}/settings/morningScreen → praise)
+                       den LOKALA classes/{id}/praise/board — elevdata,
+                       aldrig i molnet)
                      — planeringar skapas och raderas aldrig automatiskt
                        (ingen testdata/auto-seed, ingen veckostädning);
                        bara läraren själv skapar, kopierar och tar bort
@@ -384,7 +387,8 @@ teachers/{uid}/classes/{classId}/settings/lektion
                        men ingen annan lärare kan läsa eller ändra det.
   value: {
     presentedPlanId  — planeringen som visas, eller null = "Ingen planering
-                       visas". Ändras BARA av "Visa för eleverna" (och sätts
+                       visas". Ändras BARA av elevskärmspanelens "Visa på
+                       elevskärm" (issue #88; och sätts
                        till null om den visade planeringen tas bort). Pekar
                        id:t på en planering som inte finns visar elevvyn
                        tomläget, aldrig en annan planering.

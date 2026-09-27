@@ -229,7 +229,9 @@
   color: var(--color-ink-soft);
 }
 .plan-filter__search svg { position: absolute; left: var(--space-2); pointer-events: none; }
-.lesson-panel .plan-filter__search input { min-width: 0; padding-left: calc(var(--space-2) + 20px); }
+/* Sökrutan ärver annars panelens dämpade ikonfärg — för låg kontrast för
+   inskriven text (WCAG AA, issue #95). */
+.lesson-panel .plan-filter__search input { min-width: 0; padding-left: calc(var(--space-2) + 20px); color: var(--color-ink); }
 
 /* Välj flera + bekräftelse + kvittens */
 .plan-bulk,
