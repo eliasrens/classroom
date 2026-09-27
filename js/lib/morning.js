@@ -52,6 +52,14 @@ function seedTasks() {
   ];
 }
 
+/**
+ * Originalets elevtext för en fast uppgift (ur seedTasks) — för
+ * "Återställ" i panelen (issue #87). null om uppgiften inte är fast.
+ */
+export function seedStudentText(id) {
+  return seedTasks().find((t) => t.id === id && t.kind === "fixed")?.studentText ?? null;
+}
+
 // Bakgrundsbilderna (kategorier per årstid + Platser i världen) och
 // slumplogiken ligger i js/lib/backgrounds.js (issue #64).
 export { UNSPLASH_IDS, unsplashUrl } from "./backgrounds.js";

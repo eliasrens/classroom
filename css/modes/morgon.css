@@ -396,6 +396,68 @@ html[data-theme="teacher"]:has(.morgon) { scrollbar-gutter: auto; }
 }
 .morgon__task-btn:hover { background: var(--color-surface-alt); color: var(--color-ink); }
 
+/* "Eleverna ser: …" under namnet + redigering direkt i raden (issue #87).
+   Raden bryts: namn + penna överst, elevtexten (och ev. Startens dag-chips)
+   på egna rader under — allt krymper, ingen sidledsscroll i panelen. */
+.morgon__task:has(.morgon__task-sub, .morgon__task-editfoot) { flex-wrap: wrap; row-gap: 2px; }
+.morgon__task-sub {
+  order: 1;
+  flex: 1 0 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* i linje med etiketten (kryssrutans bredd + mellanrum) */
+  padding-left: calc(1em + var(--space-2));
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+}
+.morgon__task .morgon__days { order: 2; }
+.morgon__task-student { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.morgon__task-link {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.morgon__task-link:hover { color: var(--color-ink); }
+.morgon__task-editor { gap: var(--space-1); cursor: default; }
+/* I redigeringsläget: "Eleverna ser:" som liten rubrik, fältet får hela bredden. */
+.morgon__task-sub.morgon__task-editor { flex-wrap: wrap; row-gap: 2px; }
+.morgon__task-sublabel { flex: 1 0 100%; }
+.morgon__task-edit {
+  flex: 1;
+  min-width: 0;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font: inherit;
+}
+.morgon__task-edit:focus { outline: 2px solid #c79a4e; outline-offset: 0; border-color: transparent; }
+.morgon__task-edit[aria-invalid="true"] { border-color: #d9826f; }
+.morgon__task-editor .morgon__task-btn { flex: none; }
+.morgon__task-editfoot {
+  order: 3;
+  flex: 1 0 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-left: calc(1em + var(--space-2));
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+}
+.morgon__task-editfoot:not(:has(> :not([hidden]))) { display: none; }
+.morgon__task-editfoot .morgon__task-link { margin-left: auto; }
+.morgon__task-edithint { color: #e8a594; }
+
 /* input + plus-knapp på rad */
 .morgon__addtask { display: flex; gap: var(--space-2); }
 .morgon__addtask input { flex: 1; min-width: 0; }
