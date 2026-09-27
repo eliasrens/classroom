@@ -248,9 +248,13 @@ html[data-theme="teacher"]:has(.morgon) { scrollbar-gutter: auto; }
 }
 .morgon__panel-scroll {
   height: 100%;
-  overflow: auto;
+  overflow-y: auto;
+  /* Skyddsnät (issue #85): allt innehåll ska redan få plats i bredd —
+     raderna nedan krymper/trunkerar — så panelen får aldrig sidledsscroll. */
+  overflow-x: hidden;
   padding: var(--space-4) var(--space-3) var(--space-5);
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
   align-content: start;
 }
@@ -304,6 +308,8 @@ html[data-theme="teacher"]:has(.morgon) { scrollbar-gutter: auto; }
   cursor: pointer;
 }
 .morgon__show { font-weight: 600; }
+.morgon__ntstudent { min-width: 0; overflow-wrap: anywhere; }
+.morgon__ntstudent input { flex: none; }
 
 .morgon__panel input[type="text"],
 .morgon__panel input[type="url"] {
@@ -317,9 +323,14 @@ html[data-theme="teacher"]:has(.morgon) { scrollbar-gutter: auto; }
 
 .morgon__hint { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); }
 
-/* Uppgiftsrader */
-.morgon__tasklist { display: grid; gap: var(--space-1); }
+/* Uppgiftsrader. Kolumnen är minmax(0, 1fr): en lång uppgiftstext får inte
+   bestämma listans bredd (issue #85 — en auto-kolumn växte till den längsta
+   etikettens nowrap-bredd, alla rader blev bredare än panelen och Startens
+   veckodagsväljare trycktes ut). Etiketten trunkeras med ellips; väljaren
+   och pennorna krymper aldrig och syns alltid hela. */
+.morgon__tasklist { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
 .morgon__task {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -330,7 +341,7 @@ html[data-theme="teacher"]:has(.morgon) { scrollbar-gutter: auto; }
 }
 .morgon__task-main { display: flex; align-items: center; gap: var(--space-2); flex: 1; cursor: pointer; min-width: 0; }
 .morgon__task-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.morgon__weekday { padding: 2px var(--space-1); }
+.morgon__weekday { flex: none; max-width: 100%; padding: 2px var(--space-1); }
 .morgon__task-actions { display: inline-flex; gap: 2px; flex: none; }
 .morgon__task-btn {
   display: inline-grid;
@@ -346,10 +357,12 @@ html[data-theme="teacher"]:has(.morgon) { scrollbar-gutter: auto; }
 
 /* input + plus-knapp på rad */
 .morgon__addtask { display: flex; gap: var(--space-2); }
-.morgon__addtask input { flex: 1; }
+.morgon__addtask input { flex: 1; min-width: 0; }
+.morgon__addtask .btn { flex: none; }
 
 .morgon__ntstudents {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-1);
   max-height: 12rem;
   overflow: auto;

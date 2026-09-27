@@ -627,7 +627,7 @@ function taskRow(t) {
     <div class="morgon__task">
       <label class="morgon__task-main">
         <input type="checkbox" data-task="${escapeAttr(t.id)}">
-        <span class="morgon__task-label">${escapeHtml(t.label)}</span>
+        <span class="morgon__task-label" title="${escapeAttr(t.label)}">${escapeHtml(t.label)}</span>
       </label>
       ${control}
       <span class="morgon__task-actions">${actions}</span>

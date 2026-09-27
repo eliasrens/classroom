@@ -32,19 +32,19 @@
   --subject-sv: #ad3a30;     /* Svenska/SVA — tegelröd */
   --subject-en: #7463ad;     /* Engelska — blålila */
   --subject-no: #2f6b4f;     /* NO — mörkgrön */
-  --subject-bi: #4c7d3f;     /* Biologi — bladgrön (NO-familjen) */
-  --subject-ke: #237571;     /* Kemi — blågrön/petrol (NO-familjen) */
-  --subject-fy: #5e6b2a;     /* Fysik — olivgrön (NO-familjen) */
+  --subject-bi: var(--subject-no); /* Biologi — samma som NO (#85) */
+  --subject-ke: var(--subject-no); /* Kemi — samma som NO (#85) */
+  --subject-fy: var(--subject-no); /* Fysik — samma som NO (#85) */
   --subject-so: #e2bc3f;     /* SO — citrongul */
-  --subject-re: #ecd06e;     /* Religionskunskap — blekgul (SO-familjen) */
-  --subject-hi: #c1922c;     /* Historia — ockra (SO-familjen) */
-  --subject-ge: #b8c454;     /* Geografi — gulgrön (SO-familjen) */
-  --subject-sh: #e39434;     /* Samhällskunskap — bärnstensgul (SO-familjen) */
+  --subject-re: var(--subject-so); /* Religionskunskap — samma som SO (#85) */
+  --subject-hi: var(--subject-so); /* Historia — samma som SO (#85) */
+  --subject-ge: var(--subject-so); /* Geografi — samma som SO (#85) */
+  --subject-sh: var(--subject-so); /* Samhällskunskap — samma som SO (#85) */
   --subject-idh: #eb9d8e;    /* Idrott & hälsa — laxrosa */
   --subject-bl: #84573f;     /* Bild — rödbrun */
   --subject-mu: #7d6e5f;     /* Musik — gråbrun/taupe */
   --subject-sl: #a9c8a4;     /* Slöjd — ljusgrön/salvia */
-  --subject-tk: #2f6b4f;     /* Teknik — samma mörkgröna som NO */
+  --subject-tk: var(--subject-no); /* Teknik — samma mörkgröna som NO */
   --subject-mentor: #9aa0a8; /* Mentorstid — grå */
   --subject-rast: #d7d3cb;   /* Rast/övrigt — neutral ljus */
 
