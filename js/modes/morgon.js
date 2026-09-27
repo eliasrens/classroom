@@ -257,7 +257,7 @@ export default {
           const next = clone();
           const t = next.tasks.find((x) => x.id === day.dataset.weekday);
           if (t) t.weekday = day.value;
-          commit(next);
+          commit(next).then(renderTaskControls); // "Eleverna ser"-raden bär veckodagen
         }
       });
       taskList.addEventListener("click", (e) => {
