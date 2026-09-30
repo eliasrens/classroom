@@ -268,6 +268,8 @@ classes/{classId}/settings/morningScreen — Läge 1:s tillstånd (js/lib/mornin
   widgets: [{ id, type, slot, size, cfg }]
                      — widgets i hörnen (issue #115, js/widgets/README.md):
                        slot tl|tr|bl|br (aldrig två på samma), size s|m|l.
+                       cfg per typ: clock-digital { seconds, date },
+                       clock-analog { seconds } (alla standard false, #116).
                        Inställningar, ingen elevdata. Körtillstånd (timrar,
                        vald ljudnivå) ligger LOKALT i
                        classroom:local:widgets/{classId}/{widgetId}.
@@ -404,6 +406,7 @@ teachers/{uid}/classes/{classId}/lessonPlans/{planId}
   widgets: [{ id, type, cfg }]
                      — widgetbrickor i rubrikraden (issue #115, högst 3
                        visas). Följer med i Kopiera/Skicka kopia (nya id:n).
+                       Samma cfg som på Morgonskärmen (klockorna: #116).
                      — planeringar skapas och raderas aldrig automatiskt
                        (ingen testdata/auto-seed, ingen veckostädning);
                        bara läraren själv skapar, kopierar och tar bort

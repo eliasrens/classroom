@@ -116,7 +116,7 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const empty = normalizePlan({ id: "p1", name: "X" });
   ok(Array.isArray(empty.widgets) && empty.widgets.length === 0, "normalizePlan: widgets standard []");
   const withW = normalizePlan({ id: "p2", widgets: [{ id: "w1", type: "clock-digital" }, { junk: true }] });
-  ok(eq(withW.widgets, [{ id: "w1", type: "clock-digital", cfg: {} }]), "normalizePlan: widgets normaliseras");
+  ok(eq(withW.widgets, [{ id: "w1", type: "clock-digital", cfg: { seconds: false, date: false } }]), "normalizePlan: widgets normaliseras");
   ok(eq(normalizePlan(withW).widgets, withW.widgets), "normalizePlan: widgets idempotent");
   ok(withW.show.subject === true && withW.fields.vad === "", "övriga fält orörda");
 
@@ -136,7 +136,7 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const n = reg.normalizeMorningWidgets;
   ok(eq(n(undefined), []), "morgon: standard []");
   const a = n([{ id: "k", type: "clock-digital", slot: "br", size: "l" }]);
-  ok(eq(a, [{ id: "k", type: "clock-digital", slot: "br", size: "l", cfg: {} }]), "morgon: giltig post orörd");
+  ok(eq(a, [{ id: "k", type: "clock-digital", slot: "br", size: "l", cfg: { seconds: false, date: false } }]), "morgon: giltig post orörd");
   const b = n([{ id: "k", type: "clock-digital", slot: "mitten", size: "xl" }]);
   ok(b[0].slot === "tl" && b[0].size === "m", "morgon: ogiltig plats → första lediga, ogiltig storlek → M");
   const c = n([

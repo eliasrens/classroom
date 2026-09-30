@@ -29,8 +29,9 @@
  */
 
 import clockDigital from "./clock-digital.js";
+import clockAnalog from "./clock-analog.js";
 
-const TYPES = [clockDigital];
+const TYPES = [clockDigital, clockAnalog];
 
 /** Högst så många brickor visas i lektionens rubrikrad. */
 export const MAX_CHIPS = 3;

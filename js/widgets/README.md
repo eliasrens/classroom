@@ -1,7 +1,8 @@
 # Widgets — API (epic #114)
 
 Del 1 (issue #115) är grunden: register, datamodell, körtillstånd,
-inställnings-UI och rendering. Den första widgeten är **Klocka (digital)**.
+inställnings-UI och rendering. Den första widgeten är **Klocka (digital)**;
+del 2 (#116) lägger till **Klocka (analog)** och klockornas inställningar.
 Del 2–4 (klockor, timrar, ljudnivå) bygger på det som står här.
 
 | Fil | Jobb |
@@ -10,7 +11,9 @@ Del 2–4 (klockor, timrar, ljudnivå) bygger på det som står här.
 | `runtime.js` | Körtillstånd per klass + widget (timrar, vald ljudnivå) — lokalt, tidsstämplar |
 | `host.js` | Rendering: brickor i lektionens rubrikrad, hörn på Morgonskärmen |
 | `settings-ui.js` | Kryssrutor, "+ Lägg till", plats/storlek, typens egna inställningar |
-| `clock-digital.js` | Första typen — mall för nya typer |
+| `clock-digital.js` | Klocka (digital) — mall för nya typer (#115; sekunder/datum #116) |
+| `clock-analog.js` | Klocka (analog) — skolklocka i SVG (#116) |
+| `clock-shared.js` | Klockornas ritsignal (`createClockTicker`), svenska datum, av/på-kryssrutor |
 | `css/ui/widgets.css` | Alla widget-stilar |
 
 ## En ny widget-typ
@@ -52,7 +55,9 @@ export default {
 
 - **Rita aldrig räknare med egen `setInterval`** — använd `createTicker`
   (`js/lib/timer.js`) som ritsignal och räkna tiden ur tidsstämplar.
-  Klockan i `clock-digital.js` är mönstret.
+  Klockorna ritar precis vid sekund-/minutskiftet med `createClockTicker`
+  (`clock-shared.js`): en väntan i taget, omräknad från `serverNow()`,
+  stoppar sig själv om elementet försvunnit — `clock-digital.js` är mönstret.
 - Tid: `serverNow()` (`js/lib/clock.js`).
 - Respektera `prefers-reduced-motion` i egna animationer.
 - `destroy(el)` MÅSTE stoppa tickers och `runtime.watch`-lyssnare: brickorna
@@ -67,6 +72,26 @@ export default {
 - **Stor:** `.mw` sätter `--mw-font` efter S/M/L (redan multiplicerad med
   `--morgon-scale`) och `font-size: var(--mw-font)`. Räkna i `em`. Glaset
   (bakgrund, oskärpa, ram) kommer från `.mw`.
+
+### Klockorna (#116)
+
+| Typ | cfg (standard) | Ritas om |
+|---|---|---|
+| `clock-digital` | `{ seconds: false, date: false }` | varje sekund med sekunder, annars varje minut |
+| `clock-analog` | `{ seconds: false }` (sekundvisare) | varje sekund med sekundvisare, annars varje minut |
+
+- Alltid 24 timmar (`formatClock`), datum i lång form "tisdag 29 september"
+  (`formatDate`, utan Intl — samma i alla webbläsare och i Node).
+- Digitala brickan: får datumet inte plats bredvid tiden döljs det (hellre
+  inget datum än ett avklippt).
+- Analoga: visarnas vinklar räknas i `handAngles(now, { seconds })`;
+  `unwrapAngle` gör att 59 → 0 tickar framåt. Visarna tickar med en kort
+  CSS-övergång som bara finns med `prefers-reduced-motion: no-preference`
+  och slås på först efter första bilden (ingen inflygning vid omritning).
+  Färgerna är CSS-variabler (`--wa-face`, `--wa-ink`, `--wa-second` …):
+  glaset på Morgonskärmen, `--subj-ink` i rubrikbrickan. Brickans urtavla
+  är lika hög som rubrikraden; container-frågor visar bara 12/3/6/9 på en
+  liten tavla och bara timstreck på en mycket liten.
 
 ### Egna inställningar
 
@@ -124,4 +149,6 @@ och elevskärmen kör samma kod.
 ## Test
 
 `node docs/test-widgets.mjs` — normalisering, `normalizePlan`, kopior,
-platskrockar och runtime-tidsstämplar. Varje ny del lägger till en egen svit.
+platskrockar och runtime-tidsstämplar. Varje ny del lägger till en egen svit:
+`node docs/test-clock-widgets.mjs` (#116) — visarvinklar, formatering,
+inställningar, ritsignalen och att `destroy` inte lämnar några timrar.
