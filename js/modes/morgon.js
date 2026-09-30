@@ -26,6 +26,9 @@ import {
 } from "../lib/backgrounds.js";
 import { openBgPicker, closeBgPicker } from "../ui/bg-picker.js";
 import { collapsibleHTML, mountCollapsibles } from "../ui/collapsible.js";
+import { createCornerLayer } from "../widgets/host.js";
+import { mountWidgetSettings, widgetsSummary } from "../widgets/settings-ui.js";
+import { normalizeMorningWidgets } from "../widgets/registry.js";
 
 const PANEL_KEY = "classroom:morgon:panelOpen";
 // Ny slumpad bild per sidladdning, men stabil inom sessionen (per klass).
@@ -76,6 +79,32 @@ export default {
     stage.append(board.el);
     this._board = board;
     let clearNt = () => {};
+
+    // Widgets i hörnen (issue #115). Kortet och Bra jobbat-tavlan får aldrig
+    // skymmas — en widget som skulle göra det flyttas till närmaste lediga hörn.
+    let widgetsUI = null;
+    const corners = createCornerLayer(stage, {
+      view, classId,
+      obstacles: () => [$(".morgon__card"), board.el],
+      onPlaced: (placed) => widgetsUI?.setPlacement(placed),
+    });
+    this._corners = corners;
+    // Kortets och tavlans storlek ändras med innehållet → lägg ut hörnen igen.
+    if (typeof ResizeObserver === "function") {
+      let frame = 0;
+      const ro = new ResizeObserver(() => {
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(() => corners.layout());
+      });
+      ro.observe(stage);
+      ro.observe($(".morgon__card"));
+      ro.observe(board.el);
+      this._cornersRO = () => { cancelAnimationFrame(frame); ro.disconnect(); };
+    }
+    // Kortet glider (padding-övergång) när panelen eller tavlan växlar.
+    $(".morgon__center").addEventListener("transitionend", (e) => {
+      if (e.target === e.currentTarget) corners.layout();
+    });
 
     // Skyddsnät: om vyn redan bytts ut (routern har rensat <main> medan
     // ett watch-callback ligger i kö) är .morgon inte längre i DOM:en —
@@ -163,6 +192,7 @@ export default {
       renderGreeting();
       renderTasks();
       renderNametavla();
+      corners.set(settings.widgets);
     }
 
     // ---------- Skrivning ----------
@@ -425,6 +455,27 @@ export default {
         e.target.value = "";
       });
 
+      // ---- Widgets (issue #115) ----
+      // Sektionen byggs om bara när listan ändrats UTIFRÅN (annat fönster);
+      // egna ändringar ritar den själv, så ett fält man skriver i behåller fokus.
+      let widgetsKey = JSON.stringify(settings.widgets);
+      widgetsUI = mountWidgetSettings(panel.querySelector(".morgon__widgets-set"), {
+        form: "morning",
+        ctx: { view, classId },
+        get: () => settings.widgets,
+        set: (list) => {
+          const next = clone();
+          next.widgets = normalizeMorningWidgets(list);
+          widgetsKey = JSON.stringify(next.widgets);
+          return commit(next);
+        },
+      });
+      this._widgetsUI = widgetsUI;
+      const syncWidgets = () => {
+        const key = JSON.stringify(settings.widgets);
+        if (key !== widgetsKey) { widgetsKey = key; widgetsUI.render(); }
+      };
+
       // ---- Panel-synk (utan att stjäla fokus / bygga om stabila fält) ----
       syncPanel = () => {
         if (!mounted()) return;
@@ -447,6 +498,7 @@ export default {
         });
         syncNtStudents();
         syncBgHint();
+        syncWidgets();
         syncSummaries();
       };
 
@@ -461,6 +513,7 @@ export default {
           (names ? `${names} namn` : "Tom") + (settings.showNametavla ? "" : " · dold"));
         sections.setSummary("greeting", greetingText(settings, activeClass));
         sections.setSummary("background", { html: bgSummaryHTML(settings.background) });
+        sections.setSummary("widgets", widgetsSummary(settings.widgets));
       }
 
       const bgHint = $(".morgon__bg-hint");
@@ -571,6 +624,12 @@ export default {
     this._closePicker = null;
     this._board?.destroy();
     this._board = null;
+    this._cornersRO?.();
+    this._cornersRO = null;
+    this._widgetsUI?.destroy();
+    this._widgetsUI = null;
+    this._corners?.destroy();
+    this._corners = null;
   },
 };
 
@@ -606,7 +665,7 @@ function renderShell(isTeacher) {
 // Panelens delar är utfällbara (issue #66). Hälsningen ligger överst
 // (issue #69) men stängd; det som används varje morgon är öppet;
 // hälsning och bakgrund visar en sammanfattning på rubrikraden.
-const PANEL_DEFAULTS = { tasks: true, praise: true, greeting: false, background: false };
+const PANEL_DEFAULTS = { tasks: true, praise: true, greeting: false, background: false, widgets: false };
 
 function renderPanel() {
   return `
@@ -646,6 +705,9 @@ function renderPanel() {
           ${icon("upload")}<span>Ladda upp egen bild</span>
           <input class="morgon__bg-file" type="file" accept="image/*" hidden>
         </label>` })}
+
+      ${collapsibleHTML({ key: "widgets", className: "morgon__section", icon: icon("clock"), title: "Widgets", body: `
+        <div class="morgon__widgets-set"></div>` })}
     </div>`;
 }
 

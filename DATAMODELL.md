@@ -263,8 +263,14 @@ classes/{classId}/settings/lektion      — OANVÄND sedan issue #39 (tidigare
                        teachers/{uid}/classes/{classId}/settings/lektion.
 
 classes/{classId}/settings/morningScreen — Läge 1:s tillstånd (js/lib/morning.js)
-  value: { greeting, tasks, showNametavla, background }
+  value: { greeting, tasks, showNametavla, background, widgets }
   background: { current, extraUrls, pickedOn }
+  widgets: [{ id, type, slot, size, cfg }]
+                     — widgets i hörnen (issue #115, js/widgets/README.md):
+                       slot tl|tr|bl|br (aldrig två på samma), size s|m|l.
+                       Inställningar, ingen elevdata. Körtillstånd (timrar,
+                       vald ljudnivå) ligger LOKALT i
+                       classroom:local:widgets/{classId}/{widgetId}.
                      — current = bild-URL som visas; extraUrls = egna
                        bilder; pickedOn = "ÅÅÅÅ-MM-DD" då läraren själv
                        valde bilden (Slumpa/Välj bild/egen) — då slumpas
@@ -395,6 +401,9 @@ teachers/{uid}/classes/{classId}/lessonPlans/{planId}
                        "Bra jobbat"-rutan i högerkolumnen (namnen läses ur
                        den LOKALA classes/{id}/praise/board — elevdata,
                        aldrig i molnet)
+  widgets: [{ id, type, cfg }]
+                     — widgetbrickor i rubrikraden (issue #115, högst 3
+                       visas). Följer med i Kopiera/Skicka kopia (nya id:n).
                      — planeringar skapas och raderas aldrig automatiskt
                        (ingen testdata/auto-seed, ingen veckostädning);
                        bara läraren själv skapar, kopierar och tar bort
