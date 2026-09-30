@@ -29,8 +29,9 @@
  */
 
 import clockDigital from "./clock-digital.js";
+import { timeLeft, countdown } from "./timers.js";
 
-const TYPES = [clockDigital];
+const TYPES = [clockDigital, timeLeft, countdown];
 
 /** Högst så många brickor visas i lektionens rubrikrad. */
 export const MAX_CHIPS = 3;

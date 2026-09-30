@@ -39,6 +39,7 @@ const PATHS = {
   // Trafikljusur (Läge 3)
   play: `<path d="M7 5.5v13l11-6.5z"/>`,
   stop: `<rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/>`,
+  pause: `<path d="M9 6v12M15 6v12"/>`,
   reset: `<path d="M4 5.5v5h5M4.6 10.5a8 8 0 1 1-1.1 5"/>`,
   save: `<path d="M5 4h11l3 3v13H5zM8 4v5h7M8 20v-6h8v6"/>`,
   // Läge 4 — Elevlista & noteringar (check/x delas med Morgonskärmen)

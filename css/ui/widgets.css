@@ -79,6 +79,181 @@
 .wclock { font-variant-numeric: tabular-nums; }
 .wclock--large { display: block; font-weight: 600; letter-spacing: 0.02em; }
 
+/* ---- Timrar (issue #117): "Kvar av lektionen" och "Nedräkning" ----
+   Tre utseenden: .wt--digits, .wt--bar, .wt--analog. Brickan räknar i em
+   från tavlans text; det stora (.mw) i em från --mw-font. */
+.wt { font-variant-numeric: tabular-nums; }
+.wt__time { font-weight: 700; white-space: nowrap; }
+.wt [hidden] { display: none !important; }
+
+/* Bricka i rubrikraden: [tårtbit] rubrik 12:34 [stapel] [knappar]
+   Trångt (tre brickor, smal tavla): rubriken kortas först (…), siffrorna
+   aldrig; räcker det inte klipps brickan för sig — aldrig in i grannen. */
+.lb-chip:has(> .wt) { overflow: hidden; padding-inline: 0.5em; font-size: 0.95em; }
+.wt--chip { display: inline-flex; align-items: center; gap: 0.3em; min-width: 0; }
+.wt--chip > * { flex: none; }
+.wt--chip .wt__label {
+  flex: 0 1 auto;
+  min-width: 1.2em;
+  max-width: 7em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.8em;
+  font-weight: 600;
+  opacity: 0.9;
+}
+.wt--chip .wt-face { width: 1.05em; height: 1.05em; }
+.wt--chip .wt-bar {
+  width: 2em;
+  height: 0.34em;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 22%, transparent);
+}
+.wt--chip .wt-bar__fill { background: currentColor; }
+
+/* Urtavlan ("Time Timer") — röd tårtbit på ljus tavla. */
+.wt-face { display: block; overflow: visible; text-shadow: none; }
+.wt-face__pie { fill: #e5484d; }
+.wt-face--chip .wt-face__bg { fill: rgb(255 255 255 / 88%); stroke: currentColor; stroke-width: 7; }
+.wt-face--large .wt-face__bg { fill: #f7f5f0; stroke: rgb(0 0 0 / 18%); stroke-width: 1; }
+.wt-face__tick { stroke: #2b2f36; stroke-width: 0.6; stroke-linecap: round; }
+.wt-face__tick--major { stroke-width: 1.3; }
+.wt-face__nums text {
+  fill: #2b2f36;
+  font-size: 6.4px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.wt-face__knob { fill: #2b2f36; }
+
+/* Stapeln krymper åt vänster (transform — ingen omlayout varje tick). */
+.wt-bar__fill { display: block; width: 100%; height: 100%; transform-origin: left center; }
+
+/* Stor på Morgonskärmen */
+.wt--large {
+  display: grid;
+  justify-items: center;
+  gap: 0.12em;
+  min-width: 3.2em;
+  text-align: center;
+}
+.wt--large .wt__label {
+  max-width: 7em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.34em;
+  font-weight: 600;
+  opacity: 0.92;
+}
+.wt--large .wt__time { font-size: 1em; letter-spacing: 0.01em; }
+.wt--large .wt__state { font-size: 0.32em; font-weight: 600; }
+.wt--large.wt--analog .wt-face { width: 2.7em; height: 2.7em; margin: 0.06em 0; }
+.wt--large.wt--analog .wt__time { font-size: 0.5em; }
+.wt--large .wt-bar {
+  width: 4.4em;
+  height: 0.18em;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgb(255 255 255 / 22%);
+}
+.wt--large .wt-bar__fill { background: #f7f5f0; }
+/* "Börjar om 5 min" / "Ingen sluttid" är text, inte en siffra — mindre. */
+.wt--large[data-status="before"] .wt__time,
+.wt--large[data-status="later"] .wt__time,
+.wt--large[data-status="none"] .wt__time { font-size: 0.5em; }
+
+/* Lärarens knappar — små och diskreta; ritas bara i lärarvyn
+   (+ .teacher-only: syns aldrig på elevskärmen). */
+.wt-ctl { display: inline-flex; align-items: center; gap: 0.2em; }
+.wt--large .wt-ctl { font-size: 0.32em; gap: 0.35em; margin-top: 0.15em; }
+.wt-ctl__btn {
+  display: inline-grid;
+  place-items: center;
+  width: 1.35em;
+  height: 1.35em;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.8;
+}
+.wt--large .wt-ctl__btn { width: 1.9em; height: 1.9em; }
+.wt-ctl__btn:hover, .wt-ctl__btn:focus-visible { opacity: 1; background: color-mix(in srgb, currentColor 16%, transparent); }
+.wt-ctl__btn:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+.wt-ctl__btn .icon { width: 0.78em; height: 0.78em; }
+.wt--chip .wt-ctl { font-size: 0.7em; gap: 0.25em; }
+
+/* När tiden är ute: färgmarkering + lugn pulsering (nyss slut). */
+.lb-chip[data-wt-status="done"] {
+  background: #c94f4a;
+  border-color: #c94f4a;
+  color: #fff;
+}
+.mw[data-wt-status="done"] {
+  background: rgb(140 36 32 / 62%);
+  border-color: rgb(255 150 140 / 60%);
+}
+.lb-chip.wt-alarm,
+.mw.wt-alarm { animation: wt-pulse 2.4s ease-in-out infinite; }
+@keyframes wt-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.62; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lb-chip.wt-alarm,
+  .mw.wt-alarm { animation: none; }
+}
+
+/* Timrarnas egna inställningar (under instansen i "Widgets") */
+.wt-set { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); font-size: var(--text-s); }
+.wt-set__row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.wt-set__row > span:first-child { min-width: 4.5em; color: var(--color-ink-soft); }
+.wt-set input.wt-set__title,
+.wt-set input.wt-set__time,
+.wt-set__num input {
+  margin: 0;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+}
+.wt-set input.wt-set__title { flex: 1 1 10em; width: auto; min-width: 0; }
+.wt-set input.wt-set__time { width: auto; }
+.wt-set__num { display: inline-flex; align-items: center; gap: 4px; }
+.wt-set__num input { width: 4.2em; }
+.wt-set__hint { margin: 0; color: var(--color-ink-soft); font-size: var(--text-s); }
+.wt-set__check { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; cursor: pointer; }
+.wt-set__check .wt-set__hint { flex-basis: 100%; padding-left: 1.6em; }
+.wt-set__check input { accent-color: var(--color-accent); }
+.wt-set__looks { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--color-line); border-radius: var(--radius-m); overflow: hidden; }
+.wt-set__look { position: relative; cursor: pointer; }
+.wt-set__look input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: inherit; }
+.wt-set__look span { display: block; padding: 2px var(--space-2); font-weight: 600; }
+.wt-set__look + .wt-set__look span { border-left: 1px solid var(--color-line); }
+.wt-set__look input:checked + span { background: var(--color-accent); color: var(--color-accent-ink); }
+.wt-set__look input:focus-visible + span { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+.wt-set__run {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: var(--space-2);
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--color-ink) 6%, transparent);
+}
+.wt-set__status { font-variant-numeric: tabular-nums; font-weight: 600; }
+.wt-set__status[data-status="done"] { color: var(--color-danger); }
+.wt-set__btns { display: inline-flex; gap: var(--space-2); }
+.wt-set__btn { padding: 2px var(--space-2); font-size: var(--text-s); }
+
 /* ---- Inställnings-UI (lektionens "Widgets" och morgonpanelens "Widgets") ---- */
 .wset-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
 .wset .field-edit__head,
