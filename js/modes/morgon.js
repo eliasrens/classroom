@@ -513,7 +513,7 @@ export default {
           (names ? `${names} namn` : "Tom") + (settings.showNametavla ? "" : " · dold"));
         sections.setSummary("greeting", greetingText(settings, activeClass));
         sections.setSummary("background", { html: bgSummaryHTML(settings.background) });
-        sections.setSummary("widgets", widgetsSummary(settings.widgets));
+        sections.setSummary("widgets", widgetsSummary(settings.widgets, "morning"));
       }
 
       const bgHint = $(".morgon__bg-hint");

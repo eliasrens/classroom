@@ -2,7 +2,8 @@
 
 Del 1 (issue #115) är grunden: register, datamodell, körtillstånd,
 inställnings-UI och rendering. Den första widgeten är **Klocka (digital)**;
-del 2 (#116) lägger till **Klocka (analog)** och klockornas inställningar.
+del 2 (#116) lägger till **Klocka (analog)** och klockornas inställningar;
+del 3 (#117) lägger till timrarna **Kvar av lektionen** och **Nedräkning**.
 Del 2–4 (klockor, timrar, ljudnivå) bygger på det som står här.
 
 | Fil | Jobb |
@@ -14,6 +15,9 @@ Del 2–4 (klockor, timrar, ljudnivå) bygger på det som står här.
 | `clock-digital.js` | Klocka (digital) — mall för nya typer (#115; sekunder/datum #116) |
 | `clock-analog.js` | Klocka (analog) — skolklocka i SVG (#116) |
 | `clock-shared.js` | Klockornas ritsignal (`createClockTicker`), svenska datum, av/på-kryssrutor |
+| `timers.js` | Kvar av lektionen + Nedräkning (#117): rendering, knappar, inställningar |
+| `timer-logic.js` | Timrarnas rena logik: vad som visas nu, urtavlans tårtbit, tonens fönsterval (Node-testad) |
+| `chime.js` | Mjuk ton med Web Audio + vilket fönster som spelar den |
 | `css/ui/widgets.css` | Alla widget-stilar |
 
 ## En ny widget-typ
@@ -93,6 +97,40 @@ export default {
   är lika hög som rubrikraden; container-frågor visar bara 12/3/6/9 på en
   liten tavla och bara timstreck på en mycket liten.
 
+### Timrarna (#117)
+
+| Typ | cfg (standard) | Körtillstånd |
+|---|---|---|
+| `time-left` "Kvar av lektionen" (en) | `{ look: "digits", sound: false, until: "" }` | inget — följer klockan |
+| `countdown` "Nedräkning" (flera) | `{ title: "", minutes: 5, seconds: 0, look: "digits", sound: false }` | runtime-stämplarna (`startTimer` …) |
+
+- `look`: `digits` (mm:ss), `bar` (stapel som krymper), `analog` ("Time
+  Timer": röd tårtbit moturs från 12 på en 60-minuterstavla, krymper medurs
+  mot 0; mer än 60 min kvar = hel skiva).
+- **Kvar av lektionen**: i lektionen räknar den mot planeringens `end` i dag
+  (`ctx.lesson` = `{ date, start, end }`, som `chipsHTML(list, plan)` bär på
+  `.lb-widgets`). Före `start`: "Börjar om N min"; efter `end`: "Slut".
+  Planering en annan dag: "Börjar fre 2/10" / "Slut" (ingen ton). På
+  Morgonskärmen: lärarens klockslag `until`. Typen heter "Nedräkning till
+  klockslag" där (`names: { morning }` — settings-ui visar `names[form]`).
+- **Nedräkning**: Start / Paus·Fortsätt / Återställ i inställningarna och som
+  små knappar på brickan (lager vid hover/fokus) och på den stora widgeten —
+  bara i lärarvyn. Återställ = `runtime.write(null)` (tillbaka till inställd tid).
+- **Vad som visas** räknas i `timer-logic.js` (`lessonLeftView`, `untilView`,
+  `countdownView`) → `{ status, text, label, fraction, dial, endMs, alarm }`.
+  Renderingen ritar bara ut den, var 250:e ms (`createClockTicker`).
+- **Trång rubrikrad**: timerbrickorna släpper det minst viktiga i steg
+  (`fitRow`, `data-wt-fit` på `.lb-widgets`): "Kvar", kortad rubrik, ingen
+  rubrik, "Tiden är ute" → "0:00", vänsterställt. Siffrorna kortas aldrig.
+- **Slut**: färgmarkering + lugn pulsering första minuten (`ALARM_MS`), ingen
+  puls med `prefers-reduced-motion`. "Tiden är ute" (+ "0:00"/"Slut").
+- **Ton** (`sound`, AV från början): Web Audio, ingen ljudfil. Spelas i
+  EXAKT ett fönster: elevskärmen om den är öppen och får spela ljud, annars
+  lärarfönstret (som väntar 1,5 s när en elevskärm är öppen och bara spelar
+  om ingen tagit tonen). Aldrig i förhandsvisningen (`?preview`). "Tagen"
+  lagras lokalt per widget och slut (`classroom:local:widgets-chime/…`), så
+  en omladdning spelar den inte igen; ett slut äldre än 15 s spelas inte.
+
 ### Egna inställningar
 
 `settingsHTML` ritas under instansen. `bindSettings(root, cfg, onChange)`
@@ -152,3 +190,6 @@ och elevskärmen kör samma kod.
 platskrockar och runtime-tidsstämplar. Varje ny del lägger till en egen svit:
 `node docs/test-clock-widgets.mjs` (#116) — visarvinklar, formatering,
 inställningar, ritsignalen och att `destroy` inte lämnar några timrar.
+`node docs/test-timers.mjs` (#117) — kvarvarande tid, paus/fortsätt,
+omladdning, kvar av lektionen före/under/efter, två timrar samtidigt,
+urtavlan och att tonen spelas i ett fönster, en gång.

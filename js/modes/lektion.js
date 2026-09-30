@@ -264,7 +264,7 @@ function boardHTML(rawPlan, subjects, { praise = false } = {}) {
       : (show.time ? "" : "");
     // Widgetbrickorna (issue #115) mellan ämnet och tiden — "" utan widgets,
     // så att tavlan då är exakt som förut.
-    top = `<div class="lb-top">${subjEl}${chipsHTML(plan.widgets)}${timeEl || `<span></span>`}</div>`;
+    top = `<div class="lb-top">${subjEl}${chipsHTML(plan.widgets, plan)}${timeEl || `<span></span>`}</div>`;
   }
 
   // Mitten — tre kolumner, var och en utelämnas helt om tom
