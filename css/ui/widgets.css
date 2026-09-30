@@ -1,5 +1,5 @@
 /* ============================================================
-   WIDGETS (issue #115) — brickor i lektionens rubrikrad, hörn på
+   WIDGETS (issue #115, klockorna #116) — brickor i lektionens rubrikrad, hörn på
    Morgonskärmen och inställnings-UI:t. Logik: js/widgets/.
    ============================================================ */
 
@@ -75,9 +75,114 @@
 .mw--l { --mw-font: calc(var(--morgon-scale) * clamp(3.4rem, 13vh, 7rem)); }
 .mw { font-size: var(--mw-font); }
 
-/* ---- Klocka (digital) ---- */
+/* ---- Klocka (digital) — #115, sekunder/datum #116 ---- */
 .wclock { font-variant-numeric: tabular-nums; }
-.wclock--large { display: block; font-weight: 600; letter-spacing: 0.02em; }
+.wclock__date { font-variant-numeric: normal; }
+/* Bricka: datumet bredvid tiden. Får det inte plats bryts det till en andra
+   rad som klipps bort (en rads höjd) — hellre inget datum än "onsdag 30 sep".
+   clock-digital.js döljer det då helt (--no-date) så att brickan krymper. */
+.wclock--chip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  column-gap: 0.5em;
+  height: 1.2em;
+  line-height: 1.2;
+  overflow: hidden;
+}
+.wclock--chip .wclock__date { font-size: 0.82em; font-weight: 500; opacity: 0.9; }
+.wclock--no-date .wclock__date { display: none; } /* js: fick inte plats */
+.wclock--large { display: flex; flex-direction: column; align-items: center; font-weight: 600; letter-spacing: 0.02em; }
+.wclock--large .wclock__date {
+  margin-top: 0.22em;
+  font-size: 0.34em;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+/* ---- Klocka (analog), #116 ----
+   SVG i viewBox −100…100; visarna vrids runt mitten (0 0). Färgerna är
+   variabler: glaset på Morgonskärmen, ämnesfärgen i rubrikbrickan. */
+.wanalog {
+  --wa-face: rgb(255 255 255 / 7%);
+  --wa-ring: rgb(255 255 255 / 38%);
+  --wa-tick: rgb(255 255 255 / 55%);
+  --wa-ink: #fff;
+  --wa-second: #f6b44f; /* varm guldton — appens accent, ljusare för glaset */
+  display: block;
+  aspect-ratio: 1;
+}
+.wanalog__svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.wanalog__face { fill: var(--wa-face); stroke: var(--wa-ring); stroke-width: 2.5; }
+.wanalog__tick { stroke: var(--wa-tick); stroke-width: 1.6; stroke-linecap: round; }
+.wanalog__tick--hour { stroke: var(--wa-ink); stroke-width: 3.4; }
+.wanalog__nums text {
+  fill: var(--wa-ink);
+  font-size: 17px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+  font-variant-numeric: lining-nums;
+}
+.wanalog__hand { transform-box: view-box; transform-origin: 0 0; }
+.wanalog__hand line { stroke: var(--wa-ink); stroke-linecap: round; }
+.wanalog__hand--hour line { stroke-width: 8; }
+.wanalog__hand--minute line { stroke-width: 5.5; }
+.wanalog__hand--second line { stroke: var(--wa-second); stroke-width: 2.2; }
+.wanalog__hand--second circle { fill: var(--wa-second); }
+.wanalog__cap { fill: var(--wa-ink); }
+/* Visarna tickar fram med en kort studs — inget svep alls med reducerad rörelse.
+   --live sätts först efter första bilden (ingen inflygning vid omritning). */
+@media (prefers-reduced-motion: no-preference) {
+  .wanalog--live .wanalog__hand { transition: transform 0.22s cubic-bezier(0.3, 1.9, 0.6, 1); }
+}
+
+/* Stor på Morgonskärmen: glaset blir självt en rund urtavla. */
+.mw[data-widget-type="clock-analog"] { padding: calc(var(--mw-font) * 0.09); border-radius: 50%; }
+.wanalog--large { width: 2.9em; }
+.wanalog--large .wanalog__svg { filter: drop-shadow(0 2px 6px rgb(0 0 0 / 45%)); }
+
+/* Bricka i rubrikraden: liten urtavla, rubrikradens höjd, i ämnesfärgen. */
+.lb-chip[data-widget-type="clock-analog"] {
+  flex: 0 0 auto;
+  height: 100%;
+  max-height: none;
+  aspect-ratio: 1;
+  padding: 0;
+  background: none;
+  border: 0;
+}
+.wanalog--chip {
+  --wa-face: color-mix(in srgb, var(--subj-ink) 12%, transparent);
+  --wa-ring: color-mix(in srgb, var(--subj-ink) 45%, transparent);
+  --wa-tick: color-mix(in srgb, var(--subj-ink) 55%, transparent);
+  --wa-ink: var(--subj-ink);
+  --wa-second: var(--subj-ink);
+  width: 100%;
+  height: 100%;
+  container-type: size;
+}
+/* Liten urtavla: bara 12, 3, 6 och 9 (större) och timstrecken — alla tolv
+   siffror blir för små för att läsas. Mycket liten: bara timstrecken. */
+@container (max-height: 130px) {
+  .wanalog__nums text:not(.wanalog__num--q),
+  .wanalog__tick:not(.wanalog__tick--hour) { display: none; }
+  .wanalog__nums .wanalog__num--q { font-size: 27px; }
+  .wanalog__tick--q { display: none; }
+  .wanalog__tick--hour { stroke-width: 5; }
+}
+@container (max-height: 56px) {
+  .wanalog__nums { display: none; }
+  .wanalog__tick--q { display: inline; }
+  .wanalog__tick--hour { stroke-width: 8; }
+}
+
+/* Typernas egna av/på-inställningar (klockorna). */
+.wopts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); }
+.wopt { display: inline-flex; align-items: center; gap: var(--space-2); cursor: pointer; font-size: var(--text-s); }
+.wopt input { width: 1em; height: 1em; margin: 0; accent-color: var(--color-accent); cursor: pointer; }
 
 /* ---- Timrar (issue #117): "Kvar av lektionen" och "Nedräkning" ----
    Tre utseenden: .wt--digits, .wt--bar, .wt--analog. Brickan räknar i em

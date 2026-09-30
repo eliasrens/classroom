@@ -10,7 +10,7 @@
  *
  * Tiden räknas ALLTID ur tidsstämplar (serverNow + runtime-tillståndet),
  * så lärar- och elevfönster visar samma sak och en omladdning mitt i en
- * nedräkning fortsätter rätt. Tickern (createTicker) är bara en ritsignal.
+ * nedräkning fortsätter rätt. Tickern (createClockTicker) är bara en ritsignal.
  *
  * Styrning (Start, Paus/Fortsätt, Återställ) finns i widget-inställningarna
  * och som små knappar på brickan/widgeten — BARA i lärarvyn (ritas inte
@@ -22,7 +22,7 @@
  */
 
 import { serverNow } from "../lib/clock.js";
-import { createTicker } from "../lib/timer.js";
+import { createClockTicker } from "./clock-shared.js";
 import { icon } from "../lib/icons.js";
 import {
   readRuntime, writeRuntime, watchRuntime, startTimer, pauseTimer, resumeTimer,
@@ -144,8 +144,7 @@ function mountTimer(el, cfg, ctx, { viewAt, label, controls = false }) {
   let last = {};
   const set = (key, value, fn) => { if (last[key] !== value) { last[key] = value; fn(value); } };
 
-  function paint() {
-    const now = serverNow();
+  function paint(now = serverNow()) {
     const v = viewAt(now);
     // Brickan: "Tiden är ute" ersätter rubriken; stort: egen rad under.
     let lab = label;
@@ -169,7 +168,9 @@ function mountTimer(el, cfg, ctx, { viewAt, label, controls = false }) {
     chimer.check(v, cfg.sound, now);
   }
 
-  const stopTick = createTicker(paint, { intervalMs: 250 });
+  // Ritsignal var 250:e ms i takt med klockan (samma i alla fönster) — stoppar
+  // av sig själv om brickan försvinner utan destroy.
+  const stopTick = createClockTicker(paint, { periodMs: 250, el: root });
   const offWatch = ctx.runtime?.watch?.(() => paint()) ?? (() => {});
 
   const onClick = (e) => {
@@ -352,8 +353,8 @@ export const countdown = {
       paint();
     };
     btnsEl.addEventListener("click", onClick);
-    const stopTick = createTicker(paint, { intervalMs: 250 });
-    const offWatch = watchRuntime(ctx.classId, ctx.widgetId, paint);
+    const stopTick = createClockTicker(() => paint(), { periodMs: 250, el: root });
+    const offWatch = watchRuntime(ctx.classId, ctx.widgetId, () => paint());
     return () => {
       f.off();
       stopTick();

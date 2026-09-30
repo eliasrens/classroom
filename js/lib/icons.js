@@ -47,6 +47,7 @@ const PATHS = {
   x: `<path d="m6 6 12 12M18 6 6 18"/>`,
   search: `<circle cx="11" cy="11" r="6"/><path d="m20 20-4.6-4.6"/>`,
   clock: `<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>`,
+  "clock-digital": `<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M7 9.5v5M11.5 10.6v.01M11.5 13.4v.01M15 9.5h2.5v5H15z"/>`,
   undo: `<path d="M4 8h10a5 5 0 0 1 0 10H8M4 8l3.5-3.5M4 8l3.5 3.5"/>`,
   flag: `<path d="M5 21V4c4-2 6 2 10 0v9c-4 2-6-2-10 0"/>`,
   keyboard: `<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6"/>`,
