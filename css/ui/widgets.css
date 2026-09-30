@@ -191,12 +191,30 @@
 .wt__time { font-weight: 700; white-space: nowrap; }
 .wt [hidden] { display: none !important; }
 
-/* Bricka i rubrikraden: [tårtbit] rubrik 12:34 [stapel] [knappar]
-   Trångt (tre brickor, smal tavla): rubriken kortas först (…), siffrorna
-   aldrig; räcker det inte klipps brickan för sig — aldrig in i grannen. */
-.lb-chip:has(> .wt) { overflow: hidden; padding-inline: 0.5em; font-size: 0.95em; }
+/* Bricka i rubrikraden: [tårtbit] rubrik 12:34, stapeln som en tunn linje
+   längs pillerns underkant och lärarens knappar som ett lager ovanpå
+   (hover/fokus) — varken stapel eller knappar tar bredd i den trånga raden.
+   Siffrorna kortas aldrig, och en bricka klipps aldrig in i grannen. */
+.lb-chip:has(> .wt) {
+  position: relative;
+  overflow: hidden;
+  min-width: min-content;
+  padding-inline: 0.5em;
+  font-size: 0.95em;
+}
+.lb-chip:has(> .wt--bar) { padding-bottom: 0.2em; } /* plats för stapeln under siffrorna */
 .wt--chip { display: inline-flex; align-items: center; gap: 0.3em; min-width: 0; }
 .wt--chip > * { flex: none; }
+/* Trång rad (timers.js fitRow), steg för steg:
+   1 "Kvar" bort, 2 rubrikerna kortas, 3 rubrikerna bort,
+   4 "Tiden är ute" → "0:00", 5 vänsterställ (sista brickan klipps). */
+.lb-widgets:is([data-wt-fit="1"], [data-wt-fit="2"], [data-wt-fit="3"], [data-wt-fit="4"], [data-wt-fit="5"]) .wt__label--minor,
+.lb-widgets:is([data-wt-fit="3"], [data-wt-fit="4"], [data-wt-fit="5"]) .wt--chip .wt__label { display: none; }
+.lb-widgets[data-wt-fit="2"] .wt--chip .wt__label { max-width: 3.2em; }
+.wt__short,
+.lb-widgets:is([data-wt-fit="4"], [data-wt-fit="5"]) .wt__long { display: none; }
+.lb-widgets:is([data-wt-fit="4"], [data-wt-fit="5"]) .wt__short { display: inline; }
+.lb-widgets[data-wt-fit="5"] { justify-content: flex-start; }
 .wt--chip .wt__label {
   flex: 0 1 auto;
   min-width: 1.2em;
@@ -209,13 +227,32 @@
 }
 .wt--chip .wt-face { width: 1.05em; height: 1.05em; }
 .wt--chip .wt-bar {
-  width: 2em;
-  height: 0.34em;
+  position: absolute;
+  left: 0.7em;
+  right: 0.7em;
+  bottom: 0.06em;
+  height: 0.12em;
   border-radius: 999px;
   overflow: hidden;
-  background: color-mix(in srgb, currentColor 22%, transparent);
+  background: color-mix(in srgb, currentColor 25%, transparent);
 }
 .wt--chip .wt-bar__fill { background: currentColor; }
+.wt--chip .wt-ctl {
+  position: absolute;
+  inset: 0;
+  justify-content: center;
+  gap: 0.3em;
+  font-size: 0.8em;
+  background: var(--subj);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.lb-chip:hover .wt-ctl,
+.lb-chip:focus-within .wt-ctl { opacity: 1; }
+.lb-chip[data-wt-status="done"] .wt-ctl { background: #c94f4a; }
+.lb-chip[data-wt-status="done"] .wt__long { font-size: 0.8em; }
+/* Pausad: siffrorna dämpas (rubriken med "Pausad" kan vara bortplockad). */
+.wt[data-status="paused"] .wt__time { opacity: 0.6; }
 
 /* Urtavlan ("Time Timer") — röd tårtbit på ljus tavla. */
 .wt-face { display: block; overflow: visible; text-shadow: none; }
@@ -240,12 +277,14 @@
 .wt--large {
   display: grid;
   justify-items: center;
-  gap: 0.12em;
-  min-width: 3.2em;
+  gap: 0.08em;
   text-align: center;
 }
+.wt--large.wt--bar { min-width: 4.4em; }
+/* Urtavlan är redan en tydlig form — tunnare glaskant runt den. */
+.mw:has(> .wt--analog) { padding: calc(var(--mw-font) * 0.14) calc(var(--mw-font) * 0.24); }
 .wt--large .wt__label {
-  max-width: 7em;
+  max-width: 11em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -255,8 +294,8 @@
 }
 .wt--large .wt__time { font-size: 1em; letter-spacing: 0.01em; }
 .wt--large .wt__state { font-size: 0.32em; font-weight: 600; }
-.wt--large.wt--analog .wt-face { width: 2.7em; height: 2.7em; margin: 0.06em 0; }
-.wt--large.wt--analog .wt__time { font-size: 0.5em; }
+.wt--large.wt--analog .wt-face { width: 1.9em; height: 1.9em; }
+.wt--large.wt--analog .wt__time { font-size: 0.42em; }
 .wt--large .wt-bar {
   width: 4.4em;
   height: 0.18em;
@@ -291,7 +330,6 @@
 .wt-ctl__btn:hover, .wt-ctl__btn:focus-visible { opacity: 1; background: color-mix(in srgb, currentColor 16%, transparent); }
 .wt-ctl__btn:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
 .wt-ctl__btn .icon { width: 0.78em; height: 0.78em; }
-.wt--chip .wt-ctl { font-size: 0.7em; gap: 0.25em; }
 
 /* När tiden är ute: färgmarkering + lugn pulsering (nyss slut). */
 .lb-chip[data-wt-status="done"] {
@@ -337,13 +375,19 @@
 .wt-set__check { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; cursor: pointer; }
 .wt-set__check .wt-set__hint { flex-basis: 100%; padding-left: 1.6em; }
 .wt-set__check input { accent-color: var(--color-accent); }
-.wt-set__looks { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--color-line); border-radius: var(--radius-m); overflow: hidden; }
+/* Utseende: tre valbara "piller" (radbryts snyggt i den smala panelen). */
+.wt-set__looks { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .wt-set__look { position: relative; cursor: pointer; }
 .wt-set__look input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: inherit; }
-.wt-set__look span { display: block; padding: 2px var(--space-2); font-weight: 600; }
-.wt-set__look + .wt-set__look span { border-left: 1px solid var(--color-line); }
-.wt-set__look input:checked + span { background: var(--color-accent); color: var(--color-accent-ink); }
-.wt-set__look input:focus-visible + span { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+.wt-set__look span {
+  display: block;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  font-weight: 600;
+}
+.wt-set__look input:checked + span { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-ink); }
+.wt-set__look input:focus-visible + span { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 .wt-set__run {
   display: flex;
   align-items: center;

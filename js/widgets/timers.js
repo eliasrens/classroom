@@ -108,6 +108,24 @@ function ctlHTML(status, { withText = false, cls = "" } = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Trång rubrikrad: brickornas yta (.lb-widgets) har fast storlek. Ryms inte
+// timerbrickorna tas det minst viktiga bort, ett steg i taget:
+//   1 "Kvar" (kvar av lektionen), 2 rubrikerna kortas ("Läs…"), 3 rubrikerna
+//   bort, 4 "Tiden är ute" blir "0:00", 5 raden vänsterställs (sista brickan
+//   klipps i kanten). Siffrorna står alltid kvar. Stilarna: css/ui/widgets.css.
+// ---------------------------------------------------------------------------
+
+const FIT_LEVELS = 5;
+
+function fitRow(row) {
+  if (!row?.isConnected) return;
+  const overflows = () => row.scrollWidth > row.clientWidth + 1;
+  let level = 0;
+  row.dataset.wtFit = "0";
+  while (level < FIT_LEVELS && overflows()) row.dataset.wtFit = String(++level);
+}
+
+// ---------------------------------------------------------------------------
 // Rendering — en gemensam ritare för båda typerna och båda formerna.
 // ---------------------------------------------------------------------------
 
@@ -115,9 +133,10 @@ function ctlHTML(status, { withText = false, cls = "" } = {}) {
  * Monterar en timer i el.
  *   viewAt(now) → timer-vyn (timer-logic.js)
  *   label       → fast rubrik ("Kvar", lärarens rubrik, …)
+ *   minor       → rubriken är minst viktig (tas bort först i en trång rad)
  *   controls    → nedräkningens knappar (bara lärarvyn)
  */
-function mountTimer(el, cfg, ctx, { viewAt, label, controls = false }) {
+function mountTimer(el, cfg, ctx, { viewAt, label, minor = false, controls = false }) {
   destroy(el);
   const chip = ctx.form === "chip";
   const look = cfg.look;
@@ -133,6 +152,7 @@ function mountTimer(el, cfg, ctx, { viewAt, label, controls = false }) {
 
   const $ = (s) => root.querySelector(s);
   const labelEl = $(".wt__label");
+  labelEl.classList.toggle("wt__label--minor", minor); // tas bort först när raden är trång
   const timeEl = $(".wt__time");
   const stateEl = $(".wt__state");
   const pieEl = $(".wt-face__pie");
@@ -141,20 +161,36 @@ function mountTimer(el, cfg, ctx, { viewAt, label, controls = false }) {
   const pieR = chip ? PIE_R_CHIP : PIE_R_LARGE;
   const chimer = createChimer({ view: ctx.view, classId: ctx.classId, widgetId: ctx.widgetId });
 
-  let last = {};
-  const set = (key, value, fn) => { if (last[key] !== value) { last[key] = value; fn(value); } };
+  const last = {};
+  const WIDTH_KEYS = new Set(["label", "text", "status"]); // ändrar brickans bredd
+  let widthChanged = false;
+  const set = (key, value, fn) => {
+    if (last[key] === value) return;
+    last[key] = value;
+    if (WIDTH_KEYS.has(key)) widthChanged = true;
+    fn(value);
+  };
+  const row = chip ? el.closest(".lb-widgets") : null;
 
   function paint(now = serverNow()) {
     const v = viewAt(now);
     // Brickan: "Tiden är ute" ersätter rubriken; stort: egen rad under.
     let lab = label;
+    let text = v.text;
     if (chip) {
-      if (v.status === "done") lab = v.label;
+      // Slut i brickan: nedräkningen säger "Tiden är ute" i stället för
+      // "0:00", "Kvar av lektionen" säger "Slut" — ett ord, ingen rubrik.
+      if (v.status === "done") { lab = ""; if (v.label && v.text === "0:00") text = `${v.label}\u0000${v.text}`; }
       else if (v.status === "paused") lab = [label, v.label].filter(Boolean).join(" · ");
       else if (v.status !== "running" && v.status !== "idle") lab = ""; // "Börjar om 5 min" står för sig själv
     }
     set("label", lab, (t) => { labelEl.textContent = t; labelEl.hidden = !t; });
-    set("text", v.text, (t) => { timeEl.textContent = t; });
+    set("text", text, (t) => {
+      // "lång\0kort": fitRow väljer den korta när den långa inte ryms.
+      const [long, short] = t.split("\u0000");
+      if (short == null) timeEl.textContent = t;
+      else timeEl.innerHTML = `<span class="wt__long">${esc(long)}</span><span class="wt__short">${esc(short)}</span>`;
+    });
     if (stateEl) set("state", v.label, (t) => { stateEl.textContent = t; stateEl.hidden = !t; });
     set("status", v.status, (s) => {
       root.dataset.status = s;
@@ -166,12 +202,22 @@ function mountTimer(el, cfg, ctx, { viewAt, label, controls = false }) {
     if (fillEl) set("fill", Math.round(v.fraction * 1000), (f) => { fillEl.style.transform = `scaleX(${f / 1000})`; });
     root.title = [label, v.text, v.label].filter(Boolean).join(" · ");
     chimer.check(v, cfg.sound, now);
+    // Bredden ändras bara när texten/läget gör det — mät då (inte varje tick).
+    if (row && widthChanged) fitRow(row);
+    widthChanged = false;
   }
 
   // Ritsignal var 250:e ms i takt med klockan (samma i alla fönster) — stoppar
   // av sig själv om brickan försvinner utan destroy.
   const stopTick = createClockTicker(paint, { periodMs: 250, el: root });
   const offWatch = ctx.runtime?.watch?.(() => paint()) ?? (() => {});
+  // Tavlan byter storlek (fönstret, --lb-scale) → pröva igen.
+  let ro = null;
+  if (row && typeof ResizeObserver === "function") {
+    let w = row.clientWidth;
+    ro = new ResizeObserver(() => { if (row.clientWidth !== w) { w = row.clientWidth; fitRow(row); } });
+    ro.observe(row);
+  }
 
   const onClick = (e) => {
     const b = e.target.closest("[data-wt-act]");
@@ -185,6 +231,7 @@ function mountTimer(el, cfg, ctx, { viewAt, label, controls = false }) {
   mounts.set(el, () => {
     stopTick();
     offWatch();
+    ro?.disconnect();
     ctlEl?.removeEventListener("click", onClick);
     root.remove();
     delete el.dataset.wtStatus;
@@ -256,7 +303,7 @@ export const timeLeft = {
   renderChip(el, cfg, ctx) {
     const c = normalizeTimeLeftCfg(cfg);
     // Tårtbiten säger "kvar" själv — då får siffrorna platsen.
-    mountTimer(el, c, ctx, { label: c.look === "analog" ? "" : "Kvar", viewAt: (now) => lessonLeftView(ctx.lesson, now) });
+    mountTimer(el, c, ctx, { label: c.look === "analog" ? "" : "Kvar", minor: true, viewAt: (now) => lessonLeftView(ctx.lesson, now) });
   },
   renderLarge(el, cfg, ctx) {
     const c = normalizeTimeLeftCfg(cfg);
