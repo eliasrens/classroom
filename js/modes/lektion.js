@@ -59,6 +59,11 @@
  *   ("Visas nu"-brickan i listan räcker). Utskicket görs av
  *   elevskärmspanelens enda knapp via lägets onPresent (js/lib/present.js).
  *
+ * - Widgets (issue #115, js/widgets/README.md): plan.widgets visas som
+ *   brickor i rubrikraden mellan ämnet och "Tid: …" (högst 3), valda i
+ *   den fällbara sektionen "Widgets" efter "Fält". Utan widgets är tavlans
+ *   markup exakt som förut; brickorna påverkar aldrig fitBoard.
+ *
  * Kontrakt: docs/MODULKONTRAKT.md. Data: DATAMODELL.md.
  * Planeringar OCH presentedPlanId är PRIVATA per lärare
  * (teachers/{uid}/classes/{id}/lessonPlans resp. …/settings/lektion, se
@@ -86,6 +91,9 @@ import { collapsibleHTML, mountCollapsibles } from "../ui/collapsible.js";
 import { createMenuButton } from "../ui/menu-button.js";
 import { openSendPlanDialog } from "../ui/send-plan-dialog.js";
 import { setActiveClass } from "../ui/class-picker.js";
+import { normalizeLessonWidgets, copyLessonWidgets } from "../widgets/registry.js";
+import { chipsHTML, createChipHost } from "../widgets/host.js";
+import { mountWidgetSettings, widgetsSummary } from "../widgets/settings-ui.js";
 
 /* De nio av-/påslagbara delarna, i den ordning kryssrutorna visas.
    `slot` säger var i tavlan de bor; `list` = flerradsfält. */
@@ -198,6 +206,9 @@ function normalizePlan(plan) {
       // "Bra jobbat"-rutan i högerkolumnen (delas med "När du är klar").
       praise: show.praise ?? false,
     },
+    // Widgets (issue #115): brickor i rubrikraden, [{ id, type, cfg }].
+    // Följer med i Kopiera och Skicka kopia.
+    widgets: normalizeLessonWidgets(p.widgets),
   };
 }
 
@@ -251,7 +262,9 @@ function boardHTML(rawPlan, subjects, { praise = false } = {}) {
     const timeEl = show.time && (plan.start || plan.end)
       ? `<div class="lb-time">Tid: ${esc(plan.start)}${plan.end ? "–" + esc(plan.end) : ""}</div>`
       : (show.time ? "" : "");
-    top = `<div class="lb-top">${subjEl}${timeEl || `<span></span>`}</div>`;
+    // Widgetbrickorna (issue #115) mellan ämnet och tiden — "" utan widgets,
+    // så att tavlan då är exakt som förut.
+    top = `<div class="lb-top">${subjEl}${chipsHTML(plan.widgets)}${timeEl || `<span></span>`}</div>`;
   }
 
   // Mitten — tre kolumner, var och en utelämnas helt om tom
@@ -339,8 +352,9 @@ function fitBoard(fitEl, praiseBoard = null) {
  * Ritar tavlan i `container` (lärarens förhandsvisning eller elevvyn),
  * hänger in Bra jobbat-rutan och anpassar texten.
  * `praise` = { board, names, emptyText } — board skapas en gång per montering.
+ * `chips` = widgetbrickornas värd (js/widgets/host.js), en per montering.
  */
-function renderBoard(container, rawPlan, subjects, praise) {
+function renderBoard(container, rawPlan, subjects, praise, chips) {
   const plan = normalizePlan(rawPlan);
   const withPraise = plan.show.praise && (praise.names.length > 0 || !!praise.emptyText);
   container.innerHTML = `<div class="lb-fit">${boardHTML(plan, subjects, { praise: withPraise })}</div>`;
@@ -350,6 +364,7 @@ function renderBoard(container, rawPlan, subjects, praise) {
     slot.append(praise.board.el);
     praise.board.setNames(praise.names, { emptyText: praise.emptyText });
   }
+  chips?.mount(fitEl);
   fitBoard(fitEl, slot ? praise.board : null);
 }
 
@@ -433,9 +448,17 @@ function fieldsSummary(rawPlan) {
   return names.length ? `${names.join(", ")} visas` : "Inga fält visas";
 }
 
+/** "Klocka (digital)" / "Inga widgets" — "Widgets" när blocket är infällt. */
+function lessonWidgetsSummary(rawPlan) {
+  return rawPlan ? widgetsSummary(normalizePlan(rawPlan).widgets) : "";
+}
+
 /* ============================================================
    MODEN
    ============================================================ */
+
+/** Exporterad för docs/test-widgets.mjs (widgets följer med planeringen). */
+export { normalizePlan };
 
 export default {
   id: "lektion",
@@ -524,6 +547,10 @@ export default {
     });
     this._offs.push(() => praiseBoard.destroy());
 
+    // ---------- Widgetbrickorna i rubrikraden (issue #115) ----------
+    const chipHost = createChipHost({ view, classId: activeClass.id });
+    this._offs.push(() => chipHost.destroy());
+
     function praiseNames() {
       return shownPraise().map((p) => {
         if (p.kind === "free") return p.text;
@@ -581,8 +608,8 @@ export default {
       const renderStudent = () => {
         if (!stage.isConnected) return;
         const p = presentedPlan();
-        if (p) renderBoard(stage, p, subjects, praise());
-        else stage.innerHTML = `<div class="lesson-empty"><h1>Ingen planering visas</h1><p>Läraren väljer en lektion att visa.</p></div>`;
+        if (p) renderBoard(stage, p, subjects, praise(), chipHost);
+        else { chipHost.destroy(); stage.innerHTML = `<div class="lesson-empty"><h1>Ingen planering visas</h1><p>Läraren väljer en lektion att visa.</p></div>`; }
       };
       observeStage(stage);
       this._offs.push(data.watch(plansPath, (docs) => { plans = docs; renderStudent(); }));
@@ -663,6 +690,10 @@ export default {
             <p class="field-edit__hint">Kryssrutan slår av/på fältet på tavlan — layouten omfördelar sig automatiskt. Valen sparas med planeringen.</p>
             <div data-el="fields"></div>
           </div>` })}
+
+          ${collapsibleHTML({ key: "widgets", level: 2, className: "lesson-fold", title: "Widgets", body: `<div class="lesson-panel__group">
+            <div data-el="widgets"></div>
+          </div>` })}
         </aside>
 
         <div class="lesson__main">
@@ -672,6 +703,7 @@ export default {
 
     const listEl = el.querySelector('[data-el="list"]');
     const fieldsEl = el.querySelector('[data-el="fields"]');
+    const widgetsEl = el.querySelector('[data-el="widgets"]');
     const stageEl = el.querySelector('[data-el="stage"]');
     const bulkEl = el.querySelector('[data-el="bulk"]');
     const confirmEl = el.querySelector('[data-el="confirm"]');
@@ -915,6 +947,18 @@ export default {
       return rows.join("");
     }
 
+    // -- Widgets (issue #115): kryssrutor + egna inställningar, sparas i planeringen --
+    const widgetsUI = mountWidgetSettings(widgetsEl, {
+      form: "lesson",
+      ctx: { view, classId: activeClass.id },
+      get: () => (editingPlan() ? normalizePlan(editingPlan()).widgets : []),
+      set: async (widgets) => {
+        await patchEditing({ widgets });
+        renderPreview();
+      },
+    });
+    this._offs.push(() => widgetsUI.destroy());
+
     // -- Bra jobbat-redigeraren i fältet (monteras om med fälten) --
     let praiseEditor = null;
     this._offs.push(() => praiseEditor?.destroy());
@@ -1041,6 +1085,7 @@ export default {
     function renderSummaries() {
       folds.setSummary("about", aboutSummary(editingPlan(), subjects));
       folds.setSummary("fields", fieldsSummary(editingPlan()));
+      folds.setSummary("widgets", lessonWidgetsSummary(editingPlan()));
     }
 
     function renderBulk() {
@@ -1089,8 +1134,8 @@ export default {
     function renderPreview() {
       if (!stageEl.isConnected) return;
       const p = editingPlan();
-      if (p) renderBoard(stageEl, p, subjects, praise());
-      else stageEl.innerHTML = `<div class="lesson-empty"><h1>Ingen planering</h1><p>Skapa en ny planering för att börja.</p></div>`;
+      if (p) renderBoard(stageEl, p, subjects, praise(), chipHost);
+      else { chipHost.destroy(); stageEl.innerHTML = `<div class="lesson-empty"><h1>Ingen planering</h1><p>Skapa en ny planering för att börja.</p></div>`; }
       renderPresentState();
       renderSummaries();
     }
@@ -1141,7 +1186,7 @@ export default {
       const disabled = !p;
       for (const inp of metaInputs()) inp.disabled = disabled;
       editorFor = p?.id ?? null;
-      if (!p) { fieldsEl.innerHTML = ""; mountFieldPraise(); return; }
+      if (!p) { fieldsEl.innerHTML = ""; widgetsEl.innerHTML = ""; mountFieldPraise(); return; }
       const np = normalizePlan(p);
       el.querySelector('[data-meta="name"]').value = np.name;
       el.querySelector('[data-meta="date"]').value = np.date;
@@ -1151,6 +1196,7 @@ export default {
       renderSubjectHint();
       fieldsEl.innerHTML = fieldsHTML(np);
       mountFieldPraise();
+      widgetsUI.render();
     }
     function syncEditor() {
       if ((editingPlan()?.id ?? null) !== editorFor) renderEditor();
@@ -1187,6 +1233,7 @@ export default {
       if (!src) return;
       const copy = normalizePlan(src);
       delete copy.id;
+      copy.widgets = copyLessonWidgets(copy.widgets);
       copy.ownerUid = currentUid();
       copy.date = nextSameWeekday(copy.date);
       if (copy.date === src.date) copy.name = `${copy.name} (kopia)`;
