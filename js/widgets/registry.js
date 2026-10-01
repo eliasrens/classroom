@@ -188,6 +188,23 @@ export function rectsOverlap(a, b, gap = 0) {
 }
 
 /**
+ * Överlappar widgetens form `a` rektangeln `b` (med marginal `gap`)? En
+ * rund widget (`a.round`, t.ex. den analoga klockan) räknas som cirkeln i
+ * sin kvadrat — hörnen på kvadraten är tomma och får gå in över kortets
+ * hörn (issue #119).
+ */
+export function shapeOverlaps(a, b, gap = 0) {
+  if (!rectsOverlap(a, b, gap)) return false;
+  if (!a.round) return true;
+  const r = Math.min(a.right - a.left, a.bottom - a.top) / 2;
+  const cx = (a.left + a.right) / 2;
+  const cy = (a.top + a.bottom) / 2;
+  const nx = Math.max(b.left, Math.min(cx, b.right));
+  const ny = Math.max(b.top, Math.min(cy, b.bottom));
+  return Math.hypot(cx - nx, cy - ny) < r + gap;
+}
+
+/**
  * Platserna i ordning efter avstånd från `slot` (närmast först). Avståndet
  * mäts mellan hörnen i en yta på width × height — på en bred skärm är
  * hörnet rakt under/över alltså närmare än hörnet på andra sidan.
@@ -200,39 +217,91 @@ export function slotsByDistance(slot, width = 16, height = 9) {
 }
 
 /**
- * Var widgetarna faktiskt hamnar. `items` = [{ id, slot }] i prioritetsordning,
- * `rectFor(item, slot)` = widgetens rektangel om den står på `slot`,
- * `obstacles` = rektanglar som aldrig får skymmas (kortet, Bra jobbat-tavlan).
- * En widget som krockar flyttas till närmaste lediga plats; widgetar som
- * står på sin egen plats utan krock går först, så de aldrig knuffas bort.
- * → Map(id → slot | null) — null = ingen plats ledig (widgeten döljs).
+ * Var widgetarna faktiskt hamnar och hur stora de blir (issue #115, #119).
+ *
+ *   items     = [{ id, slot }] i prioritetsordning
+ *   rectFor(item, slot, scale) = widgetens form på `slot` i skala `scale`
+ *               (1 = lärarens storlek), { left, top, right, bottom, round? },
+ *               förankrad i hörnet — en mindre form ligger inuti en större
+ *   minScale(item) = minsta tillåtna skala (storlek S i förhållande till
+ *               lärarens), standard 1 = krymp aldrig
+ *   obstacles = rektanglar som aldrig får skymmas (kortet, Bra jobbat-tavlan),
+ *               valfritt med `name` ("kortet") för panelens förklaring
+ *
+ * Ordning: 1) alla som ryms där läraren ställt dem, i sin storlek;
+ * 2) de som inte gör det KRYMPER i sitt hörn till största skala som ryms
+ * (hellre mindre än i ett annat hörn); 3) först när inte ens minsta skalan
+ * ryms flyttas widgeten till närmaste lediga hörn (största skala som ryms
+ * där). Den som står rätt knuffas aldrig bort.
+ *
+ * → Map(id → { slot, scale, blockedBy }) — `slot` null = ingen plats (döljs);
+ *   `blockedBy` = namnen på det som skulle skymts i lärarens hörn och storlek
+ *   (tom när widgeten står som läraren valt).
  */
-export function resolveSlots(items, { rectFor, obstacles = [], width = 16, height = 9, gap = 0 }) {
+export function resolveSlots(items, { rectFor, minScale = () => 1, obstacles = [], width = 16, height = 9, gap = 0 }) {
   const result = new Map();
   const placed = []; // { slot, rect }
-  const fits = (item, slot) => {
+  const obs = obstacles.filter(Boolean);
+  const fits = (item, slot, scale) => {
     if (placed.some((p) => p.slot === slot)) return null;
-    const rect = rectFor(item, slot);
+    const rect = rectFor(item, slot, scale);
     if (!rect) return null;
-    if (obstacles.some((o) => o && rectsOverlap(rect, o, gap))) return null;
-    if (placed.some((p) => rectsOverlap(rect, p.rect, gap))) return null;
+    if (obs.some((o) => shapeOverlaps(rect, o, gap))) return null;
+    if (placed.some((p) => shapeOverlaps(rect, p.rect, gap))) return null;
     return rect;
   };
-  const rest = [];
-  // 1) Alla som får plats där läraren ställt dem.
-  for (const item of items) {
-    const rect = fits(item, item.slot);
-    if (rect) { placed.push({ slot: item.slot, rect }); result.set(item.id, item.slot); }
-    else rest.push(item);
-  }
-  // 2) Krockarna flyttas till närmaste lediga plats.
-  for (const item of rest) {
-    let got = null;
-    for (const slot of slotsByDistance(item.slot, width, height)) {
-      const rect = fits(item, slot);
-      if (rect) { placed.push({ slot, rect }); got = slot; break; }
+  // Största skala i [min, 1] som ryms på slot (formen växer monotont i
+  // hörnet → binärsökning), avrundad nedåt till hundradelar. null = ryms inte.
+  const largest = (item, slot) => {
+    if (fits(item, slot, 1)) return 1;
+    const min = Math.min(1, Math.max(0, minScale(item) ?? 1));
+    if (min >= 1 || !fits(item, slot, min)) return null;
+    let lo = min, hi = 1;
+    for (let i = 0; i < 14; i++) {
+      const mid = (lo + hi) / 2;
+      if (fits(item, slot, mid)) lo = mid; else hi = mid;
     }
-    result.set(item.id, got);
+    return Math.max(min, Math.floor(lo * 100) / 100);
+  };
+  const place = (item, slot, scale) => {
+    const blockedBy = blockers(item); // före push — widgeten skymmer aldrig sig själv
+    placed.push({ slot, rect: rectFor(item, slot, scale) });
+    result.set(item.id, { slot, scale, blockedBy });
+  };
+  // Vad som skulle skymts om widgeten stod som läraren valt (för panelen).
+  const blockers = (item) => {
+    const rect = rectFor(item, item.slot, 1);
+    if (!rect) return [];
+    const names = obs.filter((o) => shapeOverlaps(rect, o, gap)).map((o) => o.name ?? "");
+    if (placed.some((p) => p.slot !== item.slot && shapeOverlaps(rect, p.rect, gap))) names.push("widget");
+    return [...new Set(names)];
+  };
+
+  // 1) Alla som ryms där läraren ställt dem, i sin storlek.
+  let rest = [];
+  for (const item of items) {
+    if (fits(item, item.slot, 1)) {
+      placed.push({ slot: item.slot, rect: rectFor(item, item.slot, 1) });
+      result.set(item.id, { slot: item.slot, scale: 1, blockedBy: [] });
+    } else rest.push(item);
+  }
+  // 2) Krymp i det egna hörnet.
+  const moving = [];
+  for (const item of rest) {
+    const scale = largest(item, item.slot);
+    if (scale != null) place(item, item.slot, scale);
+    else moving.push(item);
+  }
+  // 3) Flytta till närmaste hörn där den ryms (största skala där).
+  rest = moving;
+  for (const item of rest) {
+    let done = false;
+    for (const slot of slotsByDistance(item.slot, width, height)) {
+      if (slot === item.slot) continue;
+      const scale = largest(item, slot);
+      if (scale != null) { place(item, slot, scale); done = true; break; }
+    }
+    if (!done) result.set(item.id, { slot: null, scale: 1, blockedBy: blockers(item) });
   }
   return result;
 }
