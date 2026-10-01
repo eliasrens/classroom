@@ -3,7 +3,8 @@
 Del 1 (issue #115) är grunden: register, datamodell, körtillstånd,
 inställnings-UI och rendering. Den första widgeten är **Klocka (digital)**;
 del 2 (#116) lägger till **Klocka (analog)** och klockornas inställningar;
-del 3 (#117) lägger till timrarna **Kvar av lektionen** och **Nedräkning**.
+del 3 (#117) lägger till timrarna **Kvar av lektionen** och **Nedräkning**;
+del 4 (#118) lägger till **Ljudnivåskylt** och **Ljudmätare**.
 Del 2–4 (klockor, timrar, ljudnivå) bygger på det som står här.
 
 | Fil | Jobb |
@@ -18,6 +19,10 @@ Del 2–4 (klockor, timrar, ljudnivå) bygger på det som står här.
 | `timers.js` | Kvar av lektionen + Nedräkning (#117): rendering, knappar, inställningar |
 | `timer-logic.js` | Timrarnas rena logik: vad som visas nu, urtavlans tårtbit, tonens fönsterval (Node-testad) |
 | `chime.js` | Mjuk ton med Web Audio + vilket fönster som spelar den |
+| `sound-sign.js` | Ljudnivåskylt (#118): bricka, stor skylt med SVG-symbol, nivåknappar, namn; `fitSoundRow` |
+| `sound-meter.js` | Ljudmätare (#118): stapel/halvcirkel, gräns, "Koppla till skylten", utskick till elevskärmen |
+| `sound-mic.js` | Fönstrets enda mikrofon (getUserMedia + AnalyserNode), öppnas/stängs uttryckligen |
+| `sound-level.js` | Ljudnivåns rena logik: nivåer, RMS → skala, zoner, gränsen, "för högt"-hysteresen (Node-testad) |
 | `css/ui/widgets.css` | Alla widget-stilar |
 
 ## En ny widget-typ
@@ -54,6 +59,8 @@ export default {
   form: "chip" | "large",
   size: "s" | "m" | "l" | null,          // bara Morgonskärmen
   runtime: { read(), write(state), watch(cb) → off },  // körtillståndet för DENNA instans
+  sync,                                  // sync-bussen (#118: mätarens nivå till elevskärmen)
+  siblings() → [{ id, type, cfg }],      // de andra widgetarna i samma lista (#118: mätaren hittar skylten)
 }
 ```
 
@@ -132,6 +139,45 @@ export default {
   om ingen tagit tonen). Aldrig i förhandsvisningen (`?preview`). "Tagen"
   lagras lokalt per widget och slut (`classroom:local:widgets-chime/…`), så
   en omladdning spelar den inte igen; ett slut äldre än 15 s spelas inte.
+
+### Ljudnivå (#118)
+
+| Typ | cfg (standard) | Körtillstånd |
+|---|---|---|
+| `sound-sign` "Ljudnivåskylt" (en) | `{ names: ["Tyst", "Viska", "Prata lågt", "Prata", "Redovisa"] }` | `{ level: 0–4 }` (standard 1) |
+| `sound-meter` "Ljudmätare" (en) | `{ limit: 0.6, linkSign: false }` | inget sparat — nivån skickas live |
+
+- **Skylten**: nivå 0–4 med färg (`LEVELS` i `sound-level.js`) och lärarens
+  namn. Bricka "● 1 Viska"; stor: rund färgskylt med en egen SVG-symbol per
+  nivå (huvud + mun + 0–3 ljudvågor, Tyst = "sch"-finger). Läraren byter
+  nivå i inställningarna, med ‹ › som lager på brickan (hover/fokus) och
+  med 0–4-knapparna under den stora skylten — bara i lärarvyn.
+- **Mätaren**: mikrofonen (`sound-mic.js`) öppnas BARA i lärarfönstret när
+  läraren trycker Starta, och bara en gång per fönster. Var 100:e ms: RMS
+  av `AnalyserNode`-samplen, glidande medel över 0,5 s, dB-skala −60…−10 dB
+  → 0–1. Nivån (ett tal) går till elevskärmen via sync-bussen
+  (`widgets:sound`); elevvyn öppnar aldrig mikrofonen och visar ingenting
+  när mätaren inte går (av, nekad, ingen mikrofon, ingen nivå på 2,5 s).
+  Mikrofonen stängs helt (tracks stoppas, ljudkontexten stängs) vid Stoppa,
+  när ingen vy av mätaren finns kvar (widgeten kryssas ur, läget byts) och
+  vid `pagehide`.
+- **Zoner**: rött från gränsen, gult 0,15 under den, grönt därunder.
+  "Koppla till skylten" (och en skylt finns i samma lista): gränsen följer
+  skyltens nivå (`SIGN_LIMITS` = 0,30 / 0,45 / 0,60 / 0,75 / 0,90).
+  Över gränsen i 3 s → lugnt rött (bricka/glas), tillbaka först efter 2 s
+  under gränsen − 0,05 (`createOverDetector`). Ingen ljudsignal.
+- **Dataskydd**: inget spelas in, lagras eller skickas — texten står i
+  inställningarna (`PRIVACY_TEXT`). Mikrofon nekad / saknas: vänlig text i
+  lärarvyn (hela texten i inställningarna, kort på den stora mätaren —
+  ovanpå halvcirkeln, så widgetens storlek är densamma i lärar- och elevvyn).
+- **Trång rubrikrad** (`fitSoundRow`, `data-ws-fit` på `.lb-widgets`):
+  1 mätarens ikon bort, 2 kortare stapel, 3 mätaren blir en liten stående
+  stapel, 4 skyltens namn bort ("● 2"), 5 vänsterställt. Pricken, siffran
+  och stapeln tas aldrig bort. Med skylt + mätare i samma rad ryms Tyst,
+  Viska och Prata med namn; Prata lågt och Redovisa visas som "● 2"/"● 4".
+- **Stort**: allt i em från `--mw-font`, så skylten och halvcirkeln krymper
+  med #119:s hörnlogik; lärarknapparna och texterna har en minsta storlek
+  (11 px) så de går att läsa även i storlek S.
 
 ### Egna inställningar
 
@@ -213,3 +259,7 @@ inställningar, ritsignalen och att `destroy` inte lämnar några timrar.
 `node docs/test-timers.mjs` (#117) — kvarvarande tid, paus/fortsätt,
 omladdning, kvar av lektionen före/under/efter, två timrar samtidigt,
 urtavlan och att tonen spelas i ett fönster, en gång.
+`node docs/test-sound-level.mjs` (#118) — RMS → zon med gränsen, kopplingen
+till skylten, "för högt i N sekunder"-hysteresen, att mikrofonen öppnas en
+gång och stängs när widgeten stängs (mockad `getUserMedia`), nekad
+mikrofon, elevvyn och skylten.

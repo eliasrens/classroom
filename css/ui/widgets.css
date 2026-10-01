@@ -498,12 +498,27 @@
 .lb-chip:has(> .wsign),
 .lb-chip:has(> .wsound) { flex: none; }
 /* Trång rad (sound-sign.js fitSoundRow), steg för steg. */
-.lb-widgets:is([data-ws-fit="1"], [data-ws-fit="2"], [data-ws-fit="3"], [data-ws-fit="4"]) .wsound--chip > .icon { display: none; }
+.lb-widgets:is([data-ws-fit="1"], [data-ws-fit="2"], [data-ws-fit="3"], [data-ws-fit="4"], [data-ws-fit="5"]) .wsound--chip > .icon { display: none; }
 .lb-widgets:is([data-ws-fit="2"], [data-ws-fit="3"], [data-ws-fit="4"]) .wsound--chip .wsound__bar { width: 2.2em; }
-.lb-widgets:is([data-ws-fit="3"], [data-ws-fit="4"]) .wsign--chip > .wsign__name { display: none; }
-.lb-widgets[data-ws-fit="4"] { justify-content: flex-start; }
+/* 3: mätaren blir en liten stående stapel (fylls nedifrån, gränsen som streck). */
+.lb-widgets:is([data-ws-fit="3"], [data-ws-fit="4"], [data-ws-fit="5"]) .lb-chip:has(> .wsound) { padding-inline: 0.3em; }
+.lb-widgets:is([data-ws-fit="3"], [data-ws-fit="4"], [data-ws-fit="5"]) .wsound--chip .wsound__bar { width: 0.42em; height: 0.95em; }
+.lb-widgets:is([data-ws-fit="3"], [data-ws-fit="4"], [data-ws-fit="5"]) .wsound--chip .wsound__zones {
+  background: linear-gradient(to top,
+    var(--wsound-green) 0 calc(var(--wsound-warn) * 100%),
+    var(--wsound-yellow) calc(var(--wsound-warn) * 100%) calc(var(--wsound-limit) * 100%),
+    var(--wsound-red) calc(var(--wsound-limit) * 100%) 100%);
+}
+.lb-widgets:is([data-ws-fit="3"], [data-ws-fit="4"], [data-ws-fit="5"]) .wsound--chip .wsound__fill { transform-origin: center bottom; transform: scaleY(var(--wsound-level)); }
+.lb-widgets:is([data-ws-fit="3"], [data-ws-fit="4"], [data-ws-fit="5"]) .wsound--chip[data-status]:not([data-status="on"]) .wsound__fill { transform: scaleY(0); }
+.lb-widgets:is([data-ws-fit="3"], [data-ws-fit="4"], [data-ws-fit="5"]) .wsound--chip .wsound__mark {
+  left: 0; right: 0; top: auto; width: auto; height: 2px; margin: 0 0 -1px;
+  bottom: calc(var(--wsound-limit) * 100%);
+}
+.lb-widgets:is([data-ws-fit="4"], [data-ws-fit="5"]) .wsign--chip > .wsign__name { display: none; }
+.lb-widgets[data-ws-fit="5"] { justify-content: flex-start; }
 
-/* Bricka: "● 1 Viska" (+ ‹ ● 1 › som lager i lärarvyn). */
+/* Bricka: "● 1 Viska" (+ ‹ 1 › som lager i lärarvyn). */
 .wsign--chip { display: inline-flex; align-items: center; gap: 0.32em; height: 1.2em; min-width: 0; }
 .wsign--chip > * { flex: none; }
 .wsign__steps {
@@ -512,7 +527,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.3em;
+  gap: 0.12em;
   background: var(--subj);
   opacity: 0;
   transition: opacity 0.15s ease;
@@ -530,7 +545,7 @@
   font: inherit;
   cursor: pointer;
 }
-.wsign--chip .wsign__btn { font-size: 0.72em; width: 1.2em; height: 1.2em; border-radius: 50%; opacity: 0.55; }
+.wsign--chip .wsign__btn { font-size: 0.72em; width: 1.05em; height: 1.2em; border-radius: 999px; opacity: 0.7; }
 .wsign--chip .wsign__btn:hover { opacity: 1; background: color-mix(in srgb, currentColor 14%, transparent); }
 .wsign--chip .wsign__btn:disabled { opacity: 0.18; cursor: default; background: none; }
 .wsign__btn:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; opacity: 1; }
@@ -555,7 +570,7 @@
 .wsign--large .wsign__num { font-size: 1em; line-height: 0.9; }
 .wsign--large .wsign__name { font-size: 0.42em; font-weight: 700; letter-spacing: 0.01em; }
 /* Lärarvyns små nivåknappar under skylten. */
-.wsign__pick { display: flex; gap: 0.35em; font-size: 0.2em; text-shadow: none; }
+.wsign__pick { display: flex; gap: 0.35em; font-size: max(0.2em, 11px); text-shadow: none; }
 .wsign__pick .wsign__btn {
   width: 1.9em;
   height: 1.9em;
@@ -651,6 +666,9 @@
   opacity: 0;
   transition: opacity 0.15s ease;
 }
+/* Smal bricka (trång rad): bara ikonen på knappen. */
+.wsound__ctl { container-type: inline-size; }
+@container (max-width: 5em) { .wsound--chip .wsound__btn > span { display: none; } }
 .lb-chip:hover .wsound__ctl,
 .lb-chip:focus-within .wsound__ctl { opacity: 1; }
 .wsound--chip .wsound__btn {
@@ -673,7 +691,7 @@
 }
 
 /* Stor: halvcirkelmätare (viewBox −100…100). */
-.wsound--large { display: flex; flex-direction: column; align-items: center; width: 3.4em; }
+.wsound--large { position: relative; display: flex; flex-direction: column; align-items: center; width: 3.4em; }
 .wsound__gauge { display: block; width: 100%; height: auto; overflow: visible; }
 .wsound__arc { fill: none; stroke-width: 15; opacity: 0.38; }
 .wsound__arc--green { stroke: var(--wsound-green); }
@@ -684,15 +702,24 @@
 .wsound__needle line { stroke: #fff; stroke-width: 5; stroke-linecap: round; }
 .wsound__hub { fill: #fff; }
 .wsound--large[data-status]:not([data-status="on"]) .wsound__gauge { opacity: 0.55; }
+/* Lärarens text (av, nekad, ingen mikrofon) ligger OVANPÅ halvcirkeln — den
+   tar ingen plats, så widgeten har samma storlek i lärar- och elevvyn och
+   hörnlogiken (#119) placerar den likadant. Läsbar även i storlek S. */
 .wsound__msg {
-  max-width: 17em;
-  margin: 0.45em 0 0;
-  font-size: 0.17em;
-  font-weight: 500;
-  line-height: 1.35;
+  position: absolute;
+  inset: 0 0 auto;
+  aspect-ratio: 200 / 108; /* precis över halvcirkeln (viewBox) */
+  margin: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 0.1em;
+  font-size: max(0.15em, 11px);
+  font-weight: 600;
+  line-height: 1.3;
   text-align: center;
   white-space: normal;
-  text-shadow: none;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 70%);
+  background: radial-gradient(closest-side, rgb(18 20 26 / 55%), transparent);
 }
 .wsound__msg[hidden] { display: none; }
 .wsound__btn--large {
@@ -702,7 +729,7 @@
   margin-top: 0.5em;
   padding: 0.3em 0.9em;
   border-radius: 999px;
-  font-size: 0.18em;
+  font-size: max(0.18em, 11px);
   font-weight: 600;
   text-shadow: none;
   background: rgb(255 255 255 / 16%);

@@ -50,7 +50,15 @@ const MESSAGES = {
   unavailable: "Hittar ingen mikrofon. Anslut en mikrofon och tryck Starta igen.",
   error: "Mikrofonen gick inte att starta. Försök igen om en stund.",
 };
-const SHORT = { off: "Av", starting: "…", denied: "Mikrofon nekad", unavailable: "Ingen mikrofon", error: "Fel" };
+/** Den stora mätarens text ligger ovanpå halvcirkeln (tar ingen plats) — kortare; hela texten står i inställningarna. */
+const LARGE_MESSAGES = {
+  off: "Tryck Starta för att mäta.",
+  starting: "Väntar på mikrofonen …",
+  denied: "Mikrofonen är blockerad. Tillåt den i adressfältet och tryck Starta igen.",
+  unavailable: "Hittar ingen mikrofon.",
+  error: "Mikrofonen gick inte att starta.",
+};
+const SHORT = { off: "Av", starting: "…", denied: "Nekad", unavailable: "Saknas", error: "Fel" };
 
 // ---------------------------------------------------------------------------
 // Lärarfönstret: en kontroll per mätare — gränsen, "för högt"-hysteresen och
@@ -236,7 +244,7 @@ function mount(el, cfg, ctx, form) {
         parts.btn.title = running ? "Stoppa ljudmätaren" : "Starta ljudmätaren";
         parts.btn.setAttribute("aria-label", parts.btn.title);
       }
-      if (parts.msg) { parts.msg.textContent = live ? "" : (MESSAGES[st] ?? ""); parts.msg.hidden = live; }
+      if (parts.msg) { parts.msg.textContent = live ? "" : (LARGE_MESSAGES[st] ?? ""); parts.msg.hidden = live; parts.msg.dataset.status = st; }
       if (parts.short) { parts.short.textContent = live ? "" : (SHORT[st] ?? ""); parts.short.hidden = live; }
     }
     if (fit) fitSoundRow(row);

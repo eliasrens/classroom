@@ -272,7 +272,9 @@ classes/{classId}/settings/morningScreen — Läge 1:s tillstånd (js/lib/mornin
                        clock-analog { seconds } (alla standard false, #116),
                        time-left { look, sound, until "HH:MM" },
                        countdown { title, minutes, seconds, look, sound }
-                       (look digits|bar|analog, sound standard false, #117).
+                       (look digits|bar|analog, sound standard false, #117),
+                       sound-sign { names[5] }, sound-meter { limit 0,1–0,95,
+                       linkSign } (#118).
                        Inställningar, ingen elevdata. Körtillstånd (timrar,
                        vald ljudnivå) ligger LOKALT i
                        classroom:local:widgets/{classId}/{widgetId}.

@@ -72,11 +72,12 @@ export function signSymbol(level) {
 // Trång rubrikrad — skylten och mätaren släpper det minst viktiga i steg
 // (data-ws-fit på .lb-widgets, CSS döljer per steg), som timrarnas fitRow:
 //   1 mätarens mikrofonikon bort, 2 mätarens stapel kortare,
-//   3 skyltens namn bort ("● 2"), 4 vänsterställ (sista brickan klipps).
+//   3 mätaren blir en liten stående stapel, 4 skyltens namn bort ("● 2"),
+//   5 vänsterställ (sista brickan klipps).
 // Pricken, siffran och stapeln tas aldrig bort.
 // ---------------------------------------------------------------------------
 
-export const SOUND_FIT_LEVELS = 4;
+export const SOUND_FIT_LEVELS = 5;
 
 export function fitSoundRow(row) {
   if (!row?.isConnected) return;
@@ -112,7 +113,7 @@ function mount(el, cfg, ctx, form) {
       // Lager ovanpå brickan (hover/fokus) — tar ingen bredd i den trånga raden.
       ? `<span class="wsign__steps teacher-only">
           <button type="button" class="wsign__btn" data-sign-step="-1" title="Lägre ljudnivå" aria-label="Lägre ljudnivå">${icon("chevron-left")}</button>
-          <span class="wsign__dot" aria-hidden="true"></span><span class="wsign__num" aria-hidden="true"></span>
+          <span class="wsign__num" aria-hidden="true"></span>
           <button type="button" class="wsign__btn" data-sign-step="1" title="Högre ljudnivå" aria-label="Högre ljudnivå">${icon("chevron-right")}</button>
         </span>`
       : `<div class="wsign__pick" role="group" aria-label="Byt ljudnivå">${LEVELS.map((L) =>
