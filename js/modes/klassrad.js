@@ -22,6 +22,12 @@
  * mallen ("Redigera mall…", js/modes/klassrad/template-dialog.js) står i
  * sidopanelen. Ändrad mall påverkar bara nya möten.
  *
+ * "Skriv ut" (issue #126, js/modes/klassrad/print.js) öppnar en panel
+ * under verktygsraden: Protokoll (ifyllt — det öppna mötet eller ett ur
+ * arkivet) eller Tom mall (lärarens aktuella mall, linjer att skriva på),
+ * med förhandsvisning av A4-arken. Esc stänger. Ctrl+P direkt skriver ut
+ * det öppna mötets protokoll, inte appen.
+ *
  * Elevskärmen: ett lugnt, stort papper — KLASSRÅD, datum, vecka, ordförande
  * och sekreterare överst, sedan den visade punkten stort med anteckningarna
  * live som punktlista. "Visa alla" ger en översikt i två kolumner som skalas
@@ -52,6 +58,10 @@ import {
   isoDate, isIsoDate, weekOfDate, formatDate,
 } from "../lib/klassrad.js";
 import { openTemplateDialog, closeTemplateDialog } from "./klassrad/template-dialog.js";
+import {
+  buildKlassradPrint, closeKlassradPrint, hasKlassradPrint,
+  renderKlassradPreview, printKlassrad, titleKlassradPrint,
+} from "./klassrad/print.js";
 
 const FOCUS_KEY = "classroom:klassrad:focus"; // fokusläget (sessionStorage, bara lärarvyn)
 const MIN_FIT = 0.32; // minsta skalning på elevskärmen innan texten får rulla
@@ -263,6 +273,11 @@ export default {
       const nextBtn = $('[data-act="next"]');
       const focusBtn = $('[data-act="focus"]');
       const readingEl = $(".kr-reading");
+      const printBtn = $('[data-act="print"]');
+      const printPanel = $(".kr-printpanel");
+      const printSel = printPanel.querySelector('select[name="kr-print-meeting"]');
+      const printPreview = printPanel.querySelector(".krp-preview");
+      const printInfo = printPanel.querySelector(".kr-printpanel__info");
 
       const uid = currentUid();
       const settingsPath = klassradSettingsPath(uid);
@@ -541,6 +556,7 @@ export default {
       function openMeeting(id) {
         if (id === cur) return;
         flush();
+        closePrintPanel();
         const prevCur = cur;
         cur = meetings.some((m) => m.id === id) ? id : null;
         dropIfBlank(prevCur);
@@ -571,6 +587,7 @@ export default {
         if (!m) return;
         meetings = meetings.filter((x) => x !== m);
         saved.delete(id);
+        closePrintPanel();
         confirmId = null;
         void data.remove(path, id);
         // Tas det utskickade klassrådet bort blir elevskärmen tom — den
@@ -731,6 +748,91 @@ export default {
         }
       });
 
+      // ---- Skriv ut: protokollet (ett möte) eller den tomma mallen ----
+
+      /** Mötena som går att skriva ut: det öppna och arkivets, nyaste först. */
+      const printable = () => sortMeetings(meetings.filter((m) => saved.has(m.id) || m.id === cur));
+      const printKind = () => printPanel.querySelector('input[name="kr-print-kind"]:checked')?.value ?? "protocol";
+
+      function buildPrint(kind = printKind(), id = printSel.value || cur) {
+        const m = meetings.find((x) => x.id === id) ?? curM();
+        flush();
+        return buildKlassradPrint(kind === "template"
+          ? { kind, template, className: activeClass.name ?? "" }
+          : { kind, meeting: m, prev: m ? previousFollowUp(meetings, m) : null, className: activeClass.name ?? "" });
+      }
+
+      function drawPrintPreview() {
+        const kind = printKind();
+        printSel.disabled = kind === "template";
+        const built = buildPrint(kind);
+        renderKlassradPreview(printPreview);
+        const n = built.pages;
+        printInfo.innerHTML = `<strong>${n} ${n === 1 ? "sida" : "sidor"} A4</strong>
+          <span>Filnamn: <span class="kr-printpanel__file">${esc(built.title)}.pdf</span></span>`;
+      }
+
+      function openPrintPanel() {
+        const list = printable();
+        printSel.innerHTML = list.map((m) => {
+          const week = weekOfDate(m.date);
+          return `<option value="${esc(m.id)}">${esc(formatDate(m.date, { short: true, year: true }))}${week ? ` · v. ${week}` : ""}${m.id === cur ? " (öppet nu)" : ""}</option>`;
+        }).join("");
+        printSel.value = cur ?? "";
+        const protocol = printPanel.querySelector('input[name="kr-print-kind"][value="protocol"]');
+        if (!printPanel.querySelector('input[name="kr-print-kind"]:checked')) protocol.checked = true;
+        printPanel.hidden = false;
+        printBtn.setAttribute("aria-expanded", "true");
+        drawPrintPreview();
+        printPanel.querySelector('input[name="kr-print-kind"]:checked').focus();
+      }
+
+      function closePrintPanel({ focus = false } = {}) {
+        closeKlassradPrint();
+        printPreview.replaceChildren();
+        if (printPanel.hidden) return;
+        printPanel.hidden = true;
+        printBtn.setAttribute("aria-expanded", "false");
+        if (focus) printBtn.focus();
+      }
+
+      printBtn.addEventListener("click", () => {
+        if (!printPanel.hidden) { closePrintPanel(); return; }
+        openPrintPanel();
+      });
+      printPanel.addEventListener("change", (e) => {
+        if (e.target.matches('input[name="kr-print-kind"], select[name="kr-print-meeting"]')) drawPrintPreview();
+      });
+      printPanel.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closePrintPanel({ focus: true }); }
+      });
+      printPanel.addEventListener("click", (e) => {
+        const act = e.target.closest("[data-act]")?.dataset.act;
+        if (act === "print-cancel") closePrintPanel({ focus: true });
+        if (act === "print-go") {
+          drawPrintPreview(); // det som står i mötet just nu
+          printKlassrad();
+        }
+      });
+
+      // Ctrl+P: med panelen öppen det som förhandsvisas, annars det öppna
+      // mötets protokoll — aldrig appen. Efteråt stängs panelen.
+      const onBeforePrint = () => {
+        if (!hasKlassradPrint()) {
+          if (!curM()) return;
+          buildPrint("protocol", cur);
+        }
+        titleKlassradPrint();
+      };
+      const onAfterPrint = () => closePrintPanel();
+      window.addEventListener("beforeprint", onBeforePrint);
+      window.addEventListener("afterprint", onAfterPrint);
+      offs.push(() => {
+        window.removeEventListener("beforeprint", onBeforePrint);
+        window.removeEventListener("afterprint", onAfterPrint);
+        closeKlassradPrint();
+      });
+
       // ---- Fokusläget ----
 
       function setFocusMode(on) {
@@ -750,6 +852,7 @@ export default {
         if (e.defaultPrevented || e.altKey || modalOpen()) return;
         const t = e.target;
         if (t !== document.body && !el.contains(t)) return;
+        if (printPanel.contains(t)) return; // radioknappar och listan har egna pilar
         if (e.key === "PageDown" || e.key === "PageUp") {
           if (e.ctrlKey || e.metaKey || e.shiftKey) return;
           e.preventDefault();
@@ -880,9 +983,32 @@ function teacherMarkup() {
             <span class="kr-saved" role="status" hidden>${icon("check")}<span>Sparat</span></span>
             <button type="button" class="btn kr-follow" data-act="follow" aria-pressed="true"
               title="Punkten du skriver i är den som visas för eleverna">${icon("pen")}<span>Följ mig</span></button>
+            <button type="button" class="btn btn--ghost kr-printbtn" data-act="print" aria-expanded="false"
+              title="Skriv ut protokollet eller en tom mall på A4 (eller spara som PDF)">${icon("printer")}<span>Skriv ut</span></button>
             <button type="button" class="btn btn--ghost" data-act="focus" aria-pressed="false"
               title="Fokusläge (F): bara punkterna och anteckningarna">${icon("expand")}<span>Fokusläge</span></button>
           </span>
+        </div>
+
+        <div class="kr-printpanel teacher-only" role="group" aria-label="Skriv ut" hidden>
+          <div class="kr-printpanel__opts">
+            <fieldset class="kr-printpanel__kinds">
+              <legend>Vad vill du skriva ut?</legend>
+              <label class="kr-printpanel__kind"><input type="radio" name="kr-print-kind" value="protocol" checked>
+                <span><strong>Protokoll (ifyllt)</strong><em>Klassrådet med anteckningar, som din Word-mall.</em></span></label>
+              <label class="kr-printpanel__meeting"><span>Klassråd</span>
+                <select name="kr-print-meeting" aria-label="Vilket klassråd"></select></label>
+              <label class="kr-printpanel__kind"><input type="radio" name="kr-print-kind" value="template">
+                <span><strong>Tom mall</strong><em>Linjer att skriva på för hand, t.ex. för en elevsekreterare. Din aktuella mall.</em></span></label>
+            </fieldset>
+            <p class="kr-printpanel__info" aria-live="polite"></p>
+            <p class="kr-printpanel__note">Välj <strong>Spara som PDF</strong> i utskriftsrutan för en fil. Protokollet innehåller elevernas namn och skrivs ut direkt från den här datorn.</p>
+            <div class="kr-printpanel__actions">
+              <button type="button" class="btn btn--primary" data-act="print-go">${icon("printer")}<span>Skriv ut…</span></button>
+              <button type="button" class="btn btn--ghost" data-act="print-cancel">Avbryt</button>
+            </div>
+          </div>
+          <div class="krp-preview" aria-label="Förhandsvisning"></div>
         </div>
 
         <ol class="kr-points" aria-label="Punkter"></ol>
