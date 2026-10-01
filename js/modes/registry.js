@@ -24,7 +24,8 @@
  * är fäst. Ett nytt läge läggs alltså bara in här med sin grupp och
  * ordning — menyn, siffrorna och hjälpen följer med av sig själva.
  * Tankekarta (#53) har `group: "tools", order: 30` och står mellan
- * Skrivtavla och Lottning. Ett nytt verktyg är inte fäst från början.
+ * Skrivtavla och Lottning. Klassråd (#125) har `order: 45` och står mellan
+ * Lottning och Veckan. Ett nytt verktyg är inte fäst från början.
  */
 import morgon from "./morgon.js";
 import lektion from "./lektion.js";
@@ -35,6 +36,7 @@ import vecka from "./vecka.js";
 import skriv from "./skriv.js";
 import lotta from "./lotta.js";
 import karta from "./karta.js";
+import klassrad from "./klassrad.js";
 
 export const NAV_GROUPS = {
   classroom: { label: "Rutiner" },
@@ -53,6 +55,7 @@ export const MODES = [
   entry(skriv, { group: "tools", short: "Skrivtavla", order: 20 }),
   entry(karta, { group: "tools", short: "Tankekarta", order: 30 }),
   entry(lotta, { group: "tools", short: "Lottning", order: 40 }),
+  entry(klassrad, { group: "tools", short: "Klassråd", order: 45 }),
   entry(vecka, { group: "tools", short: "Veckan", order: 50 }),
   // ---- Lärare ▾ (aldrig på elevskärmen) ----
   entry(elever, { group: "teacher", short: "Elevlista" }),
@@ -102,6 +105,9 @@ export const MODE_ALIASES = {
  * listorna, frånvaron eller "Redan dragna".
  * "karta" (Tankekarta) visar bara rubriken och bubblorna läraren själv
  * skriver — aldrig kartlistan, namnen i listan eller kontrollerna.
+ * "klassrad" (Klassråd) visar bara det utskickade klassrådets huvud (datum,
+ * vecka, ordförande, sekreterare), punkterna och anteckningarna — aldrig
+ * arkivet, mallen eller några kontroller.
  */
 export const STUDENT_MODE_IDS = Object.freeze(
   MODES.filter((m) => STUDENT_GROUPS.includes(m.group)).map((m) => m.id));

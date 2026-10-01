@@ -5,11 +5,12 @@
  *
  * Kontrollerar:
  *   - rutinerna (Morgon, Lektion) står i menyraden; Verktyg i ordningen
- *     Trafikljus, Skrivtavla, Tankekarta, Lottning, Veckan; Elevlista + Översikt i "Lärare ▾"
+ *     Trafikljus, Skrivtavla, Tankekarta, Lottning, Klassråd, Veckan; Elevlista + Översikt i "Lärare ▾"
  *   - `order` styr ordningen inom gruppen: Tankekarta (#53, order 30)
- *     står mellan Skrivtavla och Lottning
- *   - kortkommandonas ordning: rutinerna, sedan verktygen, sist lärarlägena,
- *     och alla lägen nås med en siffra (1–9)
+ *     står mellan Skrivtavla och Lottning, Klassråd (#125, order 45) mellan
+ *     Lottning och Veckan
+ *   - kortkommandonas ordning: rutinerna, sedan verktygen, sist lärarlägena;
+ *     alla lägen nås med en siffra: 1–9 och 0 för det tionde (#125)
  *   - verktygen är fortfarande elevlägen; lärarlägena aldrig
  *   - varje läge har en känd grupp
  *   - fästa lägen (js/lib/menu-pins.js): standard Morgon, Lektion,
@@ -23,12 +24,12 @@ import assert from "node:assert/strict";
 import {
   MODES, NAV_GROUPS, NAV_GROUP_ORDER, modesInGroup, navOrder, STUDENT_MODE_IDS, isStudentMode,
 } from "../js/modes/registry.js";
-import { shortcutModes } from "../js/ui/shortcuts.js";
+import { shortcutModes, shortcutKey } from "../js/ui/shortcuts.js";
 
 const ids = (list) => list.map((m) => m.id);
 
 assert.deepEqual(ids(modesInGroup("classroom")), ["morgon", "lektion"]);
-assert.deepEqual(ids(modesInGroup("tools")), ["trafikljus", "skriv", "karta", "lotta", "vecka"]);
+assert.deepEqual(ids(modesInGroup("tools")), ["trafikljus", "skriv", "karta", "lotta", "klassrad", "vecka"]);
 assert.deepEqual(ids(modesInGroup("teacher")), ["elever", "oversikt"]);
 
 for (const m of MODES) {
@@ -41,15 +42,19 @@ assert.deepEqual(order, [
   ...ids(modesInGroup("classroom")), ...ids(modesInGroup("tools")), ...ids(modesInGroup("teacher")),
 ]);
 assert.equal(order.length, MODES.length, "alla lägen står i menyordningen");
-assert.ok(MODES.length <= 9, "alla lägen ska nås med en siffra (1–9)");
+// Siffrorna 1–9 och 0 går till de tio första lägena i menyordningen. Med
+// Klassråd (#125) finns tio lägen — det tionde (Översikt) nås med 0.
+assert.ok(MODES.length <= 10, "alla lägen ska nås med en siffra (1–9, 0)");
 assert.deepEqual(ids(shortcutModes()), order);
+assert.deepEqual(order.map((_, i) => shortcutKey(i)), ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]);
+assert.equal(shortcutKey(10), null, "ingen elfte siffra");
 
-// Tankekarta (order 30) står mellan Skrivtavla och Lottning — både i menyn
-// och i sifferordningen.
-assert.deepEqual(ids(shortcutModes()),
-  ["morgon", "lektion", "trafikljus", "skriv", "karta", "lotta", "vecka", "elever", "oversikt"]);
+// Tankekarta (order 30) står mellan Skrivtavla och Lottning, Klassråd
+// (order 45) mellan Lottning och Veckan — både i menyn och i sifferordningen.
+assert.deepEqual(order,
+  ["morgon", "lektion", "trafikljus", "skriv", "karta", "lotta", "klassrad", "vecka", "elever", "oversikt"]);
 
-for (const id of ["morgon", "lektion", "trafikljus", "vecka", "skriv", "karta", "lotta"]) {
+for (const id of ["morgon", "lektion", "trafikljus", "vecka", "skriv", "karta", "lotta", "klassrad"]) {
   assert.ok(isStudentMode(id), `${id} ska kunna visas på elevskärmen`);
 }
 for (const id of ["elever", "oversikt"]) {
@@ -67,7 +72,7 @@ const {
 
 assert.deepEqual(pinnedIds(null), ["morgon", "lektion", "trafikljus"], "standard första gången");
 assert.deepEqual([...DEFAULT_PINNED], ["morgon", "lektion", "trafikljus"]);
-assert.deepEqual(ids(pinnableModes()), ["morgon", "lektion", "trafikljus", "skriv", "karta", "lotta", "vecka"]);
+assert.deepEqual(ids(pinnableModes()), ["morgon", "lektion", "trafikljus", "skriv", "karta", "lotta", "klassrad", "vecka"]);
 assert.deepEqual(pinnedIds({ pinned: ["vecka", "okänt", "morgon", "elever", "morgon"] }), ["morgon", "vecka"],
   "listans ordning, okända id och lärarlägen faller bort, inga dubbletter");
 assert.deepEqual(pinnedIds({ pinned: [] }), [], "inget fäst är ett giltigt val");
@@ -78,6 +83,7 @@ assert.deepEqual(togglePinned(["morgon"], "oversikt"), ["morgon"], "lärarlägen
 {
   // Ett nytt verktyg (Tankekarta) är inte fäst hos någon som redan sparat ett val.
   assert.ok(!pinnedIds(null).includes("karta"), "Tankekarta är inte fäst som standard");
+  assert.ok(!pinnedIds(null).includes("klassrad"), "Klassråd är inte fäst som standard");
   assert.deepEqual(pinnedIds({ pinned: ["morgon", "skriv", "lotta"] }), ["morgon", "skriv", "lotta"]);
   assert.deepEqual(togglePinned(["morgon", "skriv", "lotta"], "karta"), ["morgon", "skriv", "karta", "lotta"]);
 }

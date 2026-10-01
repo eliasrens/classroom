@@ -5,7 +5,7 @@ så modellen gäller oavsett om Firebase är anslutet eller ej.
 
 **ELEVDATA ÄR ENDAST LOKAL (issue #32).** Ingenting om enskilda elever
 lämnar lärardatorn: samlingarna `students`, `notes`, `praise`,
-`praiseArchive`, `privacy`, `reports`, `skriv`, `lotta` och `karta` under en klass routas av datalagret till
+`praiseArchive`, `privacy`, `reports`, `skriv`, `lotta`, `karta` och `klassrad` under en klass routas av datalagret till
 en egen lokal lagring (`js/data/local-only.js`, prefix
 `classroom:local:`) som aldrig går via outboxen eller Firestore.
 Molnet innehåller bara klasstatistik: `sessions` (trafikljuspass) och
@@ -250,6 +250,36 @@ classes/{classId}/karta/{docId}         — Tankekartorna (issue #53) — ENDAST
                        aldrig datorn. Live via sync-bussen (`karta:state`,
                        docs/SYNC.md); ångra-historiken finns bara i minnet.
 
+classes/{classId}/klassrad/{docId}      — Klassråden (issue #125) — ENDAST LOKALT
+  state:     { cur, presented, follow, rev }
+    cur:     "m-<id>" | null            — klassrådet som är öppet i lärarvyn
+    presented: "m-<id>" | null          — klassrådet som elevskärmen visar; sätts
+                                          bara av "Visa på elevskärm" (issue #88)
+    follow:  true                       — "Följ mig": punkten läraren skriver i
+                                          visas för eleverna
+  m-<id>:    { date, chair, secretary, points, shown, followDone, createdAt, editedAt, rev }
+    date:    "2026-10-01"               — mötets datum (veckan räknas fram, ISO)
+    chair, secretary: ""                — ordförande och sekreterare (fritext,
+                                          ofta elevnamn)
+    points:  [{ id, title, prompts, notesLabel, icon, numbered, role, notes }]
+                                        — en KOPIA av mallens punkter när mötet
+                                          skapades: ändras mallen senare ändras
+                                          aldrig ett gammalt protokoll. notes =
+                                          anteckningarna, en rad per punkt i
+                                          punktlistan. role: "previous" (rutan
+                                          "Från förra klassrådet"), "council"
+                                          (Till elevrådet), "followup" (Till
+                                          nästa klassråd) eller null
+    shown:   "<punkt-id>" | "all"       — punkten som visas för eleverna, eller
+                                          översikten "Visa alla"
+    followDone: ["<möte>:<punkt>:<rad>"] — avbockade rader i rutan "Från förra
+                                          klassrådet" (raderna läses ur det
+                                          senaste tidigare mötet med innehåll)
+                     — ordförande, sekreterare och elevernas synpunkter är
+                       elevdata → lämnar aldrig datorn (js/lib/klassrad.js).
+                       Live via sync-bussen (`klassrad:state`, docs/SYNC.md).
+                       "Radera all data för klass" tar bort alla klassråd.
+
 classes/{classId}/settings/{key}        — inställningar per klass
                                           (dokument-id = inställningens namn,
                                            t.ex. "morningScreen", "trafikljus")
@@ -395,6 +425,21 @@ teachers/{uid}/settings/classes         — Mina klasser (issue #102,
                        Översiktens klasslista) lägger till den nya klassen här
                        när läraren har gjort ett val. Statistik, Veckor och
                        klassåtgärder filtreras aldrig (de visar bara vald klass).
+
+teachers/{uid}/settings/klassrad        — Klassrådets mall + sekreterarens förval
+                       (issue #125, js/lib/klassrad.js). PRIVAT per lärare,
+                       ALDRIG elevdata; följer läraren mellan datorer (i lokalt
+                       läge: uid "local").
+  template: { points: [{ id, title, prompts, notesLabel, icon, numbered, role }] } | null
+                     — lärarens mall för NYA klassråd. null/saknas =
+                       standardmallen (lärarens Word-mall: Vi startar …
+                       Till nästa klassråd). Påverkar aldrig påbörjade möten.
+  secretary: { [classId]: "me" }
+                     — det senaste sekreterarvalet per klass: bara markören
+                       "me" (den inloggade läraren, "Jag") sparas och
+                       förifylls i nästa möte. Väljs en elev eller annan
+                       fritext tas klassens förval bort — ett elevnamn
+                       sparas aldrig här.
 
 teachers/{uid}/classes/{classId}/lessonPlans/{planId}
                      — lektionsplanering (Läge 2). PRIVAT per lärare:
