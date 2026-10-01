@@ -140,6 +140,9 @@ class FakeNode {
         n.dataset[key] = m[1];
         out.push(n);
       }
+    } else {
+      const one = this.querySelector(sel); // klasser: en delad attrapp räcker
+      if (one) out.push(one);
     }
     this._all.set(sel, out);
     return out;

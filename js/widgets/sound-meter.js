@@ -26,6 +26,7 @@
 import { icon } from "../lib/icons.js";
 import { readRuntime, watchRuntime } from "./runtime.js";
 import { mic } from "./sound-mic.js";
+import { fitSoundRow, watchSoundRow } from "./sound-sign.js";
 import {
   clampLimit, effectiveLimit, warnFrom, signLevelOf, normalizeNames, limitForSign,
   createOverDetector, DEFAULT_LIMIT, MIN_LIMIT, MAX_LIMIT,
@@ -163,7 +164,7 @@ function chipHTML(teacher) {
     ${icon("mic")}
     <span class="wsound__bar" aria-hidden="true"><span class="wsound__zones"></span><span class="wsound__fill"></span><span class="wsound__mark"></span></span>
     ${teacher ? `<span class="wsound__short"></span>
-      <button type="button" class="wsound__btn" data-sound-toggle></button>` : ""}
+      <span class="wsound__ctl teacher-only"><button type="button" class="wsound__btn" data-sound-toggle></button></span>` : ""}
   </span>`;
 }
 
@@ -197,9 +198,14 @@ function mount(el, cfg, ctx, form) {
     msg: q(".wsound__msg"), short: q(".wsound__short"), btn: q("[data-sound-toggle]"),
   };
   let drawnLimit = null;
+  const row = form === "chip" ? el.closest?.(".lb-widgets") : null;
+  let drawnStatus = null;
 
   const draw = (s) => {
     const st = s?.status ?? "off";
+    // Brickans bredd ändras bara med statusen ("Av", "Mikrofon nekad" …).
+    const fit = row && st !== drawnStatus;
+    drawnStatus = st;
     const live = st === "on";
     root.dataset.status = st;
     root.dataset.zone = live ? s.zone : "green";
@@ -226,18 +232,17 @@ function mount(el, cfg, ctx, form) {
     if (teacher) {
       const running = st === "on" || st === "starting";
       if (parts.btn) {
-        parts.btn.innerHTML = form === "chip"
-          ? icon(running ? "mic-off" : "mic")
-          : `${icon(running ? "mic-off" : "mic")}<span>${running ? "Stoppa" : "Starta"}</span>`;
+        parts.btn.innerHTML = `${icon(running ? "mic-off" : "mic")}<span>${running ? "Stoppa" : "Starta"}</span>`;
         parts.btn.title = running ? "Stoppa ljudmätaren" : "Starta ljudmätaren";
         parts.btn.setAttribute("aria-label", parts.btn.title);
       }
       if (parts.msg) { parts.msg.textContent = live ? "" : (MESSAGES[st] ?? ""); parts.msg.hidden = live; }
       if (parts.short) { parts.short.textContent = live ? "" : (SHORT[st] ?? ""); parts.short.hidden = live; }
     }
+    if (fit) fitSoundRow(row);
   };
 
-  const offs = [];
+  const offs = [watchSoundRow(row)];
   if (teacher) {
     const view = attachView(ctx, cfg, draw);
     offs.push(() => view.detach());

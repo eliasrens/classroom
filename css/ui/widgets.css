@@ -487,9 +487,41 @@
 .wsign__num { font-variant-numeric: tabular-nums; font-weight: 800; }
 .wsign__name { white-space: nowrap; }
 
-/* Bricka: "● 1 Viska" (+ små ‹ › i lärarvyn). */
-.wsign--chip { display: inline-flex; align-items: center; gap: 0.32em; height: 1.2em; }
-.wsign__steps { display: inline-flex; margin-left: 0.15em; }
+/* Brickorna i rubrikraden klipps aldrig in i grannen (samma som timrarna):
+   lärarens knappar ligger som ett lager ovanpå (hover/fokus) och tar ingen
+   bredd. Blir raden trång kortas skyltens namn ("Prata l…") — pricken och
+   siffran kortas aldrig. */
+.lb-chip:has(> .wsign),
+.lb-chip:has(> .wsound) {
+  position: relative;
+  overflow: hidden;
+  padding-inline: 0.5em;
+  font-size: 0.95em;
+}
+.lb-chip:has(> .wsign),
+.lb-chip:has(> .wsound) { flex: none; }
+/* Trång rad (sound-sign.js fitSoundRow), steg för steg. */
+.lb-widgets:is([data-ws-fit="1"], [data-ws-fit="2"], [data-ws-fit="3"], [data-ws-fit="4"]) .wsound--chip > .icon { display: none; }
+.lb-widgets:is([data-ws-fit="2"], [data-ws-fit="3"], [data-ws-fit="4"]) .wsound--chip .wsound__bar { width: 2.2em; }
+.lb-widgets:is([data-ws-fit="3"], [data-ws-fit="4"]) .wsign--chip > .wsign__name { display: none; }
+.lb-widgets[data-ws-fit="4"] { justify-content: flex-start; }
+
+/* Bricka: "● 1 Viska" (+ ‹ ● 1 › som lager i lärarvyn). */
+.wsign--chip { display: inline-flex; align-items: center; gap: 0.32em; height: 1.2em; min-width: 0; }
+.wsign--chip > * { flex: none; }
+.wsign__steps {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3em;
+  background: var(--subj);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.lb-chip:hover .wsign__steps,
+.lb-chip:focus-within .wsign__steps { opacity: 1; }
 .wsign__btn {
   display: inline-grid;
   place-items: center;
@@ -521,7 +553,7 @@
   box-shadow: 0 0 0 0.05em rgb(255 255 255 / 60%), 0 0.08em 0.3em rgb(0 0 0 / 35%);
   transition: background-color 0.4s ease;
 }
-.wsign__svg { width: 80%; height: 80%; overflow: visible; }
+.wsign__svg { width: 88%; height: 88%; overflow: visible; }
 .wsign--large .wsign__text { display: flex; flex-direction: column; align-items: flex-start; gap: 0.06em; }
 .wsign--large .wsign__num { font-size: 1em; line-height: 0.9; }
 .wsign--large .wsign__name { font-size: 0.42em; font-weight: 700; letter-spacing: 0.01em; }
@@ -610,8 +642,32 @@
 .wsound--chip { display: inline-flex; align-items: center; gap: 0.35em; height: 1.2em; }
 .wsound--chip > .icon { width: 0.95em; height: 0.95em; opacity: 0.8; }
 .wsound--chip .wsound__short { font-size: 0.72em; font-weight: 600; opacity: 0.85; }
-.wsound--chip .wsound__btn { font-size: 0.72em; width: 1.3em; height: 1.3em; border-radius: 50%; opacity: 0.6; }
-.wsound--chip .wsound__btn:hover { opacity: 1; background: color-mix(in srgb, currentColor 14%, transparent); }
+.wsound--chip > * { flex: none; }
+/* Start/stopp: lager ovanpå brickan (hover/fokus), som skyltens ‹ ›. */
+.wsound__ctl {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--subj);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.lb-chip:hover .wsound__ctl,
+.lb-chip:focus-within .wsound__ctl { opacity: 1; }
+.wsound--chip .wsound__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.05em 0.55em;
+  border-radius: 999px;
+  font-size: 0.75em;
+  font-weight: 700;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+}
+.wsound--chip .wsound__btn .icon { width: 1em; height: 1em; }
+.wsound--chip .wsound__btn:hover { background: color-mix(in srgb, currentColor 26%, transparent); }
 /* "För högt" en stund: brickan blir lugnt röd (ingen blinkning, inget ljud). */
 .lb-chip[data-widget-type="sound-meter"] { transition: background-color 1.2s ease, border-color 1.2s ease; }
 .lb-chip:has(.wsound[data-alert="true"]) {

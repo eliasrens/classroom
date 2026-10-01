@@ -69,6 +69,35 @@ export function signSymbol(level) {
 }
 
 // ---------------------------------------------------------------------------
+// Trång rubrikrad — skylten och mätaren släpper det minst viktiga i steg
+// (data-ws-fit på .lb-widgets, CSS döljer per steg), som timrarnas fitRow:
+//   1 mätarens mikrofonikon bort, 2 mätarens stapel kortare,
+//   3 skyltens namn bort ("● 2"), 4 vänsterställ (sista brickan klipps).
+// Pricken, siffran och stapeln tas aldrig bort.
+// ---------------------------------------------------------------------------
+
+export const SOUND_FIT_LEVELS = 4;
+
+export function fitSoundRow(row) {
+  if (!row?.isConnected) return;
+  const overflows = () => row.scrollWidth > row.clientWidth + 1;
+  let level = 0;
+  row.dataset.wsFit = "0";
+  while (level < SOUND_FIT_LEVELS && overflows()) row.dataset.wsFit = String(++level);
+}
+
+/** Mät raden nu och när dess bredd ändras (fönstret, --lb-scale). → stop(). */
+export function watchSoundRow(row) {
+  if (!row) return () => {};
+  fitSoundRow(row);
+  if (typeof ResizeObserver !== "function") return () => {};
+  let w = row.clientWidth;
+  const ro = new ResizeObserver(() => { if (row.clientWidth !== w) { w = row.clientWidth; fitSoundRow(row); } });
+  ro.observe(row);
+  return () => ro.disconnect();
+}
+
+// ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
 
@@ -80,8 +109,10 @@ function mount(el, cfg, ctx, form) {
   const teacher = ctx?.view === "teacher";
   const btns = teacher
     ? (form === "chip"
-      ? `<span class="wsign__steps">
+      // Lager ovanpå brickan (hover/fokus) — tar ingen bredd i den trånga raden.
+      ? `<span class="wsign__steps teacher-only">
           <button type="button" class="wsign__btn" data-sign-step="-1" title="Lägre ljudnivå" aria-label="Lägre ljudnivå">${icon("chevron-left")}</button>
+          <span class="wsign__dot" aria-hidden="true"></span><span class="wsign__num" aria-hidden="true"></span>
           <button type="button" class="wsign__btn" data-sign-step="1" title="Högre ljudnivå" aria-label="Högre ljudnivå">${icon("chevron-right")}</button>
         </span>`
       : `<div class="wsign__pick" role="group" aria-label="Byt ljudnivå">${LEVELS.map((L) =>
@@ -99,7 +130,7 @@ function mount(el, cfg, ctx, form) {
         </div>${btns}
       </div>`;
   const root = el.firstElementChild;
-  const num = root.querySelector(".wsign__num");
+  const nums = root.querySelectorAll(".wsign__num");
   const name = root.querySelector(".wsign__name");
   const badge = root.querySelector(".wsign__badge");
   let shown = null;
@@ -110,7 +141,7 @@ function mount(el, cfg, ctx, form) {
     shown = l;
     root.dataset.level = String(l);
     root.setAttribute("style", levelVars(l));
-    num.textContent = String(l);
+    for (const n of nums) n.textContent = String(l);
     name.textContent = names[l];
     root.setAttribute("aria-label", `Ljudnivå ${l}: ${names[l]}`);
     if (badge) badge.innerHTML = signSymbol(l);
@@ -119,8 +150,10 @@ function mount(el, cfg, ctx, form) {
       b.disabled = (b.dataset.signStep === "-1" && l === 0) || (b.dataset.signStep === "1" && l === LEVELS.length - 1);
     }
   };
+  const row = form === "chip" ? el.closest?.(".lb-widgets") : null;
   draw(ctx?.runtime?.read?.());
-  const offWatch = ctx?.runtime?.watch?.((s) => draw(s)) ?? (() => {});
+  const stopFit = watchSoundRow(row);
+  const offWatch = ctx?.runtime?.watch?.((s) => { const was = shown; draw(s); if (row && shown !== was) fitSoundRow(row); }) ?? (() => {});
 
   // Bara lärarvyn har knappar — elevvyn skriver aldrig körtillståndet.
   const onClick = (e) => {
@@ -138,6 +171,7 @@ function mount(el, cfg, ctx, form) {
   if (teacher) el.addEventListener("click", onClick);
   cleanups.set(el, () => {
     offWatch();
+    stopFit();
     el.removeEventListener("click", onClick);
   });
 }
