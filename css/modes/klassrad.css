@@ -1,0 +1,753 @@
+/* ============================================================
+   KLASSRÅD (issue #125) — fyll i (lärarvyn), visa (elevskärmen).
+
+   Rubrikfärgen är en lugn mörk petrolton (lärarens Word-mall, epic #124)
+   i harmoni med temat: --kr-petrol per tema nedan. Appens accentfärg
+   (mässing) markerar som vanligt det som är valt — här punkten som visas.
+
+   Elevskärmen: ett papper som fyller skärmen. Alla mått i cqw/cqh (en
+   procent av elevskärmens bredd/höjd), så att projektor och förhands-
+   visning ser likadana ut. Kroppen skalas av js/modes/klassrad.js →
+   fitBody() via --kr-fit (≤ 1) så att allt ryms utan scroll.
+   ============================================================ */
+
+html[data-theme="teacher"] { --kr-petrol: #86bfc6; --kr-petrol-soft: #1d2b2f; }
+html[data-theme="teacher"][data-scheme="light"] { --kr-petrol: #1f5d68; --kr-petrol-soft: #e1edee; }
+html[data-theme="student"], .theme-student { --kr-petrol: #1d5a66; --kr-petrol-soft: #e3eeef; }
+
+.kr-ico { display: inline-flex; flex: none; color: var(--kr-petrol); line-height: 0; }
+.kr-blank { color: var(--color-ink-soft); font-weight: 400; }
+
+/* ---- Elevskärmen ------------------------------------------------------ */
+
+.kr--student {
+  position: fixed;
+  inset: 0;
+  container-type: size;
+  background: var(--color-bg);
+  text-align: left;
+}
+
+.kr-paper {
+  --kr-fit: 1;
+  position: absolute;
+  inset: 2.2cqh 1.8cqw;
+  display: flex;
+  flex-direction: column;
+  gap: 2.4cqh;
+  padding: 3.4cqh 3.4cqw;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-m);
+  color: var(--color-ink);
+  overflow: hidden;
+}
+
+.kr-empty {
+  margin: auto;
+  font-size: 1.6cqw;
+  color: var(--color-ink-soft);
+}
+
+.kr-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 1cqh 3.2cqw;
+  padding-bottom: 1.8cqh;
+  border-bottom: 2px solid var(--kr-petrol);
+}
+.kr-head__title {
+  margin: 0;
+  font-size: 2.6cqw;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--kr-petrol);
+}
+.kr-head__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6cqh 2.6cqw;
+  margin: 0;
+}
+.kr-head__meta div { display: flex; align-items: baseline; gap: 0.7cqw; }
+.kr-head__meta dt {
+  font-size: 1.05cqw;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+}
+.kr-head__meta dd { margin: 0; font-size: 1.55cqw; font-weight: 600; }
+
+.kr-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.kr-num {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--kr-petrol);
+}
+.kr-num::after { content: "."; }
+
+/* Den visade punkten, stort */
+.kr-big { display: flex; flex-direction: column; gap: calc(var(--kr-fit) * 2.2cqh); }
+.kr-big__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  margin: 0;
+  font-size: calc(var(--kr-fit) * 3.4cqw);
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--kr-petrol);
+}
+.kr-big__title .kr-ico svg { width: 1.05em; height: 1.05em; }
+.kr-big__prompts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: calc(var(--kr-fit) * 1.9cqw);
+  line-height: 1.35;
+  color: var(--color-ink-soft);
+}
+.kr-big__label {
+  margin: 0;
+  font-size: calc(var(--kr-fit) * 1.7cqw);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+}
+.kr-big .kr-notes-list { font-size: calc(var(--kr-fit) * 2.5cqw); }
+
+.kr-notes-list {
+  margin: 0;
+  padding-left: 1.2em;
+  line-height: 1.32;
+}
+.kr-notes-list li { padding-left: 0.2em; overflow-wrap: anywhere; }
+.kr-notes-list li + li { margin-top: 0.28em; }
+.kr-notes-list li::marker { color: var(--kr-petrol); }
+.kr-notes-empty { margin: 0; color: var(--color-ink-soft); }
+
+/* "Visa alla": två kolumner, skalas så att allt ryms */
+.kr-body.is-all .kr-all {
+  height: 100%;
+  column-count: 2;
+  column-gap: 4cqw;
+  column-fill: balance;
+  column-rule: 1px solid var(--color-line);
+}
+.kr-mini {
+  break-inside: avoid;
+  padding-bottom: calc(var(--kr-fit) * 2cqh);
+}
+.kr-mini__title {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  margin: 0 0 0.3em;
+  font-size: calc(var(--kr-fit) * 1.9cqw);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--kr-petrol);
+}
+.kr-mini .kr-notes-list,
+.kr-mini .kr-notes-empty { font-size: calc(var(--kr-fit) * 1.55cqw); }
+
+/* ---- "Från förra klassrådet" (båda vyerna) ---- */
+
+.kr-prev {
+  padding: 0.7em 1em 0.8em;
+  background: var(--kr-petrol-soft);
+  border: 1px solid color-mix(in srgb, var(--kr-petrol) 35%, transparent);
+  border-radius: var(--radius-l);
+}
+.kr--student .kr-prev { font-size: calc(var(--kr-fit) * 1.75cqw); }
+.kr-prev__title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4em;
+  margin: 0 0 0.35em;
+  font-size: 1em;
+  color: var(--kr-petrol);
+}
+.kr-prev__date { font-weight: 400; color: var(--color-ink-soft); }
+.kr-prev__group { margin: 0.4em 0 0.1em; font-weight: 600; font-size: 0.86em; color: var(--color-ink-soft); }
+.kr-prev__none { margin: 0; color: var(--color-ink-soft); }
+.kr-prev__list { margin: 0; padding: 0; list-style: none; }
+.kr-prev__list li { display: flex; align-items: baseline; gap: 0.5em; line-height: 1.35; }
+.kr-prev__list li + li { margin-top: 0.2em; }
+.kr-prev__list li.is-done > span:not(.kr-prev__mark),
+.kr-prev__list li.is-done label > span { color: var(--color-ink-soft); text-decoration: line-through; text-decoration-thickness: 1px; }
+.kr-prev__mark {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1em;
+  height: 1em;
+  border: 2px solid var(--kr-petrol);
+  border-radius: var(--radius-s);
+  color: var(--kr-petrol);
+  transform: translateY(0.12em);
+}
+.kr-prev__mark svg { width: 0.85em; height: 0.85em; }
+.kr-prev__list label { display: flex; align-items: baseline; gap: 0.5em; cursor: pointer; }
+.kr-prev__list input { flex: none; accent-color: var(--kr-petrol); transform: translateY(0.1em); }
+
+/* ---- Lärarvyn --------------------------------------------------------- */
+
+.kr--teacher {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: var(--space-4);
+  align-items: start;
+  width: 100%;
+}
+@media (max-width: 920px) {
+  .kr--teacher { grid-template-columns: minmax(0, 1fr); }
+}
+.kr-main { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.kr--teacher .btn:disabled { opacity: 0.45; cursor: default; }
+
+/* Fokusläge: arkiv och mall borta, en lugn bred kolumn */
+.kr--teacher.is-focus { grid-template-columns: minmax(0, 1fr); }
+.kr--teacher.is-focus .kr-side,
+.kr--teacher.is-focus .kr-hint { display: none; }
+.kr--teacher.is-focus .kr-main { width: min(100%, 72rem); margin: 0 auto; }
+
+/* Huvudfälten */
+.kr-fields {
+  display: grid;
+  grid-template-columns: auto 4.5rem minmax(10rem, 1fr) minmax(12rem, 1.25fr);
+  gap: var(--space-3);
+  align-items: end;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-l);
+}
+@media (max-width: 760px) {
+  .kr-fields { grid-template-columns: auto 4.5rem; }
+  .kr-field--name { grid-column: 1 / -1; }
+}
+.kr-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.kr-field__label {
+  font-size: var(--text-s);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--kr-petrol);
+}
+.kr-fields input {
+  min-width: 0;
+  padding: calc(var(--space-1) + 2px) var(--space-2);
+  font: inherit;
+  color: inherit;
+  background: var(--color-bg);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+}
+.kr-fields input:focus { outline: none; border-color: var(--color-accent); }
+.kr-week {
+  display: block;
+  padding: calc(var(--space-1) + 3px) var(--space-1);
+  font-size: var(--text-l);
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.kr-namebox { display: flex; gap: var(--space-1); min-width: 0; }
+.kr-namebox input { flex: 1; }
+.kr-pick { flex: none; width: 5.6rem; color: var(--color-ink-soft); }
+.kr-me { flex: none; font-weight: 600; }
+
+/* Läser ett tidigare klassråd */
+.kr-reading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-s);
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-m);
+}
+.kr-reading > span { flex: 1; min-width: 12rem; }
+
+/* Verktygsraden: visa för eleverna, Följ mig, Sparat, Fokus */
+.kr-bar {
+  position: sticky;
+  top: var(--topbar-height);
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) 0;
+  background: var(--color-bg);
+}
+.kr-nav { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.kr-nav [aria-pressed="true"] {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-accent-text);
+  font-weight: 600;
+}
+.kr-shownlabel {
+  flex: 1 1 10rem;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+}
+.kr-shownlabel strong { color: var(--color-ink); font-weight: 600; }
+.kr-dot {
+  display: inline-block;
+  margin-right: var(--space-2);
+  vertical-align: 0.05em;
+  width: 0.6em;
+  height: 0.6em;
+  border-radius: var(--radius-round);
+  border: 1.5px solid var(--color-ink-soft);
+}
+.kr-dot.is-live { background: var(--color-ok); border-color: var(--color-ok); }
+.kr-bar__end { display: inline-flex; flex: none; align-items: center; gap: var(--space-2); margin-left: auto; }
+.kr-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+}
+.kr-saved .icon { color: var(--color-ok); }
+.kr-saved.is-pending .icon { visibility: hidden; }
+/* Följ av → knappen blir tydlig (som Skrivtavlans "Följ skrivandet"). */
+.kr-follow[aria-pressed="true"] { color: var(--color-ink-soft); }
+.kr-follow.is-off {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-weight: 600;
+}
+
+/* Punkterna */
+.kr-points { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.kr-tpoint {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-l);
+  scroll-margin-top: calc(var(--topbar-height) + 4rem);
+  cursor: pointer;
+}
+.kr-tpoint:hover { border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-line)); }
+.kr-tpoint.is-shown {
+  border-color: var(--color-accent);
+  box-shadow: inset 4px 0 0 var(--color-accent);
+}
+.kr-tpoint__head { display: flex; align-items: center; gap: var(--space-2); }
+.kr-tpoint__head .kr-ico svg { width: 1.45em; height: 1.45em; }
+.kr-tpoint__head .kr-num { font-size: var(--text-l); font-weight: 700; }
+.kr-tpoint__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-l);
+  font-weight: 650;
+  color: var(--kr-petrol);
+}
+.kr-showbtn { flex: none; font-size: var(--text-s); color: var(--color-ink-soft); }
+.kr-showbtn[aria-pressed="true"] {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-accent-text);
+  font-weight: 600;
+}
+.kr-tpoint__prompts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+}
+.kr-prevslot { cursor: default; }
+.kr-prevslot .kr-prev { font-size: var(--text-s); }
+.kr-tpoint__label { margin-top: var(--space-1); font-size: var(--text-s); font-weight: 600; color: var(--color-ink-soft); cursor: text; }
+.kr-notes {
+  width: 100%;
+  min-height: 3.2em;
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: inherit;
+  background: var(--color-bg);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  resize: none;
+  overflow: hidden;
+  cursor: text;
+}
+.kr-notes::placeholder { color: var(--color-ink-soft); opacity: 0.7; }
+.kr-notes:focus { outline: none; border-color: var(--color-accent); }
+
+.kr-hint { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); }
+.kr-hint kbd { padding: 0 0.35em; font: inherit; font-size: 0.9em; border: 1px solid var(--color-line); border-radius: 4px; }
+
+/* Sidopanelen: nytt klassråd, mall, arkivet */
+.kr-side { display: flex; flex-direction: column; gap: var(--space-3); position: sticky; top: calc(var(--topbar-height) + var(--space-3)); }
+.kr-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-l);
+}
+.kr-box > .btn { justify-content: center; }
+.kr-h { margin: 0; font-size: var(--text-m); }
+.kr-sub { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); }
+.kr-archive__list { display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+.kr-archive__item { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; }
+.kr-archive__open { flex: 1; min-width: 0; justify-content: flex-start; text-align: left; }
+.kr-archive__date { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kr-archive__week { margin-left: auto; font-size: var(--text-s); color: var(--color-ink-soft); font-variant-numeric: tabular-nums; }
+.kr-archive__live { display: inline-flex; color: var(--color-ok); }
+.kr-archive__del { color: var(--color-ink-soft); }
+.kr-archive__confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  padding: 0 0 var(--space-1) var(--space-3);
+  font-size: var(--text-s);
+}
+.kr-danger { border-color: var(--color-danger); color: var(--color-danger); }
+
+/* ---- Mallen (dialogen, js/modes/klassrad/template-dialog.js) ---- */
+
+.krt-dialog { width: min(46rem, 100%); }
+.krt-list { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.krt-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: start;
+  padding: var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+}
+.krt-icon { color: var(--kr-petrol); }
+.krt-fields { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.krt-field { display: flex; flex-direction: column; gap: 2px; font-size: var(--text-s); color: var(--color-ink-soft); }
+.krt-field em { font-style: normal; opacity: 0.8; }
+.krt-field input,
+.krt-field textarea {
+  padding: var(--space-1) var(--space-2);
+  font: inherit;
+  font-size: var(--text-m);
+  color: var(--color-ink);
+  background: var(--color-bg);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  resize: vertical;
+}
+.krt-field input:focus, .krt-field textarea:focus { outline: none; border-color: var(--color-accent); }
+.krt-field [data-f="title"] { font-weight: 600; }
+.krt-line { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-3); }
+.krt-field--label { flex: 1; min-width: 12rem; }
+.krt-check { display: inline-flex; align-items: center; gap: var(--space-1); padding-bottom: 6px; font-size: var(--text-s); cursor: pointer; }
+.krt-role { margin: 0; font-size: var(--text-s); color: var(--kr-petrol); }
+.krt-tools { display: flex; flex-direction: column; gap: 2px; }
+.krt-tools .btn:disabled { opacity: 0.35; cursor: default; }
+.krt-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.krt-reset, .krt-confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: var(--text-s); }
+/* Spara/Avbryt syns alltid, även när punktlistan är lång. */
+.krt-dialog > .ms-actions {
+  position: sticky;
+  bottom: calc(-1 * var(--space-4));
+  margin: 0 calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-line);
+}
+
+/* ---- Skriv ut (issue #126) --------------------------------------------
+   Knappen "Skriv ut" öppnar en panel under verktygsraden (som Skrivtavlan):
+   vad som skrivs ut till vänster, förhandsvisningen av A4-arken till höger.
+   Arken (.krp) byggs av js/modes/klassrad/print.js direkt i <body>: på
+   skärmen osynliga men i exakt utskriftsbredd (de mäts där), under
+   utskriften det enda som syns. Förhandsvisningen är kopior av samma ark. */
+
+.kr-printbtn[aria-expanded="true"] {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+.kr-printpanel {
+  display: grid;
+  grid-template-columns: minmax(15rem, 22rem) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-l);
+}
+.kr-printpanel[hidden] { display: none; }
+@media (max-width: 760px) {
+  .kr-printpanel { grid-template-columns: minmax(0, 1fr); }
+}
+.kr-printpanel__opts { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.kr-printpanel__kinds { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; border: 0; min-width: 0; }
+.kr-printpanel__kinds legend {
+  margin-bottom: var(--space-1);
+  padding: 0;
+  font-size: var(--text-s);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--kr-petrol);
+}
+.kr-printpanel__kind {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  cursor: pointer;
+}
+.kr-printpanel__kind:has(input:checked) { border-color: var(--color-accent); background: var(--color-accent-soft); }
+.kr-printpanel__kind input { flex: none; margin-top: 0.2em; accent-color: var(--color-accent); }
+.kr-printpanel__kind > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kr-printpanel__kind em { font-style: normal; font-size: var(--text-s); color: var(--color-ink-soft); }
+.kr-printpanel__meeting {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: calc(-1 * var(--space-1)) 0 0 calc(var(--space-4) + var(--space-2));
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+}
+.kr-printpanel__meeting select { flex: 1; min-width: 0; padding: var(--space-1) var(--space-2); font: inherit; color: var(--color-ink); }
+.kr-printpanel__meeting:has(select:disabled) { opacity: 0.5; }
+.kr-printpanel__info { display: flex; flex-direction: column; gap: 2px; margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); overflow-wrap: anywhere; }
+.kr-printpanel__info strong { color: var(--color-ink); }
+.kr-printpanel__file { color: var(--color-ink); }
+.kr-printpanel__note { margin: 0; font-size: var(--text-s); color: var(--color-ink-soft); }
+.kr-printpanel__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.kr-printpanel__actions .btn { display: inline-flex; align-items: center; gap: var(--space-2); }
+
+/* Förhandsvisningen: arken i liten skala, sida vid sida (vitt papper i
+   båda temana — utskriften ser likadan ut i mörkt och ljust). */
+.krp-preview {
+  display: flex;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-2);
+  overflow-x: auto;
+  background: var(--color-bg);
+  border-radius: var(--radius-m);
+}
+.krp-preview__page {
+  flex: none;
+  zoom: 0.4;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25), 0 4px 14px rgb(0 0 0 / 0.18);
+}
+
+/* Arken. A4 stående: @page har marginal 0 och varje ark är en egen box på
+   209 × 296,5 mm (strax under A4, som Skrivtavlan #55) med marginalerna
+   som vit padding: 18 mm överst, 19 mm på sidorna, 20 mm nederst (där
+   sidfoten står). Samma mått som SHEET_MM i js/lib/klassrad-print.js —
+   print.js räknar sidindelningen med dem. */
+@page klassrad { size: A4 portrait; margin: 0; }
+
+.krp {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  width: 209mm;
+  visibility: hidden;
+  pointer-events: none;
+}
+.krp, .krp-preview__page {
+  --krp-ink: #1b1f23;
+  --krp-head: #1d5a66;   /* rubrikfärgen, samma petrol som elevskärmen */
+  --krp-soft: #5b626a;
+  --krp-rule: #8d9399;
+  color: var(--krp-ink);
+  color-scheme: light;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.krp-sheet {
+  position: relative;
+  box-sizing: border-box;
+  width: 209mm;
+  height: 296.5mm;
+  padding: 18mm 19mm 20mm;
+  overflow: hidden;
+  background: #fff;
+  font-family: var(--font-family);
+  font-size: 11pt;
+  line-height: 1.4;
+  text-align: left;
+  break-after: page;
+}
+.krp-sheet:last-child { break-after: auto; }
+.krp-body { display: flex; flex-direction: column; }
+.krp-body > * { margin: 0; }
+.krp-body > * + * { margin-top: var(--krp-gap, 6mm); }
+.krp-ico { display: inline-flex; flex: none; color: var(--krp-head); line-height: 0; }
+.krp-ico svg { width: auto; height: 1.1em; }
+
+/* Överst: ikon och KLASSRÅD, sedan fälten */
+.krp-top { padding-bottom: 1mm; }
+.krp-title {
+  display: flex;
+  align-items: center;
+  gap: 3mm;
+  margin: 0 0 4mm;
+  padding-bottom: 2.5mm;
+  border-bottom: 0.75pt solid var(--krp-head);
+  font-size: 22pt;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--krp-head);
+}
+.krp-meta {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 2mm 10mm;
+  margin: 0;
+}
+.krp-meta div { display: flex; align-items: baseline; gap: 2.5mm; min-width: 0; }
+.krp-meta dt { flex: none; font-weight: 700; }
+.krp-meta dd { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.krp-meta.is-blank { row-gap: 5mm; }
+.krp-meta .krp-fill { align-self: stretch; height: 7mm; border-bottom: 0.75pt solid var(--krp-rule); }
+
+/* En punkt: rubrik, frågor, (rutan), anteckningsrubriken och raderna */
+.krp-point { break-inside: avoid; }
+.krp-point__head { padding-bottom: 1mm; }
+.krp-point__title {
+  display: flex;
+  align-items: center;
+  gap: 2mm;
+  margin: 0 0 1mm;
+  font-size: 13.5pt;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--krp-head);
+  break-after: avoid;
+}
+.krp-point__title .krp-ico svg { height: 1.25em; }
+.krp-num { flex: none; }
+.krp-prompts p { margin: 0; }
+.krp-notes-h { margin: 2mm 0 0; font-weight: 700; break-after: avoid; }
+.krp-cont {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5mm;
+  margin: 0 0 1mm;
+  font-size: 10pt;
+  font-weight: 700;
+  color: var(--krp-head);
+}
+.krp-cont__note { font-weight: 400; color: var(--krp-soft); }
+
+/* Anteckningarna: en synlig rad per element (print.js delar dem), första
+   raden i varje punkt i listan med en punkt i rubrikfärgen. */
+.krp-item, .krp-line { padding-left: 5mm; overflow-wrap: break-word; }
+.krp-item { white-space: pre-wrap; }
+.krp-line { position: relative; height: 1.4em; white-space: pre; overflow: hidden; break-inside: avoid; }
+.krp-line--first::before {
+  content: "";
+  position: absolute;
+  left: 1.2mm;
+  top: 0.62em;
+  width: 1.4mm;
+  height: 1.4mm;
+  border: 0.9pt solid var(--krp-head);
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+/* Tomma linjer att skriva på för hand — kantlinjer, inte en bakgrund */
+.krp-rule { height: 9mm; border-bottom: 0.75pt solid var(--krp-rule); break-inside: avoid; }
+
+/* "Från förra klassrådet": tunn ram, ingen fyllning */
+.krp-prev {
+  margin: 2.5mm 0 0;
+  padding: 2.5mm 3.5mm 3mm;
+  border: 0.75pt solid var(--krp-head);
+  border-radius: 2mm;
+  font-size: 10.5pt;
+}
+.krp-prev__title { display: flex; align-items: center; gap: 2mm; margin: 0 0 1mm; font-weight: 700; color: var(--krp-head); }
+.krp-prev__date { font-weight: 400; color: var(--krp-soft); }
+.krp-prev__group { margin: 1.5mm 0 0.5mm; font-size: 9.5pt; font-weight: 700; color: var(--krp-soft); }
+.krp-prev__list { margin: 0; padding: 0; list-style: none; }
+.krp-prev__list li { display: flex; align-items: baseline; gap: 2.5mm; }
+.krp-check {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.4mm;
+  height: 3.4mm;
+  transform: translateY(0.5mm);
+  border: 0.9pt solid var(--krp-ink);
+  border-radius: 0.6mm;
+  color: var(--krp-ink);
+  line-height: 0;
+}
+.krp-check svg { width: 3mm; height: 3mm; }
+.krp-done { margin-left: auto; padding-left: 3mm; font-size: 9pt; color: var(--krp-soft); }
+
+/* Sidfoten: diskret, i den nedre marginalen */
+.krp-foot {
+  position: absolute;
+  left: 19mm;
+  right: 19mm;
+  bottom: 9mm;
+  display: flex;
+  justify-content: space-between;
+  gap: 6mm;
+  font-family: var(--font-family);
+  font-size: 8.5pt;
+  line-height: 1;
+  color: var(--krp-soft);
+}
+
+@media print {
+  body.krp-printing > :not(.krp) { display: none !important; }
+  /* Lärarvyns mörka tema får inte färga marginalerna (color-scheme styr dem). */
+  html.krp-printing { color-scheme: light !important; }
+  html.krp-printing,
+  body.krp-printing { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+  body.krp-printing .krp {
+    page: klassrad;
+    position: static;
+    visibility: visible;
+  }
+}

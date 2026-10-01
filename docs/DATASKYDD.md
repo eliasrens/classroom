@@ -48,6 +48,13 @@ självregistrering).
   kartorna sparas bara lokalt. Utskriften görs med webbläsarens egen
   utskrift, utan nätverk; sidhuvudet har bara klass och datum.
 
+- **Klassråden (issue #125)** — ordförande, sekreterare och elevernas
+  synpunkter är elevdata, så varje ifyllt klassråd och arkivet sparas bara
+  lokalt (`classes/{cid}/klassrad`). Mallen (punkternas rubriker och
+  hjälpfrågor) sparas privat per lärare i molnet och innehåller ingen
+  elevdata. Sekreterarens förval i molnet är bara markören "Jag" (läraren
+  själv) — väljs en elev sparas inget namn, förvalet tas bort.
+
 - **Ljudmätaren (issue #118)** — mikrofonen öppnas bara när läraren
   trycker Starta, i lärarfönstret, och ljudet analyseras där och då.
   Inget spelas in, lagras eller skickas: bara ett tal (ljudnivån 0–1) går

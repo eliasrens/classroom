@@ -5,9 +5,10 @@
  * (timer i trafikljus.js, snabbanteckning i quick-note.js, elevtangenter
  * i elever.js). Genvägslistan visas under "?" (js/ui/help.js).
  *
- *   1–N   byt läge i listans ordning (rutinerna, verktygen, sist
- *         Lärare ▾ — navOrder() i js/modes/registry.js, max 9) —
- *         oberoende av vilka lägen läraren fäst i övermenyn
+ *   1–9, 0  byt läge i listans ordning (rutinerna, verktygen, sist
+ *         Lärare ▾ — navOrder() i js/modes/registry.js): 1–9 de nio
+ *         första, 0 det tionde (issue #125, när Klassråd blev det tionde
+ *         läget) — oberoende av vilka lägen läraren fäst i övermenyn
  *   E     öppna/fokusera elevskärmen
  *   ?     visa genvägslistan
  *
@@ -25,8 +26,14 @@
 
 import { navOrder } from "../modes/registry.js";
 
-/** Lägena som når en siffertangent (1–9), i menyordning. */
-export const shortcutModes = () => navOrder().slice(0, 9);
+/** Siffertangenterna i ordning: 1–9, sedan 0 för det tionde läget. */
+export const SHORTCUT_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
+
+/** Lägena som når en siffertangent (1–9, 0), i menyordning. */
+export const shortcutModes = () => navOrder().slice(0, SHORTCUT_KEYS.length);
+
+/** Tangenten för läge nummer i (0-baserat) i shortcutModes(). */
+export const shortcutKey = (i) => SHORTCUT_KEYS[i] ?? null;
 
 /** Står Elevlistan i Registrera-fliken? Då äger elevtangenterna tecknen. */
 function inRegisterTab(store) {
@@ -78,9 +85,9 @@ export function initShortcuts({ store, openStudentWindow, openHelp }) {
     // enskilda tecken — lämna siffrorna och E därhän så inget krockar.
     if (inRegisterTab(store)) return;
 
-    // 1–9: byt läge i menyordning (samma ordning som övermenyn).
-    if (/^[1-9]$/.test(e.key)) {
-      const mode = shortcutModes()[Number(e.key) - 1];
+    // 1–9, 0: byt läge i menyordning (samma ordning som övermenyn).
+    if (/^[0-9]$/.test(e.key)) {
+      const mode = shortcutModes()[SHORTCUT_KEYS.indexOf(e.key)];
       if (mode) {
         e.preventDefault();
         location.hash = `#/${mode.id}`;
