@@ -26,7 +26,8 @@ import {
 } from "../lib/backgrounds.js";
 import { openBgPicker, closeBgPicker } from "../ui/bg-picker.js";
 import { collapsibleHTML, mountCollapsibles } from "../ui/collapsible.js";
-import { createCornerLayer } from "../widgets/host.js";
+import { createCornerLayer, createPlacementSharer, watchStudentPlacement } from "../widgets/host.js";
+import { isPreviewWindow } from "../sync.js";
 import { mountWidgetSettings, widgetsSummary } from "../widgets/settings-ui.js";
 import { normalizeMorningWidgets } from "../widgets/registry.js";
 
@@ -81,12 +82,17 @@ export default {
     let clearNt = () => {};
 
     // Widgets i hörnen (issue #115). Kortet och Bra jobbat-tavlan får aldrig
-    // skymmas — en widget som skulle göra det flyttas till närmaste lediga hörn.
+    // skymmas — en widget som skulle göra det krymps i sitt hörn, och flyttas
+    // till närmaste lediga hörn först när inte ens S ryms (#119).
     let widgetsUI = null;
+    // Elevskärmen delar var widgetarna hamnade med lärarens panel (#119) —
+    // aldrig förhandsvisningen, den är bara en bild av elevskärmen.
+    const sharePlacement = view === "student" && !isPreviewWindow() ? createPlacementSharer(classId) : null;
     const corners = createCornerLayer(stage, {
       view, classId,
       obstacles: () => [$(".morgon__card"), board.el],
-      onPlaced: (placed) => widgetsUI?.setPlacement(placed),
+      obstacleNames: () => ["kortet", "Bra jobbat-tavlan"],
+      onPlaced: (placed) => { widgetsUI?.setPlacement(placed); sharePlacement?.(placed); },
     });
     this._corners = corners;
     // Kortets och tavlans storlek ändras med innehållet → lägg ut hörnen igen.
@@ -471,6 +477,13 @@ export default {
         },
       });
       this._widgetsUI = widgetsUI;
+      // Elevskärmens platser, så länge den är öppen (presence → store.studentOpen).
+      let studentPlaced = null;
+      const showStudent = () => widgetsUI.setStudentPlacement(ctx.store?.get().studentOpen ? studentPlaced : null);
+      this._placementStops = [
+        watchStudentPlacement(classId, (map) => { studentPlaced = map; showStudent(); }),
+        ctx.store?.subscribe(["studentOpen"], showStudent),
+      ];
       const syncWidgets = () => {
         const key = JSON.stringify(settings.widgets);
         if (key !== widgetsKey) { widgetsKey = key; widgetsUI.render(); }
@@ -626,6 +639,8 @@ export default {
     this._board = null;
     this._cornersRO?.();
     this._cornersRO = null;
+    for (const off of this._placementStops ?? []) { try { off?.(); } catch { /* ok */ } }
+    this._placementStops = null;
     this._widgetsUI?.destroy();
     this._widgetsUI = null;
     this._corners?.destroy();

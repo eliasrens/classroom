@@ -7,7 +7,9 @@
  *
  * Inställningar (#116):
  *   seconds — visa sekunder (HH:MM:SS), standard av
- *   date    — visa datum under tiden ("tisdag 29 september"), standard av
+ *   date    — visa datum under tiden ("tisdag 29 september"), standard av.
+ *             Bara på Morgonskärmen (#119): lektionens formulär visar inte
+ *             valet, och brickan visar aldrig datum även om cfg har det.
  *
  * Utan sekunder ritas klockan om vid varje minutskifte, med sekunder vid
  * varje sekundskifte (createClockTicker, js/widgets/clock-shared.js).
@@ -36,38 +38,24 @@ function normalize(cfg) {
 function mount(el, cfg, form) {
   destroy(el);
   const c = normalize(cfg ?? {});
+  // Datum hör till Morgonskärmen — aldrig i lektionens rubrikbricka (#119).
+  const showDate = form === "large" && c.date;
   el.innerHTML = `<span class="wclock wclock--${form}">
-    <time class="wclock__time"></time>${c.date ? `<time class="wclock__date"></time>` : ""}
+    <time class="wclock__time"></time>${showDate ? `<time class="wclock__date"></time>` : ""}
   </span>`;
-  const wrap = el.firstElementChild;
   const timeEl = el.querySelector(".wclock__time");
   const dateEl = el.querySelector(".wclock__date");
-  // Brickan: får datumet inte plats bredvid tiden bryts det till en rad som
-  // klipps (CSS) — då döljs det helt så att brickan krymper till bara tiden.
-  // Mäts om när rubrikradens yta ändrar storlek (den har contain: size, så
-  // brickan själv kan inte ändra ytans storlek — ingen återkoppling).
-  let fit = () => {};
-  let ro = null;
-  if (form === "chip" && dateEl && typeof ResizeObserver === "function") {
-    fit = () => {
-      wrap.classList.remove("wclock--no-date");
-      if (dateEl.offsetTop > timeEl.offsetTop + 1) wrap.classList.add("wclock--no-date");
-    };
-    ro = new ResizeObserver(() => fit());
-    ro.observe(el.parentElement ?? el);
-  }
   const put = (out, text, attr) => {
-    if (out.textContent === text) return false;
+    if (out.textContent === text) return;
     out.textContent = text;
     out.dateTime = attr;
-    return true;
   };
   const stop = createClockTicker((now) => {
     const time = formatClock(now, c);
     put(timeEl, time, time);
-    if (dateEl && put(dateEl, formatDate(now), isoDate(now))) fit();
+    if (dateEl) put(dateEl, formatDate(now), isoDate(now));
   }, { periodMs: c.seconds ? 1000 : 60_000, el });
-  stops.set(el, () => { stop(); ro?.disconnect(); });
+  stops.set(el, stop);
 }
 
 function destroy(el) {
@@ -77,8 +65,10 @@ function destroy(el) {
 
 const OPTIONS = [
   { key: "seconds", label: "Visa sekunder" },
-  { key: "date", label: "Visa datum" },
+  { key: "date", label: "Visa datum", only: "morning" },
 ];
+/** Valen som hör till formuläret (ctx.form): "Visa datum" bara på Morgonskärmen. */
+const optionsFor = (ctx) => OPTIONS.filter((o) => !o.only || o.only === ctx?.form);
 
 export default {
   id: "clock-digital",
@@ -90,6 +80,6 @@ export default {
   renderChip: (el, cfg) => mount(el, cfg, "chip"),
   renderLarge: (el, cfg) => mount(el, cfg, "large"),
   destroy,
-  settingsHTML: (cfg) => togglesHTML(OPTIONS, normalize(cfg ?? {})),
+  settingsHTML: (cfg, ctx) => togglesHTML(optionsFor(ctx), normalize(cfg ?? {})),
   bindSettings: (root, cfg, onChange) => bindToggles(root, normalize(cfg ?? {}), onChange),
 };

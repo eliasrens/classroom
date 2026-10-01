@@ -161,7 +161,11 @@ const at = (h, m, s = 0) => new RealDate(2026, 8, 29, h, m, s).getTime();
 
   const html = digital.settingsHTML({ seconds: true, date: false });
   ok(/data-wopt="seconds" checked/.test(html) && !/data-wopt="date" checked/.test(html), "kryssrutorna speglar cfg");
-  ok(/Visa sekunder/.test(html) && /Visa datum/.test(html), "digital: Visa sekunder, Visa datum");
+  ok(/Visa sekunder/.test(html) && !/Visa datum/.test(html), "digital utan form (lektionen): bara Visa sekunder");
+  const htmlM = digital.settingsHTML({ seconds: true, date: true }, { form: "morning" });
+  ok(/Visa sekunder/.test(htmlM) && /data-wopt="date" checked/.test(htmlM), "digital på Morgonskärmen: Visa datum finns");
+  const htmlL = digital.settingsHTML({ date: true }, { form: "lesson" });
+  ok(!/Visa datum/.test(htmlL) && !/data-wopt="date"/.test(htmlL), "digital i lektionen: inget Visa datum (#119)");
   ok(/Visa sekundvisare/.test(analog.settingsHTML({})), "analog: Visa sekundvisare");
 
   // bindSettings: ändringar ackumuleras (fältet sparas utan att sektionen byggs om).
@@ -325,6 +329,8 @@ const deg = (node) => Number(node.style.transform?.match(/rotate\((-?[\d.]+)deg\
   advance(30_100);
   ok(el2.querySelector("wclock__time").textContent === "00:00", "midnatt: 00:00");
   digital.renderChip(el2, { date: true });
+  ok(!el2.querySelector("wclock__date"), "lektionsbrickan visar aldrig datum, även med date i cfg (#119)");
+  digital.renderLarge(el2, { date: true });
   ok(el2.querySelector("wclock__date").textContent === "onsdag 30 september", "datumet byts vid midnatt");
   digital.destroy(el2);
   ok(timers.size === 0, "digital bricka destroy(): inga timrar kvar");

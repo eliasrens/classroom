@@ -13,8 +13,10 @@
  *   - morgoninställningarna (morning.js normalize): widgets med, i det
  *     DELADE dokumentet (splitMorning)
  *   - brickorna: högst 3, bara kända typer; utan widgets ingen markup
- *   - platskollisioner (resolveSlots): krock med kortet/tavlan → närmaste
- *     lediga hörn, ingen plats → null, två widgets aldrig på samma plats
+ *   - platskollisioner (resolveSlots): krock med kortet/tavlan → krymp i
+ *     hörnet (ner till S), först därefter närmaste lediga hörn, ingen plats
+ *     → null; rund klocka räknas som cirkel; två widgets aldrig på samma
+ *     plats; panelens förklaring (placementText) — issue #119
  *   - runtime-tidsstämplar: paus + fortsätt ger rätt kvarvarande tid,
  *     endsAt, lokal lagring under classroom:local:…, lyssnare
  */
@@ -162,28 +164,33 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 }
 
 // ---------------------------------------------------------------------------
-// Platskollisioner (resolveSlots)
+// Platskollisioner (resolveSlots) — flytt, krympning i hörnet, rund form (#119)
 // ---------------------------------------------------------------------------
 {
-  // Yta 1600 × 900, widget 200 × 100, 20 px från kanten.
+  // Yta 1600 × 900, widget 200 × 100, 20 px från kanten. rectFor skalar
+  // formen i hörnet (förankrad mot kanten, som host.js gör).
   const W = 1600, H = 900, w = 200, h = 100, inset = 20;
-  const rectFor = (_item, slot) => {
-    const left = slot[1] === "l" ? inset : W - inset - w;
-    const top = slot[0] === "t" ? inset : H - inset - h;
-    return { left, top, right: left + w, bottom: top + h };
+  const shape = (ww, hh, round = false) => (_item, slot, scale = 1) => {
+    const sw = ww * scale, sh = hh * scale;
+    const left = slot[1] === "l" ? inset : W - inset - sw;
+    const top = slot[0] === "t" ? inset : H - inset - sh;
+    return { left, top, right: left + sw, bottom: top + sh, round };
   };
-  const card = { left: 500, top: 250, right: 1100, bottom: 650 };
-  const opts = (obstacles) => ({ rectFor, obstacles, width: W, height: H });
+  const rectFor = shape(w, h);
+  const card = { left: 500, top: 250, right: 1100, bottom: 650, name: "kortet" };
+  const opts = (obstacles, more = {}) => ({ rectFor, obstacles, width: W, height: H, ...more });
+  const slotOf = (r, id) => r.get(id)?.slot ?? null;
 
   let r = reg.resolveSlots([{ id: "a", slot: "tr" }], opts([card]));
-  ok(r.get("a") === "tr", "ingen krock → står kvar");
+  ok(slotOf(r, "a") === "tr" && r.get("a").scale === 1 && eq(r.get("a").blockedBy, []), "ingen krock → står kvar, full storlek");
 
   // Bra jobbat-tavlan till höger, hög: täcker tr och br.
-  const board = { left: 1300, top: 60, right: 1580, bottom: 840 };
+  const board = { left: 1300, top: 60, right: 1580, bottom: 840, name: "Bra jobbat-tavlan" };
   r = reg.resolveSlots([{ id: "a", slot: "tr" }], opts([card, board]));
-  ok(r.get("a") === "tl", "krock uppe till höger → närmaste lediga (uppe till vänster)");
+  ok(slotOf(r, "a") === "tl", "krock uppe till höger (ingen krympning tillåten) → närmaste lediga (uppe till vänster)");
+  ok(eq(r.get("a").blockedBy, ["Bra jobbat-tavlan"]), "blockedBy: vad som skulle skymts");
   r = reg.resolveSlots([{ id: "a", slot: "br" }], opts([card, board]));
-  ok(r.get("a") === "bl", "krock nere till höger → nere till vänster");
+  ok(slotOf(r, "a") === "bl", "krock nere till höger → nere till vänster");
 
   // Närmaste = hörnet rakt under på en bred skärm.
   ok(eq(reg.slotsByDistance("tl", W, H), ["tl", "bl", "tr", "br"]), "närmast: rakt under före andra sidan (bred skärm)");
@@ -191,21 +198,104 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
   // Den som står rätt knuffas aldrig bort av en som flyttas.
   r = reg.resolveSlots([{ id: "a", slot: "tr" }, { id: "b", slot: "tl" }], opts([board]));
-  ok(r.get("b") === "tl" && r.get("a") === "bl", "widget på egen plats behåller den; krockaren tar nästa lediga");
-  ok(new Set([...r.values()]).size === 2, "aldrig två på samma plats efter flytt");
+  ok(slotOf(r, "b") === "tl" && slotOf(r, "a") === "bl", "widget på egen plats behåller den; krockaren tar nästa lediga");
+  ok(new Set([...r.values()].map((x) => x.slot)).size === 2, "aldrig två på samma plats efter flytt");
 
   // Allt blockerat → null (döljs).
-  const all = { left: 0, top: 0, right: W, bottom: H };
-  r = reg.resolveSlots([{ id: "a", slot: "tl" }], opts([all]));
-  ok(r.get("a") === null, "ingen ledig plats → null");
+  const all = { left: 0, top: 0, right: W, bottom: H, name: "kortet" };
+  r = reg.resolveSlots([{ id: "a", slot: "tl" }], opts([all], { minScale: () => 0.4 }));
+  ok(r.get("a").slot === null && eq(r.get("a").blockedBy, ["kortet"]), "ingen ledig plats (inte ens krympt) → null, med orsak");
 
   // Kortet som täcker vänster sida: tl + bl blockeras.
   const left = { left: 0, top: 0, right: 400, bottom: H };
   r = reg.resolveSlots([{ id: "a", slot: "tl" }, { id: "b", slot: "bl" }], opts([left]));
-  ok(r.get("a") === "tr" && r.get("b") === "br", "två krockar flyttas till var sitt ledigt hörn");
+  ok(slotOf(r, "a") === "tr" && slotOf(r, "b") === "br", "två krockar flyttas till var sitt ledigt hörn");
 
   ok(reg.rectsOverlap({ left: 0, top: 0, right: 10, bottom: 10 }, { left: 15, top: 0, right: 20, bottom: 10 }, 8), "gap räknas som krock");
   ok(!reg.rectsOverlap({ left: 0, top: 0, right: 10, bottom: 10 }, { left: 10, top: 0, right: 20, bottom: 10 }), "kant mot kant utan gap = ingen krock");
+
+  // ---- Krymp hellre i hörnet än byt hörn (#119) ----
+  // Stor analog klocka (300 × 300) uppe till vänster; kortet börjar 250 px
+  // ner och 150 px in — som när Bra jobbat skjuter kortet åt vänster.
+  const big = shape(300, 300, true);
+  const lowCard = { left: 150, top: 250, right: 1100, bottom: 650, name: "kortet" };
+  const S = 0.33; // storlek S i förhållande till L
+  r = reg.resolveSlots([{ id: "c", slot: "tl" }], { rectFor: big, minScale: () => S, obstacles: [lowCard], width: W, height: H, gap: 8 });
+  const c = r.get("c");
+  ok(c.slot === "tl", "L som inte ryms uppe till vänster stannar i hörnet (krymps, flyttas inte)");
+  ok(c.scale < 1 && c.scale >= S, `krympt till mellan S och L (${c.scale})`);
+  const shrunk = big({}, "tl", c.scale);
+  ok(!reg.shapeOverlaps(shrunk, lowCard, 8), "den krympta klockan skymmer inte kortet");
+  ok(reg.shapeOverlaps(big({}, "tl", Math.min(1, c.scale + 0.02)), lowCard, 8), "största skala som ryms (lite större skulle skymma)");
+  ok(eq(c.blockedBy, ["kortet"]), "krympt: orsaken är kortet");
+
+  // Ryms inte ens S i hörnet → flyttas (hellre det än skymma kortet).
+  const tallCard = { left: 0, top: 60, right: 1100, bottom: 650, name: "kortet" };
+  r = reg.resolveSlots([{ id: "c", slot: "tl" }], { rectFor: big, minScale: () => S, obstacles: [tallCard], width: W, height: H, gap: 8 });
+  // bl är närmast (bred skärm) och rymmer en krympt klocka under kortet.
+  ok(r.get("c").slot === "bl" && r.get("c").scale < 1, "inte ens S ryms → närmaste hörn där den ryms (krympt där om det behövs)");
+  ok(eq(r.get("c").blockedBy, ["kortet"]), "flyttad: orsaken är kortet");
+  const tallCard2 = { ...tallCard, bottom: 840 };
+  r = reg.resolveSlots([{ id: "c", slot: "tl" }], { rectFor: big, minScale: () => S, obstacles: [tallCard2], width: W, height: H, gap: 8 });
+  ok(r.get("c").slot === "tr" && r.get("c").scale === 1, "vänster sida helt blockerad → uppe till höger i full storlek");
+
+  // Utan minScale (standard 1) krymps aldrig.
+  r = reg.resolveSlots([{ id: "c", slot: "tl" }], { rectFor: big, obstacles: [lowCard], width: W, height: H, gap: 8 });
+  ok(r.get("c").slot !== "tl" && r.get("c").scale === 1, "minScale 1 → ingen krympning");
+
+  // Rund form: kvadratens tomma hörn får gå in över kortets hörn.
+  const nearCard = { left: 290, top: 290, right: 1100, bottom: 650, name: "kortet" };
+  r = reg.resolveSlots([{ id: "c", slot: "tl" }], { rectFor: big, minScale: () => S, obstacles: [nearCard], width: W, height: H, gap: 8 });
+  ok(r.get("c").slot === "tl" && r.get("c").scale === 1, "rund klocka: kortets hörn i kvadratens tomma hörn = ingen krock, full storlek");
+  r = reg.resolveSlots([{ id: "c", slot: "tl" }], { rectFor: shape(300, 300, false), minScale: () => S, obstacles: [nearCard], width: W, height: H, gap: 8 });
+  ok(r.get("c").scale < 1, "samma mått som fyrkant: krock → krymps");
+  ok(!reg.shapeOverlaps({ left: 0, top: 0, right: 100, bottom: 100, round: true }, { left: 90, top: 90, right: 200, bottom: 200 }), "cirkel vs rektangel i hörnet: ingen överlapp");
+  ok(reg.shapeOverlaps({ left: 0, top: 0, right: 100, bottom: 100, round: true }, { left: 40, top: 95, right: 60, bottom: 200 }), "cirkel vs rektangel rakt under: överlapp");
+
+  // Alla fyra hörnen i alla storlekar när det finns plats (inga hinder).
+  for (const slot of reg.SLOTS) for (const size of [0.33, 0.6, 1]) {
+    const rr = reg.resolveSlots([{ id: "x", slot }], { rectFor: shape(300 * size, 300 * size, true), minScale: () => S, obstacles: [card], width: W, height: H, gap: 8 });
+    if (rr.get("x").slot !== slot || rr.get("x").scale !== 1) { ok(false, `${slot} i skala ${size} ska stå kvar`); }
+  }
+  ok(true, "alla fyra hörn × S/M/L står kvar när kortet är i mitten");
+
+  // Två widgets: en krympt i sitt hörn knuffar inte grannen.
+  r = reg.resolveSlots([{ id: "c", slot: "tl" }, { id: "d", slot: "tr" }],
+    { rectFor: big, minScale: () => S, obstacles: [lowCard], width: W, height: H, gap: 8 });
+  ok(r.get("c").slot === "tl" && r.get("c").scale < 1 && r.get("d").slot === "tr" && r.get("d").scale === 1,
+    "krympt widget i sitt hörn + granne i sitt hörn i full storlek");
+
+  // Panelens rad (settings-ui placementText).
+  const { placementText } = await import("../js/widgets/settings-ui.js");
+  const wl = { id: "c", slot: "tl" };
+  ok(placementText(wl, { slot: "tl", scale: 1, blockedBy: [] }) === null, "panel: som valt → ingen rad");
+  ok(placementText(wl, { slot: "tl", scale: 0.7, blockedBy: ["kortet"] }) === "Mindre för att inte skymma kortet.", "panel: krympt");
+  ok(placementText(wl, { slot: "tr", scale: 1, blockedBy: ["kortet", "Bra jobbat-tavlan"] }) === "Flyttad till uppe till höger — skulle skymma kortet och Bra jobbat-tavlan.", "panel: flyttad");
+  ok(/^Dold just nu/.test(placementText(wl, { slot: null, scale: 1, blockedBy: ["kortet"] })), "panel: dold");
+
+  // Elevskärmen har en annan yta (ingen verktygsrad/panel) — panelen visar dess
+  // resultat när den är öppen, och bara en rad när båda vyerna är lika.
+  const { placementLines } = await import("../js/widgets/settings-ui.js");
+  const fine = { slot: "tl", scale: 1, blockedBy: [] };
+  const small = { slot: "tl", scale: 0.6, blockedBy: ["kortet"] };
+  ok(placementLines(wl, small, null, false) === "Mindre för att inte skymma kortet.", "panel utan elevskärm: lärarvyns rad");
+  ok(placementLines(wl, fine, small, true) === "På elevskärmen: Mindre för att inte skymma kortet.", "panel: bara elevskärmen krymper den");
+  ok(placementLines(wl, small, small, true) === "Mindre för att inte skymma kortet.", "panel: samma i båda vyerna → en rad");
+  ok(placementLines(wl, small, fine, true) === "Här: Mindre för att inte skymma kortet.", "panel: bara här");
+  ok(placementLines(wl, fine, fine, true) === null, "panel: som valt överallt → ingen rad");
+  ok(placementLines(wl, fine, null, true) === null, "panel: elevskärmen har inte lagt ut än → ingen rad");
+
+  // Elevfönstret delar sina platser lokalt, bara vid ändring.
+  const host = await import("../js/widgets/host.js");
+  const seenP = [];
+  const offP = host.watchStudentPlacement("QA-PL", (m) => seenP.push(m));
+  ok(seenP.length === 1 && seenP[0] === null, "watchStudentPlacement: inget delat än → null");
+  const share = host.createPlacementSharer("QA-PL");
+  share(new Map([["c", small]]));
+  share(new Map([["c", small]]));
+  ok(seenP.length === 2 && seenP[1].get("c").scale === 0.6, "delade platser når lärarens panel (en gång per ändring)");
+  ok(mem.has("classroom:local:widgets/QA-PL/_placement"), "lagras lokalt (classroom:local:), aldrig i molnet");
+  offP();
 }
 
 // ---------------------------------------------------------------------------
