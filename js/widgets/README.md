@@ -82,12 +82,14 @@ export default {
 | Typ | cfg (standard) | Ritas om |
 |---|---|---|
 | `clock-digital` | `{ seconds: false, date: false }` | varje sekund med sekunder, annars varje minut |
+
+- **Datum bara på Morgonskärmen** (#119): lektionens formulär visar inte
+  "Visa datum" (`settingsHTML(cfg, { form })`), och brickan i rubrikraden
+  visar aldrig datum — även om `cfg.date` råkar vara sparat.
 | `clock-analog` | `{ seconds: false }` (sekundvisare) | varje sekund med sekundvisare, annars varje minut |
 
 - Alltid 24 timmar (`formatClock`), datum i lång form "tisdag 29 september"
   (`formatDate`, utan Intl — samma i alla webbläsare och i Node).
-- Digitala brickan: får datumet inte plats bredvid tiden döljs det (hellre
-  inget datum än ett avklippt).
 - Analoga: visarnas vinklar räknas i `handAngles(now, { seconds })`;
   `unwrapAngle` gör att 59 → 0 tickar framåt. Visarna tickar med en kort
   CSS-övergång som bara finns med `prefers-reduced-motion: no-preference`
@@ -178,16 +180,34 @@ förhandsvisningen.
 
 `createCornerLayer` lägger `.morgon__widgets` i `.morgon` (med öppen
 lärarpanel börjar lagret till höger om panelen, som kortet). Efter varje
-ändring och storleksändring körs `resolveSlots`: en widget som skulle skymma
-kortet eller Bra jobbat-tavlan flyttas till närmaste lediga hörn (närmast =
-avstånd mellan hörnen, så på en bred skärm går den rakt upp/ner först). Finns
-ingen ledig plats döljs den, och panelen säger det. Lärarens förhandsvisning
-och elevskärmen kör samma kod.
+ändring och storleksändring körs `resolveSlots` (#119):
+
+1. Widgeten står där läraren valt, i vald storlek, om den inte skymmer
+   kortet eller Bra jobbat-tavlan (4 px marginal).
+2. Annars **krymps den i sitt hörn** till största skala som ryms, ner till
+   storlek S (`--mw-k` på `.mw`, multipliceras in i `--mw-font`).
+3. Först när inte ens S ryms flyttas den till närmaste hörn där den ryms
+   (närmast = avstånd mellan hörnen, så på en bred skärm rakt upp/ner först).
+   Ryms den ingenstans döljs den.
+
+Den analoga klockan (`shape: "round"` på typen) räknas som cirkeln i sin
+kvadrat — kvadratens tomma hörn får gå in över kortets hörn.
+
+Panelen visar en rad under widgeten när den krymps, flyttas eller döljs
+("Mindre för att inte skymma kortet.", "Flyttad till uppe till höger — skulle
+skymma Bra jobbat-tavlan."). Elevskärmen har en annan yta än lärarens fönster
+(ingen verktygsrad eller panel, större namn på Bra jobbat), så den delar sitt
+resultat lokalt (`createPlacementSharer` → körtillståndets nyckel
+`…/{classId}/_placement`) och panelen visar "På elevskärmen: …" medan den är
+öppen. Förhandsvisningen delar aldrig.
+
+I ett upptaget hörn går det att välja en widget — de två byter plats.
 
 ## Test
 
 `node docs/test-widgets.mjs` — normalisering, `normalizePlan`, kopior,
-platskrockar och runtime-tidsstämplar. Varje ny del lägger till en egen svit:
+platskrockar (krymp i hörnet före flytt, rund klocka, panelens rader,
+elevskärmens delade platser) och runtime-tidsstämplar. Varje ny del lägger till en egen svit:
 `node docs/test-clock-widgets.mjs` (#116) — visarvinklar, formatering,
 inställningar, ritsignalen och att `destroy` inte lämnar några timrar.
 `node docs/test-timers.mjs` (#117) — kvarvarande tid, paus/fortsätt,

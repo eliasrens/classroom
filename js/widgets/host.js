@@ -10,8 +10,9 @@
  *
  *  - HÖRN på Morgonskärmen: `createCornerLayer(stage, …)` lägger ett lager
  *    i `.morgon` med en ruta per widget på sin plats (tl/tr/bl/br, storlek
- *    S/M/L) och flyttar en widget som skulle skymma kortet eller Bra
- *    jobbat-tavlan till närmaste lediga plats (resolveSlots).
+ *    S/M/L). En widget som skulle skymma kortet eller Bra jobbat-tavlan
+ *    krymps i sitt hörn, och flyttas till närmaste lediga plats först när
+ *    inte ens S ryms (resolveSlots, #119).
  *
  * Lärarens förhandsvisning och elevskärmen kör exakt samma kod.
  */
@@ -113,15 +114,17 @@ export function createChipHost(base) {
 
 /**
  * Lager med widgetarna i `.morgon`. `obstacles()` = elementen som aldrig får
- * skymmas (kortet, Bra jobbat-tavlan om den syns). `onPlaced(map)` får
- * Map(id → faktisk plats | null) efter varje layout (null = fick inte plats).
+ * skymmas (kortet, Bra jobbat-tavlan om den syns), `obstacleNames()` deras
+ * namn i samma ordning ("kortet") för panelens förklaring. `onPlaced(map)`
+ * får Map(id → { slot, scale, blockedBy }) efter varje layout (resolveSlots;
+ * slot null = fick inte plats, scale < 1 = krympt i sitt hörn).
  *
  *   const layer = createCornerLayer(stage, { view, classId, sync, obstacles });
  *   layer.set(settings.widgets);   // vid varje ändring (monterar bara om vid ny data)
  *   layer.layout();                // efter storleksändring / när kortet ändrats
  *   layer.destroy();
  */
-export function createCornerLayer(stage, { view, classId, sync = null, obstacles = () => [], onPlaced = () => {} } = {}) {
+export function createCornerLayer(stage, { view, classId, sync = null, obstacles = () => [], obstacleNames = () => [], onPlaced = () => {} } = {}) {
   const layer = document.createElement("div");
   layer.className = "morgon__widgets";
   stage.append(layer);
@@ -150,36 +153,61 @@ export function createCornerLayer(stage, { view, classId, sync = null, obstacles
     layout();
   }
 
-  /** Placera: först på lärarens plats, krockar flyttas (resolveSlots). */
+  /**
+   * Placera: först på lärarens plats och storlek; krockar krymps i sitt hörn
+   * och flyttas först när inte ens storlek S ryms (resolveSlots, #119).
+   */
   function layout() {
     if (!layer.isConnected || !items.length) { onPlaced(new Map()); return; }
     const L = layer.getBoundingClientRect();
     if (!L.width || !L.height) return;
+    const names = obstacleNames();
     const obs = obstacles()
-      .filter((el) => el && !el.hidden && el.isConnected && el.getClientRects().length)
-      .map((el) => el.getBoundingClientRect());
-    // Hörnets avstånd till kanten mäts i tl-läge (CSS styr det — --mw-inset).
+      .map((el, i) => ({ el, name: names[i] }))
+      .filter(({ el }) => el && !el.hidden && el.isConnected && el.getClientRects().length)
+      .map(({ el, name }) => {
+        const r = el.getBoundingClientRect();
+        return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, name };
+      });
+    // Mått i tl-läge i full storlek och i S (minsta krympningen). Hörnets
+    // avstånd till kanten styrs av CSS (--mw-inset) och krymper inte.
     const geo = new Map();
     for (const item of items) {
       const { el } = boxes.get(item.id);
       el.dataset.slot = "tl";
       el.hidden = false;
+      el.style.removeProperty("--mw-k");
       const r = el.getBoundingClientRect();
-      geo.set(item.id, { w: r.width, h: r.height, dx: r.left - L.left, dy: r.top - L.top });
+      let min = 1;
+      if (item.size !== "s") {
+        el.classList.replace(`mw--${item.size}`, "mw--s");
+        min = Math.min(1, el.getBoundingClientRect().width / r.width || 1);
+        el.classList.replace("mw--s", `mw--${item.size}`);
+      }
+      const round = widgetType(item.type)?.shape === "round";
+      geo.set(item.id, { w: r.width, h: r.height, dx: r.left - L.left, dy: r.top - L.top, min, round });
     }
-    const rectFor = (item, slot) => {
+    const rectFor = (item, slot, scale = 1) => {
       const g = geo.get(item.id);
-      const left = slot[1] === "l" ? L.left + g.dx : L.right - g.dx - g.w;
-      const top = slot[0] === "t" ? L.top + g.dy : L.bottom - g.dy - g.h;
-      return { left, top, right: left + g.w, bottom: top + g.h };
+      const w = g.w * scale, h = g.h * scale;
+      const left = slot[1] === "l" ? L.left + g.dx : L.right - g.dx - w;
+      const top = slot[0] === "t" ? L.top + g.dy : L.bottom - g.dy - h;
+      return { left, top, right: left + w, bottom: top + h, round: g.round };
     };
-    const placed = resolveSlots(items, { rectFor, obstacles: obs, width: L.width, height: L.height, gap: 8 });
+    const placed = resolveSlots(items, {
+      rectFor, minScale: (item) => geo.get(item.id).min,
+      // 4 px luft mot kortet/tavlan — glaset syns ändå åtskilt, och en större
+      // marginal krympte en M-klocka bara för marginalens skull (#119).
+      obstacles: obs, width: L.width, height: L.height, gap: 4,
+    });
     for (const item of items) {
       const { el } = boxes.get(item.id);
-      const slot = placed.get(item.id);
-      el.hidden = !slot;
-      el.dataset.slot = slot ?? item.slot;
-      el.classList.toggle("mw--moved", !!slot && slot !== item.slot);
+      const at = placed.get(item.id);
+      el.hidden = !at?.slot;
+      el.dataset.slot = at?.slot ?? item.slot;
+      if (at?.slot && at.scale < 1) el.style.setProperty("--mw-k", String(at.scale));
+      else el.style.removeProperty("--mw-k");
+      el.classList.toggle("mw--moved", !!at?.slot && at.slot !== item.slot);
     }
     onPlaced(placed);
   }
@@ -194,4 +222,34 @@ export function createCornerLayer(stage, { view, classId, sync = null, obstacles
       layer.remove();
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Elevskärmens faktiska platser → lärarens panel (issue #119)
+// ---------------------------------------------------------------------------
+// Elevskärmen (projektorn) har en annan yta än lärarens fönster — ingen
+// verktygsrad, ingen panel, större namn på Bra jobbat — så en widget kan
+// krympas eller flyttas där men inte hos läraren. Elevfönstret delar därför
+// sitt resultat LOKALT (körtillståndets nyckel, samma webbläsare, aldrig
+// molnet) och panelen visar det medan elevskärmen är öppen.
+
+const PLACEMENT_ID = "_placement";
+const placementJSON = (placed) => JSON.stringify(Object.fromEntries(placed ?? []));
+
+/** Elevfönstret: dela var widgetarna hamnade (bara vid ändring). */
+export function createPlacementSharer(classId) {
+  let last = null;
+  return (placed) => {
+    const json = placementJSON(placed);
+    if (json === last) return;
+    last = json;
+    writeRuntime(classId, PLACEMENT_ID, { placed: JSON.parse(json) });
+  };
+}
+
+/** Lärarfönstret: cb(Map(id → { slot, scale, blockedBy }) | null) nu och vid varje ändring. → off */
+export function watchStudentPlacement(classId, cb) {
+  const toMap = (v) => (v?.placed && typeof v.placed === "object" ? new Map(Object.entries(v.placed)) : null);
+  cb(toMap(readRuntime(classId, PLACEMENT_ID)));
+  return watchRuntime(classId, PLACEMENT_ID, (v) => cb(toMap(v)));
 }

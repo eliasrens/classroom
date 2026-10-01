@@ -5,13 +5,13 @@
  * En kryssruta per widget-typ. Typer som får finnas flera gånger (t.ex.
  * timrar) får "+ Lägg till" och en ta bort-knapp per instans. Under en
  * ikryssad typ visas instansens egna inställningar (typens settingsHTML/
- * bindSettings) och — på Morgonskärmen — platsväljaren (fyra hörn, upptagna
- * är avstängda) och storlek S/M/L.
+ * bindSettings) och — på Morgonskärmen — platsväljaren (fyra hörn; väljs ett
+ * upptaget hörn byter de två widgetarna plats) och storlek S/M/L.
  *
  *   root.innerHTML = "";   // en tom behållare i sektionen
  *   const ui = mountWidgetSettings(root, { form: "lesson", get: () => list, set: (next) => save(next) });
  *   ui.render();           // när listan bytts utifrån (annan planering / annat fönster)
- *   ui.setPlacement(map);  // Morgonskärmen: faktisk plats efter krockar (createCornerLayer)
+ *   ui.setPlacement(map);  // Morgonskärmen: faktisk plats/skala efter krockar (createCornerLayer)
  *   ui.destroy();
  */
 
@@ -41,6 +41,40 @@ export function widgetsSummary(list, form = "lesson") {
   return names.length ? names.join(", ") : "Inga widgets";
 }
 
+/** "kortet", "Bra jobbat-tavlan" → "kortet och Bra jobbat-tavlan" (blockedBy från resolveSlots). */
+function blockedText(names) {
+  const parts = (names ?? []).filter(Boolean).map((n) => (n === "widget" ? "en annan widget" : n));
+  if (!parts.length) return "kortet eller Bra jobbat";
+  return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} och ${parts.at(-1)}`;
+}
+
+/**
+ * Raden under en widget i panelen när den inte står som läraren valt
+ * (issue #119), eller null. `at` = { slot, scale, blockedBy } från resolveSlots.
+ */
+export function placementText(w, at) {
+  if (!at) return null;
+  const what = blockedText(at.blockedBy);
+  if (!at.slot) return `Dold just nu — ryms inte i något hörn utan att skymma ${what}.`;
+  if (at.slot !== w.slot) {
+    return `Flyttad till ${SLOT_LABELS[at.slot].toLowerCase()} — skulle skymma ${what}${at.scale < 1 ? ". Visas också mindre" : ""}.`;
+  }
+  if (at.scale < 1) return `Mindre för att inte skymma ${what}.`;
+  return null;
+}
+
+/**
+ * Panelens text för en widget: lärarvyns rad, och — med en öppen elevskärm —
+ * elevskärmens, som är den eleverna ser. Samma på båda = en rad.
+ */
+export function placementLines(w, here, student, studentOpen = false) {
+  const h = placementText(w, here);
+  if (!studentOpen) return h;
+  const s = placementText(w, student);
+  if (h === s) return h;
+  return [s && `På elevskärmen: ${s}`, h && `Här: ${h}`].filter(Boolean).join("\n") || null;
+}
+
 let uid = 0;
 
 export function mountWidgetSettings(root, { form = "lesson", get, set, ctx = {} }) {
@@ -51,6 +85,7 @@ export function mountWidgetSettings(root, { form = "lesson", get, set, ctx = {} 
   const group = `wset-${++uid}`;
   let bound = []; // cleanup från typernas bindSettings
   let placement = new Map();
+  let studentPlacement = null; // elevskärmens platser när den är öppen (#119)
 
   const list = () => (Array.isArray(get()) ? get() : []);
   // ctx till typernas settingsHTML/bindSettings. siblings() = alla widgets i
@@ -62,10 +97,11 @@ export function mountWidgetSettings(root, { form = "lesson", get, set, ctx = {} 
     return `<div class="wset__slots" role="radiogroup" aria-label="Plats">
       ${SLOTS.map((s) => {
         const other = taken.get(s);
-        const title = other ? `${SLOT_LABELS[s]} — upptagen av ${nameOf(widgetType(other.type)) ?? "en annan widget"}` : SLOT_LABELS[s];
-        return `<label class="wset__slot wset__slot--${s}" title="${esc(title)}">
+        // Ett upptaget hörn går att välja — widgetarna byter plats (#119).
+        const title = other ? `${SLOT_LABELS[s]} — byter plats med ${nameOf(widgetType(other.type)) ?? "en annan widget"}` : SLOT_LABELS[s];
+        return `<label class="wset__slot wset__slot--${s}${other ? " wset__slot--taken" : ""}" title="${esc(title)}">
           <input type="radio" name="${group}-slot-${esc(w.id)}" value="${s}" data-wslot="${esc(w.id)}"
-            aria-label="${esc(title)}"${w.slot === s ? " checked" : ""}${other ? " disabled" : ""}>
+            aria-label="${esc(title)}"${w.slot === s ? " checked" : ""}>
           <span aria-hidden="true"></span>
         </label>`;
       }).join("")}
@@ -122,7 +158,7 @@ export function mountWidgetSettings(root, { form = "lesson", get, set, ctx = {} 
 
     let hint;
     if (isMorning) {
-      hint = `<p class="${look.hint}">Visas i hörnen på Morgonskärmen. Två widgets kan inte ha samma plats — en widget som skulle skymma kortet eller Bra jobbat flyttas till närmaste lediga hörn.</p>`
+      hint = `<p class="${look.hint}">Visas i hörnet du väljer. Skulle den skymma kortet eller Bra jobbat blir den mindre där.</p>`
         + (slotsFull ? `<p class="${look.hint} wset__warn" role="status">Alla fyra hörnen är upptagna.</p>` : "");
     } else {
       const shown = all.filter((w) => widgetType(w.type)).length;
@@ -159,13 +195,9 @@ export function mountWidgetSettings(root, { form = "lesson", get, set, ctx = {} 
   function applyPlacement() {
     for (const p of root.querySelectorAll("[data-wplaced]")) {
       const w = list().find((x) => x.id === p.dataset.wplaced);
-      if (!w || !placement.has(w.id)) { p.hidden = true; continue; }
-      const at = placement.get(w.id);
-      if (at === w.slot) { p.hidden = true; continue; }
-      p.hidden = false;
-      p.textContent = at
-        ? `Visas just nu ${SLOT_LABELS[at].toLowerCase()} — platsen krockar med kortet eller Bra jobbat.`
-        : "Får inte plats just nu utan att skymma kortet eller Bra jobbat — prova en mindre storlek.";
+      const text = w && placementLines(w, placement.get(w.id), studentPlacement?.get(w.id) ?? null, !!studentPlacement);
+      p.hidden = !text;
+      p.textContent = text ?? "";
     }
   }
 
@@ -190,7 +222,14 @@ export function mountWidgetSettings(root, { form = "lesson", get, set, ctx = {} 
       return;
     }
     if (t.dataset.wslot && t.checked) {
-      void commit(list().map((w) => (w.id === t.dataset.wslot ? { ...w, slot: t.value } : w)));
+      // Upptaget hörn → den andra widgeten tar över det här widgetens hörn.
+      const all = list();
+      const from = all.find((w) => w.id === t.dataset.wslot)?.slot;
+      void commit(all.map((w) => {
+        if (w.id === t.dataset.wslot) return { ...w, slot: t.value };
+        if (w.slot === t.value && from) return { ...w, slot: from };
+        return w;
+      }));
       return;
     }
     if (t.dataset.wsize && t.checked) {
@@ -217,6 +256,8 @@ export function mountWidgetSettings(root, { form = "lesson", get, set, ctx = {} 
   return {
     render,
     setPlacement(map) { placement = map ?? new Map(); applyPlacement(); },
+    /** Elevskärmens platser (null = ingen elevskärm öppen). */
+    setStudentPlacement(map) { studentPlacement = map ?? null; applyPlacement(); },
     destroy() {
       root.removeEventListener("change", onChange);
       root.removeEventListener("click", onClick);

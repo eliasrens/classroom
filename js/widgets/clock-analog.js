@@ -137,6 +137,7 @@ export default {
   name: "Klocka (analog)",
   icon: "clock",
   multiple: false,
+  shape: "round", // stor på Morgonskärmen: rund urtavla — krockar räknas mot cirkeln (#119)
   defaults,
   normalize: (cfg) => normalize({ ...defaults(), ...cfg }),
   renderChip: (el, cfg) => mount(el, cfg, "chip"),
