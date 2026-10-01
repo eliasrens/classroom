@@ -1,0 +1,795 @@
+/* ============================================================
+   WIDGETS (issue #115, klockorna #116) — brickor i lektionens rubrikrad, hörn på
+   Morgonskärmen och inställnings-UI:t. Logik: js/widgets/.
+   ============================================================ */
+
+/* ---- Lektionen: brickor i rubrikraden (.lb-top) ----
+   Ytan mellan ämnet och "Tid: …". contain: size = ytan har ingen egen
+   storlek, så den kan ALDRIG göra rubrikraden högre eller bredare —
+   fitBoard (js/modes/lektion.js) påverkas inte. Får brickorna inte plats
+   klipps de i stället. Utan widgets finns elementet inte alls. */
+.lb-widgets {
+  flex: 1 1 0;
+  min-width: 0;
+  align-self: stretch;
+  contain: size;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+}
+/* Brickan tar färg från ämnet: rubrikens text (--subj-ink) som tunn ton. */
+.lb-chip {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-height: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.12em 0.7em;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--subj-ink) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--subj-ink) 30%, transparent);
+  color: var(--subj-ink);
+  font-size: 1.15em; /* samma som "Tid: …" */
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* ---- Morgonskärmen: hörnplatser ----
+   Lagret täcker .morgon; med öppen lärarpanel börjar det till höger om
+   panelen (samma yta som kortet centreras i). Allt skalas med --morgon-scale. */
+.morgon__widgets {
+  --mw-inset: clamp(var(--space-3), 2.5vw, var(--space-5));
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.morgon:has(.morgon__panel[data-open="true"]) .morgon__widgets { left: min(22rem, 88vw); }
+
+/* Samma glas som Bra jobbat-tavlan (.praise-board--glass). */
+.mw {
+  position: absolute;
+  pointer-events: auto;
+  padding: calc(var(--mw-font) * 0.22) calc(var(--mw-font) * 0.42);
+  border-radius: var(--radius-l);
+  background: rgb(18 20 26 / 52%);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  border: 1px solid rgb(255 255 255 / 14%);
+  box-shadow: 0 10px 40px rgb(0 0 0 / 28%);
+  color: #fff;
+  text-shadow: 0 2px 10px rgb(0 0 0 / 55%);
+  line-height: 1;
+}
+.mw[hidden] { display: none; }
+.mw[data-slot="tl"] { top: var(--mw-inset); left: var(--mw-inset); }
+.mw[data-slot="tr"] { top: var(--mw-inset); right: var(--mw-inset); }
+.mw[data-slot="bl"] { bottom: var(--mw-inset); left: var(--mw-inset); }
+.mw[data-slot="br"] { bottom: var(--mw-inset); right: var(--mw-inset); }
+/* S / M / L — grundstorleken för widgetens text (typerna räknar i em).
+   --mw-k < 1 sätts av host.js när widgeten krymps i sitt hörn för att inte
+   skymma kortet eller Bra jobbat (issue #119) — aldrig mindre än S. */
+.mw { --mw-k: 1; }
+.mw--s { --mw-font: calc(var(--mw-k) * var(--morgon-scale) * clamp(1.6rem, 5vh, 2.6rem)); }
+.mw--m { --mw-font: calc(var(--mw-k) * var(--morgon-scale) * clamp(2.4rem, 8vh, 4.2rem)); }
+.mw--l { --mw-font: calc(var(--mw-k) * var(--morgon-scale) * clamp(3.4rem, 13vh, 7rem)); }
+.mw { font-size: var(--mw-font); }
+
+/* ---- Klocka (digital) — #115, sekunder/datum #116 ---- */
+.wclock { font-variant-numeric: tabular-nums; }
+.wclock__date { font-variant-numeric: normal; }
+/* Bricka: bara tiden — datum visas aldrig i lektionen (#119). */
+.wclock--chip {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  height: 1.2em;
+  line-height: 1.2;
+  overflow: hidden;
+}
+.wclock--large { display: flex; flex-direction: column; align-items: center; font-weight: 600; letter-spacing: 0.02em; }
+.wclock--large .wclock__date {
+  margin-top: 0.22em;
+  font-size: 0.34em;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+/* ---- Klocka (analog), #116 ----
+   SVG i viewBox −100…100; visarna vrids runt mitten (0 0). Färgerna är
+   variabler: glaset på Morgonskärmen, ämnesfärgen i rubrikbrickan. */
+.wanalog {
+  --wa-face: rgb(255 255 255 / 7%);
+  --wa-ring: rgb(255 255 255 / 38%);
+  --wa-tick: rgb(255 255 255 / 55%);
+  --wa-ink: #fff;
+  --wa-second: #f6b44f; /* varm guldton — appens accent, ljusare för glaset */
+  display: block;
+  aspect-ratio: 1;
+}
+.wanalog__svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.wanalog__face { fill: var(--wa-face); stroke: var(--wa-ring); stroke-width: 2.5; }
+.wanalog__tick { stroke: var(--wa-tick); stroke-width: 1.6; stroke-linecap: round; }
+.wanalog__tick--hour { stroke: var(--wa-ink); stroke-width: 3.4; }
+.wanalog__nums text {
+  fill: var(--wa-ink);
+  font-size: 17px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+  font-variant-numeric: lining-nums;
+}
+.wanalog__hand { transform-box: view-box; transform-origin: 0 0; }
+.wanalog__hand line { stroke: var(--wa-ink); stroke-linecap: round; }
+.wanalog__hand--hour line { stroke-width: 8; }
+.wanalog__hand--minute line { stroke-width: 5.5; }
+.wanalog__hand--second line { stroke: var(--wa-second); stroke-width: 2.2; }
+.wanalog__hand--second circle { fill: var(--wa-second); }
+.wanalog__cap { fill: var(--wa-ink); }
+/* Visarna tickar fram med en kort studs — inget svep alls med reducerad rörelse.
+   --live sätts först efter första bilden (ingen inflygning vid omritning). */
+@media (prefers-reduced-motion: no-preference) {
+  .wanalog--live .wanalog__hand { transition: transform 0.22s cubic-bezier(0.3, 1.9, 0.6, 1); }
+}
+
+/* Stor på Morgonskärmen: glaset blir självt en rund urtavla. */
+.mw[data-widget-type="clock-analog"] { padding: calc(var(--mw-font) * 0.09); border-radius: 50%; }
+.wanalog--large { width: 2.9em; }
+.wanalog--large .wanalog__svg { filter: drop-shadow(0 2px 6px rgb(0 0 0 / 45%)); }
+
+/* Bricka i rubrikraden: liten urtavla, rubrikradens höjd, i ämnesfärgen. */
+.lb-chip[data-widget-type="clock-analog"] {
+  flex: 0 0 auto;
+  height: 100%;
+  max-height: none;
+  aspect-ratio: 1;
+  padding: 0;
+  background: none;
+  border: 0;
+}
+.wanalog--chip {
+  --wa-face: color-mix(in srgb, var(--subj-ink) 12%, transparent);
+  --wa-ring: color-mix(in srgb, var(--subj-ink) 45%, transparent);
+  --wa-tick: color-mix(in srgb, var(--subj-ink) 55%, transparent);
+  --wa-ink: var(--subj-ink);
+  --wa-second: var(--subj-ink);
+  width: 100%;
+  height: 100%;
+  container-type: size;
+}
+/* Liten urtavla: bara 12, 3, 6 och 9 (större) och timstrecken — alla tolv
+   siffror blir för små för att läsas. Mycket liten: bara timstrecken. */
+@container (max-height: 130px) {
+  .wanalog__nums text:not(.wanalog__num--q),
+  .wanalog__tick:not(.wanalog__tick--hour) { display: none; }
+  .wanalog__nums .wanalog__num--q { font-size: 27px; }
+  .wanalog__tick--q { display: none; }
+  .wanalog__tick--hour { stroke-width: 5; }
+}
+@container (max-height: 56px) {
+  .wanalog__nums { display: none; }
+  .wanalog__tick--q { display: inline; }
+  .wanalog__tick--hour { stroke-width: 8; }
+}
+
+/* Typernas egna av/på-inställningar (klockorna). */
+.wopts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); }
+.wopt { display: inline-flex; align-items: center; gap: var(--space-2); cursor: pointer; font-size: var(--text-s); }
+.wopt input { width: 1em; height: 1em; margin: 0; accent-color: var(--color-accent); cursor: pointer; }
+
+/* ---- Timrar (issue #117): "Kvar av lektionen" och "Nedräkning" ----
+   Tre utseenden: .wt--digits, .wt--bar, .wt--analog. Brickan räknar i em
+   från tavlans text; det stora (.mw) i em från --mw-font. */
+.wt { font-variant-numeric: tabular-nums; }
+.wt__time { font-weight: 700; white-space: nowrap; }
+.wt [hidden] { display: none !important; }
+
+/* Bricka i rubrikraden: [tårtbit] rubrik 12:34, stapeln som en tunn linje
+   längs pillerns underkant och lärarens knappar som ett lager ovanpå
+   (hover/fokus) — varken stapel eller knappar tar bredd i den trånga raden.
+   Siffrorna kortas aldrig, och en bricka klipps aldrig in i grannen. */
+.lb-chip:has(> .wt) {
+  position: relative;
+  overflow: hidden;
+  min-width: min-content;
+  padding-inline: 0.5em;
+  font-size: 0.95em;
+}
+.lb-chip:has(> .wt--bar) { padding-bottom: 0.2em; } /* plats för stapeln under siffrorna */
+.wt--chip { display: inline-flex; align-items: center; gap: 0.3em; min-width: 0; }
+.wt--chip > * { flex: none; }
+/* Trång rad (timers.js fitRow), steg för steg:
+   1 "Kvar" bort, 2 rubrikerna kortas, 3 rubrikerna bort,
+   4 "Tiden är ute" → "0:00", 5 vänsterställ (sista brickan klipps). */
+.lb-widgets:is([data-wt-fit="1"], [data-wt-fit="2"], [data-wt-fit="3"], [data-wt-fit="4"], [data-wt-fit="5"]) .wt__label--minor,
+.lb-widgets:is([data-wt-fit="3"], [data-wt-fit="4"], [data-wt-fit="5"]) .wt--chip .wt__label { display: none; }
+.lb-widgets[data-wt-fit="2"] .wt--chip .wt__label { max-width: 3.2em; }
+.wt__short,
+.lb-widgets:is([data-wt-fit="4"], [data-wt-fit="5"]) .wt__long { display: none; }
+.lb-widgets:is([data-wt-fit="4"], [data-wt-fit="5"]) .wt__short { display: inline; }
+.lb-widgets[data-wt-fit="5"] { justify-content: flex-start; }
+.wt--chip .wt__label {
+  flex: 0 1 auto;
+  min-width: 1.2em;
+  max-width: 7em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.8em;
+  font-weight: 600;
+  opacity: 0.9;
+}
+.wt--chip .wt-face { width: 1.05em; height: 1.05em; }
+.wt--chip .wt-bar {
+  position: absolute;
+  left: 0.7em;
+  right: 0.7em;
+  bottom: 0.06em;
+  height: 0.12em;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 25%, transparent);
+}
+.wt--chip .wt-bar__fill { background: currentColor; }
+.wt--chip .wt-ctl {
+  position: absolute;
+  inset: 0;
+  justify-content: center;
+  gap: 0.3em;
+  font-size: 0.8em;
+  background: var(--subj);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.lb-chip:hover .wt-ctl,
+.lb-chip:focus-within .wt-ctl { opacity: 1; }
+.lb-chip[data-wt-status="done"] .wt-ctl { background: #c94f4a; }
+.lb-chip[data-wt-status="done"] .wt__long { font-size: 0.8em; }
+/* Pausad: siffrorna dämpas (rubriken med "Pausad" kan vara bortplockad). */
+.wt[data-status="paused"] .wt__time { opacity: 0.6; }
+
+/* Urtavlan ("Time Timer") — röd tårtbit på ljus tavla. */
+.wt-face { display: block; overflow: visible; text-shadow: none; }
+.wt-face__pie { fill: #e5484d; }
+.wt-face--chip .wt-face__bg { fill: rgb(255 255 255 / 88%); stroke: currentColor; stroke-width: 7; }
+.wt-face--large .wt-face__bg { fill: #f7f5f0; stroke: rgb(0 0 0 / 18%); stroke-width: 1; }
+.wt-face__tick { stroke: #2b2f36; stroke-width: 0.6; stroke-linecap: round; }
+.wt-face__tick--major { stroke-width: 1.3; }
+.wt-face__nums text {
+  fill: #2b2f36;
+  font-size: 6.4px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.wt-face__knob { fill: #2b2f36; }
+
+/* Stapeln krymper åt vänster (transform — ingen omlayout varje tick). */
+.wt-bar__fill { display: block; width: 100%; height: 100%; transform-origin: left center; }
+
+/* Stor på Morgonskärmen */
+.wt--large {
+  display: grid;
+  justify-items: center;
+  gap: 0.08em;
+  text-align: center;
+}
+.wt--large.wt--bar { min-width: 4.4em; }
+/* Urtavlan är redan en tydlig form — tunnare glaskant runt den. */
+.mw:has(> .wt--analog) { padding: calc(var(--mw-font) * 0.14) calc(var(--mw-font) * 0.24); }
+.wt--large .wt__label {
+  max-width: 11em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.34em;
+  font-weight: 600;
+  opacity: 0.92;
+}
+.wt--large .wt__time { font-size: 1em; letter-spacing: 0.01em; }
+.wt--large .wt__state { font-size: 0.32em; font-weight: 600; }
+.wt--large.wt--analog .wt-face { width: 1.9em; height: 1.9em; }
+.wt--large.wt--analog .wt__time { font-size: 0.42em; }
+.wt--large .wt-bar {
+  width: 4.4em;
+  height: 0.18em;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgb(255 255 255 / 22%);
+}
+.wt--large .wt-bar__fill { background: #f7f5f0; }
+/* "Börjar om 5 min" / "Ingen sluttid" är text, inte en siffra — mindre. */
+.wt--large[data-status="before"] .wt__time,
+.wt--large[data-status="later"] .wt__time,
+.wt--large[data-status="none"] .wt__time { font-size: 0.5em; }
+
+/* Lärarens knappar — små och diskreta; ritas bara i lärarvyn
+   (+ .teacher-only: syns aldrig på elevskärmen). */
+.wt-ctl { display: inline-flex; align-items: center; gap: 0.2em; }
+.wt--large .wt-ctl { font-size: 0.32em; gap: 0.35em; margin-top: 0.15em; }
+.wt-ctl__btn {
+  display: inline-grid;
+  place-items: center;
+  width: 1.35em;
+  height: 1.35em;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.8;
+}
+.wt--large .wt-ctl__btn { width: 1.9em; height: 1.9em; }
+.wt-ctl__btn:hover, .wt-ctl__btn:focus-visible { opacity: 1; background: color-mix(in srgb, currentColor 16%, transparent); }
+.wt-ctl__btn:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+.wt-ctl__btn .icon { width: 0.78em; height: 0.78em; }
+
+/* När tiden är ute: färgmarkering + lugn pulsering (nyss slut). */
+.lb-chip[data-wt-status="done"] {
+  background: #c94f4a;
+  border-color: #c94f4a;
+  color: #fff;
+}
+.mw[data-wt-status="done"] {
+  background: rgb(140 36 32 / 62%);
+  border-color: rgb(255 150 140 / 60%);
+}
+.lb-chip.wt-alarm,
+.mw.wt-alarm { animation: wt-pulse 2.4s ease-in-out infinite; }
+@keyframes wt-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.62; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lb-chip.wt-alarm,
+  .mw.wt-alarm { animation: none; }
+}
+
+/* Timrarnas egna inställningar (under instansen i "Widgets") */
+.wt-set { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); font-size: var(--text-s); }
+.wt-set__row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.wt-set__row > span:first-child { min-width: 4.5em; color: var(--color-ink-soft); }
+.wt-set input.wt-set__title,
+.wt-set input.wt-set__time,
+.wt-set__num input {
+  margin: 0;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+}
+.wt-set input.wt-set__title { flex: 1 1 10em; width: auto; min-width: 0; }
+.wt-set input.wt-set__time { width: auto; }
+.wt-set__num { display: inline-flex; align-items: center; gap: 4px; }
+.wt-set__num input { width: 4.2em; }
+.wt-set__hint { margin: 0; color: var(--color-ink-soft); font-size: var(--text-s); }
+.wt-set__check { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; cursor: pointer; }
+.wt-set__check .wt-set__hint { flex-basis: 100%; padding-left: 1.6em; }
+.wt-set__check input { accent-color: var(--color-accent); }
+/* Utseende: tre valbara "piller" (radbryts snyggt i den smala panelen). */
+.wt-set__looks { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.wt-set__look { position: relative; cursor: pointer; }
+.wt-set__look input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: inherit; }
+.wt-set__look span {
+  display: block;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  font-weight: 600;
+}
+.wt-set__look input:checked + span { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-ink); }
+.wt-set__look input:focus-visible + span { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.wt-set__run {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: var(--space-2);
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--color-ink) 6%, transparent);
+}
+.wt-set__status { font-variant-numeric: tabular-nums; font-weight: 600; }
+.wt-set__status[data-status="done"] { color: var(--color-danger); }
+.wt-set__btns { display: inline-flex; gap: var(--space-2); }
+.wt-set__btn { padding: 2px var(--space-2); font-size: var(--text-s); }
+
+/* ---- Inställnings-UI (lektionens "Widgets" och morgonpanelens "Widgets") ---- */
+.wset-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+.wset .field-edit__head,
+.wset__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
+.wset label:has(> [data-wtoggle]) { display: inline-flex; align-items: center; gap: var(--space-2); cursor: pointer; }
+.wset [data-wtoggle] { width: 1.05em; height: 1.05em; accent-color: var(--color-accent); cursor: pointer; }
+.wset [data-wtoggle]:disabled { cursor: not-allowed; }
+.wset__add { padding: 2px var(--space-2); font-size: var(--text-s); }
+.wset__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--color-line);
+}
+.wset__itemhead { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: var(--text-s); }
+.wset__warn { color: var(--color-warn, #b7791f); font-weight: 600; }
+.wset__placed { font-style: italic; white-space: pre-line; } /* två rader: elevskärmen + här */
+.wset__place { display: flex; align-items: center; gap: var(--space-2) var(--space-3); flex-wrap: wrap; }
+.wset__label { font-size: var(--text-s); color: var(--color-ink-soft); }
+
+/* Platsväljaren: fyra hörn i en liten "skärm" (2 × 2). */
+.wset__slots {
+  display: grid;
+  grid-template-columns: repeat(2, 1.6rem);
+  grid-template-rows: repeat(2, 1.05rem);
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s, 4px);
+}
+.wset__slot { position: relative; cursor: pointer; }
+.wset__slot input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: inherit; }
+.wset__slot span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--color-ink) 10%, transparent);
+}
+.wset__slot input:checked + span { background: var(--color-accent); }
+/* Upptagen av en annan widget: randig — men valbar, de byter plats (#119). */
+.wset__slot--taken input:not(:checked) + span {
+  background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--color-ink) 22%, transparent) 0 3px, transparent 3px 6px);
+}
+.wset__slot input:focus-visible + span { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+
+/* Storlek S / M / L — segmenterad kontroll. */
+.wset__sizes { display: inline-flex; border: 1px solid var(--color-line); border-radius: var(--radius-m); overflow: hidden; }
+.wset__size { position: relative; cursor: pointer; }
+.wset__size input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: inherit; }
+.wset__size span { display: block; min-width: 2rem; padding: 2px var(--space-2); text-align: center; font-weight: 600; font-size: var(--text-s); }
+.wset__size + .wset__size span { border-left: 1px solid var(--color-line); }
+.wset__size input:checked + span { background: var(--color-accent); color: var(--color-accent-ink); }
+.wset__size input:focus-visible + span { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+
+/* Morgonpanelen: raderna i samma lugna stil som övriga panelrader. */
+.wset--morning {
+  padding: var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+}
+.wset--morning .wset__head { font-weight: 600; }
+
+/* ============================================================
+   LJUDNIVÅ (issue #118) — Ljudnivåskylt och Ljudmätare.
+   Logik: js/widgets/sound-sign.js, sound-meter.js, sound-level.js.
+   ============================================================ */
+
+/* ---- Ljudnivåskylt ----
+   --lvl-color / --lvl-ink sätts av JS per nivå (sound-level.js LEVELS). */
+.wsign__dot {
+  flex: none;
+  display: inline-block;
+  width: 0.62em;
+  height: 0.62em;
+  border-radius: 50%;
+  background: var(--lvl-color);
+  box-shadow: 0 0 0 0.09em color-mix(in srgb, currentColor 45%, transparent);
+}
+.wsign__num { font-variant-numeric: tabular-nums; font-weight: 800; }
+.wsign__name { white-space: nowrap; }
+
+/* Brickorna i rubrikraden klipps aldrig in i grannen (samma som timrarna):
+   lärarens knappar ligger som ett lager ovanpå (hover/fokus) och tar ingen
+   bredd. Blir raden trång kortas skyltens namn ("Prata l…") — pricken och
+   siffran kortas aldrig. */
+.lb-chip:has(> .wsign),
+.lb-chip:has(> .wsound) {
+  position: relative;
+  overflow: hidden;
+  padding-inline: 0.5em;
+  font-size: 0.95em;
+}
+.lb-chip:has(> .wsign),
+.lb-chip:has(> .wsound) { flex: none; }
+/* Trång rad (sound-sign.js fitSoundRow), steg för steg. */
+.lb-widgets:is([data-ws-fit="1"], [data-ws-fit="2"], [data-ws-fit="3"], [data-ws-fit="4"], [data-ws-fit="5"]) .wsound--chip > .icon { display: none; }
+.lb-widgets:is([data-ws-fit="2"], [data-ws-fit="3"], [data-ws-fit="4"]) .wsound--chip .wsound__bar { width: 2.2em; }
+/* 3: mätaren blir en liten stående stapel (fylls nedifrån, gränsen som streck). */
+.lb-widgets:is([data-ws-fit="3"], [data-ws-fit="4"], [data-ws-fit="5"]) .lb-chip:has(> .wsound) { padding-inline: 0.3em; }
+.lb-widgets:is([data-ws-fit="3"], [data-ws-fit="4"], [data-ws-fit="5"]) .wsound--chip .wsound__bar { width: 0.42em; height: 0.95em; }
+.lb-widgets:is([data-ws-fit="3"], [data-ws-fit="4"], [data-ws-fit="5"]) .wsound--chip .wsound__zones {
+  background: linear-gradient(to top,
+    var(--wsound-green) 0 calc(var(--wsound-warn) * 100%),
+    var(--wsound-yellow) calc(var(--wsound-warn) * 100%) calc(var(--wsound-limit) * 100%),
+    var(--wsound-red) calc(var(--wsound-limit) * 100%) 100%);
+}
+.lb-widgets:is([data-ws-fit="3"], [data-ws-fit="4"], [data-ws-fit="5"]) .wsound--chip .wsound__fill { transform-origin: center bottom; transform: scaleY(var(--wsound-level)); }
+.lb-widgets:is([data-ws-fit="3"], [data-ws-fit="4"], [data-ws-fit="5"]) .wsound--chip[data-status]:not([data-status="on"]) .wsound__fill { transform: scaleY(0); }
+.lb-widgets:is([data-ws-fit="3"], [data-ws-fit="4"], [data-ws-fit="5"]) .wsound--chip .wsound__mark {
+  left: 0; right: 0; top: auto; width: auto; height: 2px; margin: 0 0 -1px;
+  bottom: calc(var(--wsound-limit) * 100%);
+}
+.lb-widgets:is([data-ws-fit="4"], [data-ws-fit="5"]) .wsign--chip > .wsign__name { display: none; }
+.lb-widgets[data-ws-fit="5"] { justify-content: flex-start; }
+
+/* Bricka: "● 1 Viska" (+ ‹ 1 › som lager i lärarvyn). */
+.wsign--chip { display: inline-flex; align-items: center; gap: 0.32em; height: 1.2em; min-width: 0; }
+.wsign--chip > * { flex: none; }
+.wsign__steps {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.12em;
+  background: var(--subj);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.lb-chip:hover .wsign__steps,
+.lb-chip:focus-within .wsign__steps { opacity: 1; }
+.wsign__btn {
+  display: inline-grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.wsign--chip .wsign__btn { font-size: 0.72em; width: 1.05em; height: 1.2em; border-radius: 999px; opacity: 0.7; }
+.wsign--chip .wsign__btn:hover { opacity: 1; background: color-mix(in srgb, currentColor 14%, transparent); }
+.wsign--chip .wsign__btn:disabled { opacity: 0.18; cursor: default; background: none; }
+.wsign__btn:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; opacity: 1; }
+
+/* Stor: rund färgskylt med symbolen, siffran och namnet. */
+.wsign--large { display: flex; flex-direction: column; align-items: center; gap: 0.2em; }
+.wsign__main { display: flex; align-items: center; gap: 0.32em; }
+.wsign__badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.75em;
+  height: 1.75em;
+  border-radius: 50%;
+  background: var(--lvl-color);
+  color: var(--lvl-ink);
+  box-shadow: 0 0 0 0.05em rgb(255 255 255 / 60%), 0 0.08em 0.3em rgb(0 0 0 / 35%);
+  transition: background-color 0.4s ease;
+}
+.wsign__svg { width: 88%; height: 88%; overflow: visible; }
+.wsign--large .wsign__text { display: flex; flex-direction: column; align-items: flex-start; gap: 0.06em; }
+.wsign--large .wsign__num { font-size: 1em; line-height: 0.9; }
+.wsign--large .wsign__name { font-size: 0.42em; font-weight: 700; letter-spacing: 0.01em; }
+/* Lärarvyns små nivåknappar under skylten. */
+.wsign__pick { display: flex; gap: 0.35em; font-size: max(0.2em, 11px); text-shadow: none; }
+.wsign__pick .wsign__btn {
+  width: 1.9em;
+  height: 1.9em;
+  border-radius: 50%;
+  background: var(--lvl-color);
+  color: var(--lvl-ink);
+  font-weight: 800;
+  opacity: 0.45;
+  transition: opacity 0.2s;
+}
+.wsign__pick .wsign__btn:hover { opacity: 0.85; }
+.wsign__pick .wsign__btn[aria-pressed="true"] { opacity: 1; box-shadow: 0 0 0 0.14em #fff; }
+
+/* ---- Ljudmätare ----
+   --wsound-level / --wsound-limit / --wsound-warn (0–1) sätts av JS. */
+.wsound {
+  --wsound-green: #3fbf6f;
+  --wsound-yellow: #f2c230;
+  --wsound-red: #e0564b;
+  --wsound-color: var(--wsound-green);
+  --wsound-level: 0;
+  --wsound-limit: 0.6;
+  --wsound-warn: 0.45;
+}
+.wsound[data-zone="yellow"] { --wsound-color: var(--wsound-yellow); }
+.wsound[data-zone="red"] { --wsound-color: var(--wsound-red); }
+.wsound__bar {
+  position: relative;
+  display: block;
+  flex: none;
+  width: 3.2em;
+  height: 0.5em;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+}
+/* Zonerna som svag bakgrund: grön → gul (från --wsound-warn) → röd (från gränsen). */
+.wsound__zones {
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+  background: linear-gradient(to right,
+    var(--wsound-green) 0 calc(var(--wsound-warn) * 100%),
+    var(--wsound-yellow) calc(var(--wsound-warn) * 100%) calc(var(--wsound-limit) * 100%),
+    var(--wsound-red) calc(var(--wsound-limit) * 100%) 100%);
+}
+.wsound__fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: scaleX(var(--wsound-level));
+  background: var(--wsound-color);
+  border-radius: inherit;
+  transition: transform 0.12s linear, background-color 0.6s ease;
+}
+.wsound__mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--wsound-limit) * 100%);
+  width: 2px;
+  margin-left: -1px;
+  background: currentColor;
+  opacity: 0.75;
+}
+.wsound[data-status]:not([data-status="on"]) .wsound__fill { transform: scaleX(0); }
+.wsound__btn {
+  display: inline-grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.wsound__btn:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+
+/* Bricka: mikrofon + liten rörlig stapel (+ start/stopp i lärarvyn). */
+.wsound--chip { display: inline-flex; align-items: center; gap: 0.35em; height: 1.2em; }
+.wsound--chip > .icon { width: 0.95em; height: 0.95em; opacity: 0.8; }
+.wsound--chip .wsound__short { font-size: 0.72em; font-weight: 600; opacity: 0.85; }
+.wsound--chip > * { flex: none; }
+/* Start/stopp: lager ovanpå brickan (hover/fokus), som skyltens ‹ ›. */
+.wsound__ctl {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--subj);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+/* Smal bricka (trång rad): bara ikonen på knappen. */
+.wsound__ctl { container-type: inline-size; }
+@container (max-width: 5em) { .wsound--chip .wsound__btn > span { display: none; } }
+.lb-chip:hover .wsound__ctl,
+.lb-chip:focus-within .wsound__ctl { opacity: 1; }
+.wsound--chip .wsound__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.05em 0.55em;
+  border-radius: 999px;
+  font-size: 0.75em;
+  font-weight: 700;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+}
+.wsound--chip .wsound__btn .icon { width: 1em; height: 1em; }
+.wsound--chip .wsound__btn:hover { background: color-mix(in srgb, currentColor 26%, transparent); }
+/* "För högt" en stund: brickan blir lugnt röd (ingen blinkning, inget ljud). */
+.lb-chip[data-widget-type="sound-meter"] { transition: background-color 1.2s ease, border-color 1.2s ease; }
+.lb-chip:has(.wsound[data-alert="true"]) {
+  background: color-mix(in srgb, var(--wsound-red, #e0564b) 38%, transparent);
+  border-color: #e0564b;
+}
+
+/* Stor: halvcirkelmätare (viewBox −100…100). */
+.wsound--large { position: relative; display: flex; flex-direction: column; align-items: center; width: 3.4em; }
+.wsound__gauge { display: block; width: 100%; height: auto; overflow: visible; }
+.wsound__arc { fill: none; stroke-width: 15; opacity: 0.38; }
+.wsound__arc--green { stroke: var(--wsound-green); }
+.wsound__arc--yellow { stroke: var(--wsound-yellow); }
+.wsound__arc--red { stroke: var(--wsound-red); }
+.wsound__level { fill: none; stroke-width: 15; stroke: var(--wsound-color); transition: stroke 0.6s ease; }
+.wsound__needle { transform-box: view-box; transform-origin: 0 0; transition: transform 0.12s linear; }
+.wsound__needle line { stroke: #fff; stroke-width: 5; stroke-linecap: round; }
+.wsound__hub { fill: #fff; }
+.wsound--large[data-status]:not([data-status="on"]) .wsound__gauge { opacity: 0.55; }
+/* Lärarens text (av, nekad, ingen mikrofon) ligger OVANPÅ halvcirkeln — den
+   tar ingen plats, så widgeten har samma storlek i lärar- och elevvyn och
+   hörnlogiken (#119) placerar den likadant. Läsbar även i storlek S. */
+.wsound__msg {
+  position: absolute;
+  inset: 0 0 auto;
+  aspect-ratio: 200 / 108; /* precis över halvcirkeln (viewBox) */
+  margin: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 0.1em;
+  font-size: max(0.15em, 11px);
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  white-space: normal;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 70%);
+  background: radial-gradient(closest-side, rgb(18 20 26 / 55%), transparent);
+}
+.wsound__msg[hidden] { display: none; }
+.wsound__btn--large {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  margin-top: 0.5em;
+  padding: 0.3em 0.9em;
+  border-radius: 999px;
+  font-size: max(0.18em, 11px);
+  font-weight: 600;
+  text-shadow: none;
+  background: rgb(255 255 255 / 16%);
+  border: 1px solid rgb(255 255 255 / 28%);
+}
+.wsound__btn--large:hover { background: rgb(255 255 255 / 26%); }
+.mw[data-widget-type="sound-meter"] { transition: background-color 1.5s ease, border-color 1.5s ease; }
+.mw:has(.wsound[data-alert="true"]) {
+  background: rgb(150 36 32 / 62%);
+  border-color: rgb(255 130 120 / 60%);
+}
+/* Mjuk rörelse bara om användaren vill ha rörelse. */
+@media (prefers-reduced-motion: reduce) {
+  .wsound__fill, .wsound__needle, .wsign__badge { transition: none; }
+}
+
+/* Elevvyn: mätaren syns bara medan den går (mikrofonen av/nekad → ingenting). */
+.lb-chip:has(.wsound--student:not([data-status="on"])) { display: none; }
+.mw:has(.wsound--student:not([data-status="on"])) { visibility: hidden; }
+
+/* ---- Inställningar (skylt + mätare) ---- */
+.wsnd-set { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); font-size: var(--text-s); }
+.wsnd-set__label { font-weight: 600; color: var(--color-ink-soft); }
+.wsign-set__levels { display: flex; flex-wrap: wrap; gap: 4px; }
+.wsign-set__level {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  cursor: pointer;
+}
+.wsign-set__level:hover { border-color: var(--lvl-color); }
+.wsign-set__level[aria-pressed="true"] {
+  border-color: var(--lvl-color);
+  background: color-mix(in srgb, var(--lvl-color) 24%, var(--color-surface));
+  box-shadow: inset 0 0 0 1px var(--lvl-color);
+  font-weight: 700;
+}
+.wsign-set__level:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.wsign-set__n { font-weight: 800; font-variant-numeric: tabular-nums; }
+.wsign-set__names summary { cursor: pointer; color: var(--color-ink-soft); }
+.wsign-set__grid { display: grid; gap: 4px; margin-top: var(--space-2); }
+.wsign-set__name { display: grid; grid-template-columns: auto 1.2em minmax(0, 1fr); align-items: center; gap: 6px; font-weight: 700; }
+.wsign-set__name input { width: 100%; min-width: 0; font-weight: 400; }
+
+.wsound-set__run { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.wsound-set__btn { display: inline-flex; align-items: center; gap: var(--space-2); }
+.wsound--mini .wsound__bar { width: 8em; height: 0.6em; }
+.wsound-set__status { margin: 0; color: var(--color-warn); font-weight: 600; }
+.wsound-set__status[hidden] { display: none; }
+.wsound-set__privacy { display: flex; align-items: flex-start; gap: 6px; margin: 0; color: var(--color-ink-soft); }
+.wsound-set__privacy .icon { flex: none; width: 1.1em; height: 1.1em; margin-top: 0.1em; }
+.wsound-set__limit { display: grid; grid-template-columns: auto minmax(0, 1fr) 3.2em; align-items: center; gap: var(--space-2); }
+.wsound-set__limit input { width: 100%; accent-color: var(--color-accent); }
+.wsound-set__limit input:disabled { opacity: 0.5; }
+.wsound-set__limit output { font-variant-numeric: tabular-nums; text-align: right; }
+.wsound-set__hint { margin: 0; color: var(--color-ink-soft); font-style: italic; }
+.wsound-set__hint[hidden] { display: none; }

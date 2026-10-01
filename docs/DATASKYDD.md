@@ -48,6 +48,13 @@ självregistrering).
   kartorna sparas bara lokalt. Utskriften görs med webbläsarens egen
   utskrift, utan nätverk; sidhuvudet har bara klass och datum.
 
+- **Ljudmätaren (issue #118)** — mikrofonen öppnas bara när läraren
+  trycker Starta, i lärarfönstret, och ljudet analyseras där och då.
+  Inget spelas in, lagras eller skickas: bara ett tal (ljudnivån 0–1) går
+  till elevskärmen på samma dator, och ingenting sparas. Mikrofonen stängs
+  helt vid Stoppa, när widgeten tas bort, när läget byts och när fönstret
+  stängs. Texten står i widgetens inställningar.
+
 Datan lagras i webbläsarens lokala lagring på datorn och visas i
 lärarvyerna med märkningen "Endast den här datorn". Elevskärmen
 (projektorn) läser samma lokala lagring i samma webbläsare.

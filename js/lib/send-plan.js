@@ -7,7 +7,7 @@
  * identiska utom klockslaget. En kopia skickas till en annan klass:
  *
  *  - Kopian är OBEROENDE: nytt id, ownerUid = nuvarande lärare. Namn,
- *    ämne, fält och show kopieras; datum och tider kommer från dialogen
+ *    ämne, fält, show och widgets kopieras; datum och tider kommer från dialogen
  *    (vid flera på en gång behåller varje planering sina egna).
  *  - Den sparas i målklassens PRIVATA plansPath(målCid) — det är samma
  *    lärares planeringar, bara i en annan klass.
@@ -27,6 +27,7 @@
  */
 
 import { SUBJECTS } from "./color.js";
+import { copyLessonWidgets } from "../widgets/registry.js";
 import {
   currentUid, plansPath, lessonSettingsPath, LESSON_SETTINGS_DOC, presentedPlanOf,
 } from "../data/plans.js";
@@ -52,6 +53,8 @@ export function buildCopy(plan, when = {}, uid = currentUid()) {
     end: when.end ?? src.end ?? "",
     fields: clone(src.fields),
     show: clone(src.show),
+    // Widgetbrickorna (issue #115) följer med — med nya id:n (eget körtillstånd).
+    widgets: copyLessonWidgets(src.widgets),
   };
 }
 

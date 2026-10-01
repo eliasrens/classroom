@@ -12,6 +12,7 @@
 import { weekStartFromKey, startOfWeek } from "./week.js";
 import { serverNow } from "./clock.js";
 import { pickedToday } from "./backgrounds.js";
+import { normalizeMorningWidgets } from "../widgets/registry.js";
 
 export const MORNING_KEY = "morningScreen";
 export const settingsPath = (classId) => `classes/${classId}/settings`;
@@ -85,6 +86,10 @@ export function normalize(value) {
       // den dagen, sen slumpas en ny årstidsbild (issue #64).
       pickedOn: typeof v.background?.pickedOn === "string" ? v.background.pickedOn : "",
     },
+    // Widgets i hörnen (issue #115): [{ id, type, slot, size, cfg }] — delade
+    // inställningar, ingen elevdata. Körtillstånd (timrar) ligger lokalt
+    // (js/widgets/runtime.js), aldrig här.
+    widgets: normalizeMorningWidgets(v.widgets),
   };
 }
 

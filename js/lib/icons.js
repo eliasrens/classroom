@@ -39,6 +39,7 @@ const PATHS = {
   // Trafikljusur (Läge 3)
   play: `<path d="M7 5.5v13l11-6.5z"/>`,
   stop: `<rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/>`,
+  pause: `<path d="M9 6v12M15 6v12"/>`,
   reset: `<path d="M4 5.5v5h5M4.6 10.5a8 8 0 1 1-1.1 5"/>`,
   save: `<path d="M5 4h11l3 3v13H5zM8 4v5h7M8 20v-6h8v6"/>`,
   // Läge 4 — Elevlista & noteringar (check/x delas med Morgonskärmen)
@@ -46,6 +47,10 @@ const PATHS = {
   x: `<path d="m6 6 12 12M18 6 6 18"/>`,
   search: `<circle cx="11" cy="11" r="6"/><path d="m20 20-4.6-4.6"/>`,
   clock: `<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>`,
+  "sound-sign": `<circle cx="9" cy="12" r="5.5"/><path d="M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>`,
+  mic: `<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/>`,
+  "mic-off": `<path d="M15 10V6a3 3 0 0 0-5.8-1M9 9v2a3 3 0 0 0 4.6 2.5M5.5 11a6.5 6.5 0 0 0 10.6 5M18.5 11a6.5 6.5 0 0 1-.6 2.7M12 17.5V21M8.5 21h7M4 4l16 16"/>`,
+  "clock-digital": `<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M7 9.5v5M11.5 10.6v.01M11.5 13.4v.01M15 9.5h2.5v5H15z"/>`,
   undo: `<path d="M4 8h10a5 5 0 0 1 0 10H8M4 8l3.5-3.5M4 8l3.5 3.5"/>`,
   flag: `<path d="M5 21V4c4-2 6 2 10 0v9c-4 2-6-2-10 0"/>`,
   keyboard: `<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6"/>`,

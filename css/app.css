@@ -442,6 +442,11 @@ html[data-theme="student"] .view {
   border-radius: var(--radius-l);
   overflow: hidden;
 }
+/* Viker undan för en widget i hörnet på Morgonskärmen (issue #120, js/lib/dock.js). */
+.student-panel[data-moved="true"] { transform: translate(var(--dock-x, 0px), var(--dock-y, 0px)); }
+@media (prefers-reduced-motion: no-preference) {
+  .student-panel { transition: transform 0.2s ease; }
+}
 
 .student-panel__head {
   display: flex;
