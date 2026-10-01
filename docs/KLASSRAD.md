@@ -56,6 +56,31 @@ på ikonen). **Återställ standardmall** tar tillbaka din ursprungliga mall.
 Ändringar gäller nya klassråd. Ett klassråd du redan har börjat på behåller
 sina punkter, så gamla protokoll ändras aldrig.
 
+## Skriv ut
+
+**Skriv ut** i verktygsraden öppnar en panel med en förhandsvisning av
+A4-sidorna. Välj vad du vill skriva ut:
+
+- **Protokoll (ifyllt):** klassrådet som ett protokoll i samma form som
+  Word-mallen, med datum, vecka, ordförande, sekreterare och alla
+  anteckningar. Välj vilket klassråd i listan: det som är öppet, eller ett
+  tidigare. Punkter utan anteckningar får några tomma linjer, så att man
+  kan skriva för hand. Under punkt 2 står det som skulle följas upp från
+  förra klassrådet, med en bock för det som är gjort.
+- **Tom mall:** samma sidor med tomma linjer att skriva på, till exempel
+  för en elev som är sekreterare. Den följer din mall.
+
+Tryck **Skriv ut…** och välj skrivare, eller **Spara som PDF** för en fil.
+Filen får namnet "Klassråd 4B v.40 2026-10-01" (klass, vecka och datum),
+aldrig ett elevnamn. En punkt delas aldrig mellan två sidor. Bara en punkt
+som är längre än en hel sida fortsätter på nästa, och där står "(forts.)".
+Längst ned på varje sida står "Sida 1 av 2". Utskriften ser likadan ut i
+mörkt och ljust tema, och marginalerna blir rätt vad du än väljer i
+utskriftsrutan. **Esc** eller **Avbryt** stänger panelen.
+
+Trycker du **Ctrl+P** direkt skrivs det öppna klassrådets protokoll ut,
+inte appen.
+
 ## Var sparas det?
 
 Klassråden innehåller elevernas namn och synpunkter. De sparas därför
