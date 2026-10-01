@@ -467,7 +467,7 @@ export default {
 
   async mount(el, ctx) {
     this._offs = [];
-    const { data, activeClass, view, store } = ctx;
+    const { data, activeClass, view, store, sync } = ctx;
 
     // Bred sida (issue #82): lektionsläget använder mer av skärmbredden än
     // standardramen (#61) via .view--wide (css/app.css). Bara lärarvyn —
@@ -548,7 +548,7 @@ export default {
     this._offs.push(() => praiseBoard.destroy());
 
     // ---------- Widgetbrickorna i rubrikraden (issue #115) ----------
-    const chipHost = createChipHost({ view, classId: activeClass.id });
+    const chipHost = createChipHost({ view, classId: activeClass.id, sync });
     this._offs.push(() => chipHost.destroy());
 
     function praiseNames() {
@@ -950,7 +950,7 @@ export default {
     // -- Widgets (issue #115): kryssrutor + egna inställningar, sparas i planeringen --
     const widgetsUI = mountWidgetSettings(widgetsEl, {
       form: "lesson",
-      ctx: { view, classId: activeClass.id },
+      ctx: { view, classId: activeClass.id, sync },
       get: () => (editingPlan() ? normalizePlan(editingPlan()).widgets : []),
       set: async (widgets) => {
         await patchEditing({ widgets });

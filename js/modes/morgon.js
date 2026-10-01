@@ -89,7 +89,7 @@ export default {
     // aldrig förhandsvisningen, den är bara en bild av elevskärmen.
     const sharePlacement = view === "student" && !isPreviewWindow() ? createPlacementSharer(classId) : null;
     const corners = createCornerLayer(stage, {
-      view, classId,
+      view, classId, sync,
       obstacles: () => [$(".morgon__card"), board.el],
       obstacleNames: () => ["kortet", "Bra jobbat-tavlan"],
       onPlaced: (placed) => { widgetsUI?.setPlacement(placed); sharePlacement?.(placed); },
@@ -467,7 +467,7 @@ export default {
       let widgetsKey = JSON.stringify(settings.widgets);
       widgetsUI = mountWidgetSettings(panel.querySelector(".morgon__widgets-set"), {
         form: "morning",
-        ctx: { view, classId },
+        ctx: { view, classId, sync },
         get: () => settings.widgets,
         set: (list) => {
           const next = clone();

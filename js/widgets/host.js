@@ -17,13 +17,18 @@
  * Lärarens förhandsvisning och elevskärmen kör exakt samma kod.
  */
 
-import { chipWidgets, widgetType, resolveSlots, SLOTS } from "./registry.js";
+import { chipWidgets, normalizeLessonWidgets, widgetType, resolveSlots, SLOTS } from "./registry.js";
 import { readRuntime, writeRuntime, watchRuntime } from "./runtime.js";
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-/** ctx som en typ får i render*: vy, klass, instans och körtillståndet bundet till instansen. */
+/**
+ * ctx som en typ får i render*: vy, klass, instans, körtillståndet bundet
+ * till instansen, sync-bussen (#118: ljudmätarens nivå till elevskärmen)
+ * och `siblings()` = [{ id, type, cfg }] för alla widgets i samma lista (#118:
+ * mätaren hittar ljudnivåskylten den kan kopplas till).
+ */
 function widgetCtx(base, item, form) {
   const classId = base.classId ?? null;
   return {
@@ -32,6 +37,8 @@ function widgetCtx(base, item, form) {
     widgetId: item.id,
     form,
     size: item.size ?? null,
+    sync: base.sync ?? null,
+    siblings: () => base.siblings?.() ?? [],
     lesson: base.lesson ?? null,
     runtime: {
       read: () => readRuntime(classId, item.id),
@@ -67,10 +74,11 @@ function mountOne(el, item, form, base) {
 export function chipsHTML(list, lesson = null) {
   const chips = chipWidgets(list);
   if (!chips.length) return "";
+  const siblings = normalizeLessonWidgets(list).map(({ id, type, cfg }) => ({ id, type, cfg }));
   // Planeringens dag och tid ({ date, start, end }) → ctx.lesson i brickorna
   // ("Kvar av lektionen", issue #117).
   const when = lesson ? ` data-lesson="${esc(JSON.stringify({ date: lesson.date ?? "", start: lesson.start ?? "", end: lesson.end ?? "" }))}"` : "";
-  return `<div class="lb-widgets"${when}>${chips.map((w) =>
+  return `<div class="lb-widgets" data-siblings="${esc(JSON.stringify(siblings))}"${when}>${chips.map((w) =>
     `<div class="lb-chip" data-widget-type="${esc(w.type)}" data-widget="${esc(JSON.stringify(w))}"></div>`).join("")}</div>`;
 }
 
@@ -87,7 +95,9 @@ export function createChipHost(base) {
       clear();
       let lesson = null;
       try { lesson = JSON.parse(container.querySelector(".lb-widgets")?.dataset.lesson ?? "null"); } catch { /* ingen tid */ }
-      const at = { ...base, lesson };
+      let siblings = [];
+      try { siblings = JSON.parse(container.querySelector(".lb-widgets")?.dataset.siblings ?? "[]"); } catch { /* ok */ }
+      const at = { ...base, lesson, siblings: () => siblings };
       for (const el of container.querySelectorAll(".lb-chip[data-widget]")) {
         let item;
         try { item = JSON.parse(el.dataset.widget); } catch { continue; }
@@ -109,18 +119,18 @@ export function createChipHost(base) {
  * får Map(id → { slot, scale, blockedBy }) efter varje layout (resolveSlots;
  * slot null = fick inte plats, scale < 1 = krympt i sitt hörn).
  *
- *   const layer = createCornerLayer(stage, { view, classId, obstacles });
+ *   const layer = createCornerLayer(stage, { view, classId, sync, obstacles });
  *   layer.set(settings.widgets);   // vid varje ändring (monterar bara om vid ny data)
  *   layer.layout();                // efter storleksändring / när kortet ändrats
  *   layer.destroy();
  */
-export function createCornerLayer(stage, { view, classId, obstacles = () => [], obstacleNames = () => [], onPlaced = () => {} } = {}) {
+export function createCornerLayer(stage, { view, classId, sync = null, obstacles = () => [], obstacleNames = () => [], onPlaced = () => {} } = {}) {
   const layer = document.createElement("div");
   layer.className = "morgon__widgets";
   stage.append(layer);
 
-  const base = { view, classId };
   let items = [];
+  const base = { view, classId, sync, siblings: () => items.map(({ id, type, cfg }) => ({ id, type, cfg })) };
   let key = "";
   const boxes = new Map(); // id → { el, destroy }
 

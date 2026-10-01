@@ -96,7 +96,7 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   ok(chipsHTML([]) === "" && chipsHTML(undefined) === "", "utan widgets: ingen markup alls i rubrikraden");
   ok(chipsHTML([{ id: "x", type: "framtida-typ" }]) === "", "bara okända typer: ingen markup");
   const html = chipsHTML([{ id: "2", type: "clock-digital" }]);
-  ok(html.startsWith('<div class="lb-widgets">') && (html.match(/class="lb-chip"/g) ?? []).length === 1, "en klocka → en bricka");
+  ok(html.startsWith('<div class="lb-widgets"') && (html.match(/class="lb-chip"/g) ?? []).length === 1, "en klocka → en bricka");
   // Högst 3 brickor — med en (test)typ som får finnas flera gånger.
   const multi = { ...reg.widgetType("clock-digital"), id: "test-multi", multiple: true };
   reg.widgetTypes().push(multi);
