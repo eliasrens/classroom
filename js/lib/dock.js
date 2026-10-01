@@ -4,19 +4,19 @@
  * Elevskärmspanelen (js/ui/student-panel.js) ligger fast nere till höger i
  * lärarvyn — ovanpå allt. Element som inte får skymmas (Morgonskärmens
  * hörnwidgets) märks med `data-dock-avoid="<id>"`; skymmer dockan något av
- * dem viker den undan — åt vänster bredvid widgeten eller upp ovanför den,
- * det som skymmer minst av det som märkts `data-dock-soft` (kortet, Bra
- * jobbat-tavlan). Den går aldrig in över `data-dock-wall` (lärarpanelen) och
- * aldrig upp i verktygsraden. Ingenting annat flyttas, så lärarens
- * förhandsvisning och elevskärmen ritar fortfarande exakt samma sak.
+ * dem viker den undan — åt vänster bredvid widgeten eller upp ovanför den.
+ * En sådan plats får aldrig skymma det som märkts `data-dock-block` (kortet,
+ * Bra jobbat-tavlan), gå in över `data-dock-wall` (lärarpanelen) eller upp i
+ * verktygsraden. Ingenting annat flyttas, så lärarens förhandsvisning och
+ * elevskärmen ritar fortfarande exakt samma sak.
  *
- * Ryms dockan ingenstans (liten skärm, widgets även bredvid och ovanför)
- * står den kvar, och de skymda id:na publiceras så att panelen kan säga det
- * (DOCK_COVERED_TEXT).
+ * Ryms dockan ingenstans står den kvar på sin vanliga plats — hellre en
+ * skymd widget i lärarvyn (eleverna ser den fullt) än ett skymt kort — och
+ * de skymda id:na publiceras så att panelen kan säga det (DOCK_COVERED_TEXT).
  *
- *   el.setAttribute(DOCK_AVOID_ATTR, widgetId);  // märk: får inte skymmas
- *   el.setAttribute(DOCK_SOFT_ATTR, "");          // märk: skyms helst inte
- *   el.setAttribute(DOCK_WALL_ATTR, "");          // märk: dockan går aldrig in över (vänster gräns)
+ *   el.setAttribute(DOCK_AVOID_ATTR, widgetId);  // märk: dockan viker undan
+ *   el.setAttribute(DOCK_BLOCK_ATTR, "");         // märk: dockan flyttar aldrig in över
+ *   el.setAttribute(DOCK_WALL_ATTR, "");          // märk: vänster gräns (lärarpanelen)
  *   requestDockLayout();                          // efter varje flytt/ändring
  *   const off = watchDockCovered((ids) => …);     // skymda just nu
  *
@@ -24,7 +24,7 @@
  */
 
 export const DOCK_AVOID_ATTR = "data-dock-avoid";
-export const DOCK_SOFT_ATTR = "data-dock-soft";
+export const DOCK_BLOCK_ATTR = "data-dock-block";
 export const DOCK_WALL_ATTR = "data-dock-wall";
 export const DOCK_COVERED_TEXT = "Delvis dold av Elevskärm-panelen här — syns fullt på elevskärmen.";
 
@@ -60,16 +60,13 @@ export function watchDockCovered(cb) {
 }
 
 const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-const area = (a, b) =>
-  Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) *
-  Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
 
 /**
  * Var dockan ska stå för att inte skymma något i `avoid`.
  *
  *   dock   = dockans rektangel på sin vanliga plats (nere till höger)
- *   avoid  = rektanglar som INTE får skymmas (widgets)
- *   soft   = rektanglar som helst inte skyms (kortet, Bra jobbat)
+ *   avoid  = rektanglar dockan viker undan för (widgets)
+ *   block  = rektanglar en flyttad docka aldrig får skymma (kortet, Bra jobbat)
  *   minTop / minLeft = gränser dockan inte går förbi (verktygsraden, lärarpanelen)
  *   gap    = luft mellan dockan och det den viker undan för
  *
@@ -77,29 +74,32 @@ const area = (a, b) =>
  *   vänster, dy ≤ 0 = upp); covered = index i `avoid` som dockan skymmer där
  *   den hamnar (tom när den kunde vika undan).
  *
- * Skymmer dockan inget står den kvar — då ändras ingenting. Annars prövas två
- * platser: rakt UPP ovanför widgetarna och åt VÄNSTER bredvid dem (stegvis
- * förbi varje widget den skulle krocka med). Den som skymmer minst av `soft`
- * vinner; lika → vänster, så dockan står kvar längs nederkanten. Ryms ingen
- * står den kvar och de skymda rapporteras.
+ * Skymmer dockan ingen widget står den kvar — då ändras ingenting (även om
+ * den på sin vanliga plats ligger över kortet/tavlan, som förut). Annars
+ * prövas två platser: åt VÄNSTER bredvid widgetarna och rakt UPP ovanför dem
+ * (stegvis förbi varje widget den skulle krocka med). En plats som skymmer
+ * något i `block` eller går förbi gränserna ryms inte. Vänster vinner om båda
+ * ryms (dockan står kvar längs nederkanten); ryms ingen står den kvar och de
+ * skymda rapporteras.
  */
-export function dockPlace(dock, { avoid = [], soft = [], minTop = 0, minLeft = 0, gap = 8 } = {}) {
+export function dockPlace(dock, { avoid = [], block = [], minTop = 0, minLeft = 0, gap = 8 } = {}) {
   const hard = avoid.filter(Boolean);
-  const pref = soft.filter(Boolean);
+  const walls = block.filter(Boolean);
   const hits = (r) => hard.map((a, i) => (overlaps(r, a) ? i : -1)).filter((i) => i >= 0);
   const at = (dx, dy) => ({ left: dock.left + dx, right: dock.right + dx, top: dock.top + dy, bottom: dock.bottom + dy });
 
   const first = hits(dock);
   if (!first.length) return { dx: 0, dy: 0, covered: [] };
 
-  // Flytta längs en axel tills inget krockar (eller gränsen nås). → px eller null
+  // Flytta längs en axel tills ingen widget krockar. → px, eller null om
+  // platsen skymmer kortet/tavlan eller går förbi gränserna.
   function slide(axis) {
     let d = 0;
     for (let step = 0; step <= hard.length; step++) {
       const r = axis === "x" ? at(d, 0) : at(0, d);
       if (r.top < minTop || r.left < minLeft) return null;
       const h = hits(r);
-      if (!h.length) return d;
+      if (!h.length) return walls.some((w) => overlaps(r, w)) ? null : d;
       d = axis === "x"
         ? Math.min(...h.map((i) => hard[i].left)) - gap - dock.right
         : Math.min(...h.map((i) => hard[i].top)) - gap - dock.bottom;
@@ -107,14 +107,9 @@ export function dockPlace(dock, { avoid = [], soft = [], minTop = 0, minLeft = 0
     return null;
   }
 
-  const options = [];
   const dx = slide("x");
-  if (dx != null) options.push({ dx, dy: 0 });
+  if (dx != null) return { dx, dy: 0, covered: [] };
   const dy = slide("y");
-  if (dy != null) options.push({ dx: 0, dy });
-  if (!options.length) return { dx: 0, dy: 0, covered: first };
-
-  const cost = ({ dx, dy }) => pref.reduce((sum, s) => sum + area(at(dx, dy), s), 0);
-  const best = options.reduce((a, b) => (cost(b) < cost(a) ? b : a));
-  return { ...best, covered: [] };
+  if (dy != null) return { dx: 0, dy, covered: [] };
+  return { dx: 0, dy: 0, covered: first };
 }

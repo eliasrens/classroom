@@ -253,17 +253,18 @@ I ett upptaget hörn går det att välja en widget — de två byter plats.
 
 I lärarvyn ligger Elevskärm-panelen (`js/ui/student-panel.js`) fast nere
 till höger. Hörnlagret märker varje widget med `data-dock-avoid="<id>"`
-(bara i lärarvyn) och anropar `requestDockLayout()` efter varje layout;
-Morgonskärmen märker kortet och Bra jobbat-tavlan `data-dock-soft` och
-lärarpanelen `data-dock-wall`. Skymmer dockan en widget flyttas den
-(`dockPlace`, `js/lib/dock.js`) åt vänster bredvid widgeten eller upp ovanför
-den — det som skymmer minst av kortet och tavlan, lika → vänster. Den går
-aldrig in över lärarpanelen eller upp i verktygsraden. Widgetarna flyttas
-aldrig för dockans skull: elevskärmen har ingen docka och ritar samma sak.
-Ryms dockan ingenstans står den kvar och panelen skriver under widgeten
-"Delvis dold av Elevskärm-panelen här — syns fullt på elevskärmen."
-(`watchDockCovered` → `ui.setDockCovered(ids)`). Utan märkta element (alla
-andra lägen) står dockan exakt som förut.
+(bara i lärarvyn) och anropar `requestDockLayout()` efter varje layout —
+också när kortet eller tavlan ändrar storlek (samma ResizeObserver som
+hörnen). Morgonskärmen märker kortet och Bra jobbat-tavlan `data-dock-block`
+och lärarpanelen `data-dock-wall`. Skymmer dockan en widget flyttas den
+(`dockPlace`, `js/lib/dock.js`) åt vänster bredvid widgeten, annars upp
+ovanför den — men en plats som skymmer kortet eller tavlan, går in över
+lärarpanelen eller upp i verktygsraden ryms inte. Ryms ingen står dockan
+kvar och panelen skriver under widgeten "Delvis dold av Elevskärm-panelen
+här — syns fullt på elevskärmen." (`watchDockCovered` →
+`ui.setDockCovered(ids)`): hellre en skymd widget i lärarvyn än ett skymt
+kort. Widgetarna flyttas aldrig för dockans skull, så elevskärmen ritar
+samma sak. Utan märkta widgets (alla andra lägen) står dockan exakt som förut.
 
 ## Test
 

@@ -21,7 +21,7 @@ import { icon } from "../lib/icons.js";
 import { DEFAULT_MODE_ID, isStudentMode, getMode } from "../modes/registry.js";
 import { isExactlyPresented, presentedLabel } from "../lib/present.js";
 import { SINGLESCREEN_RETURN_KEY } from "../sync.js";
-import { DOCK_AVOID_ATTR, DOCK_SOFT_ATTR, DOCK_WALL_ATTR, dockPlace, onDockLayoutRequest, publishDockCovered } from "../lib/dock.js";
+import { DOCK_AVOID_ATTR, DOCK_BLOCK_ATTR, DOCK_WALL_ATTR, dockPlace, onDockLayoutRequest, publishDockCovered } from "../lib/dock.js";
 
 const COLLAPSED_KEY = "classroom:ui:studentPanelCollapsed";
 const RETURN_KEY = SINGLESCREEN_RETURN_KEY; // sessionStorage: lärarens läge att återvända till
@@ -205,7 +205,7 @@ export function initStudentPanel({ store, openStudentWindow, present }) {
     const walls = rects(`[${DOCK_WALL_ATTR}]`).map((x) => x.getBoundingClientRect()).filter((w) => w.right <= dock.left);
     const { dx, dy, covered } = dockPlace(dock, {
       avoid: avoidEls.map((x) => x.getBoundingClientRect()),
-      soft: rects(`[${DOCK_SOFT_ATTR}]`).map((x) => x.getBoundingClientRect()),
+      block: rects(`[${DOCK_BLOCK_ATTR}]`).map((x) => x.getBoundingClientRect()),
       minTop: (topbar && visible(topbar) ? topbar.getBoundingClientRect().bottom : 0) + 8,
       minLeft: Math.max(0, ...walls.map((w) => w.right)) + 8,
       gap: 8,
