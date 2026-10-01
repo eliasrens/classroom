@@ -17,6 +17,10 @@
  *     hörnet (ner till S), först därefter närmaste lediga hörn, ingen plats
  *     → null; rund klocka räknas som cirkel; två widgets aldrig på samma
  *     plats; panelens förklaring (placementText) — issue #119
+ *   - Elevskärm-dockan (dockPlace, issue #120): står kvar när den inte skymmer
+ *     någon widget; annars åt vänster bredvid widgeten i hörnet nere till
+ *     höger eller upp ovanför den; en plats som skymmer kortet/Bra jobbat
+ *     förkastas; ingen plats → står kvar (→ skymda id:n + panelens rad)
  *   - runtime-tidsstämplar: paus + fortsätt ger rätt kvarvarande tid,
  *     endsAt, lokal lagring under classroom:local:…, lyssnare
  */
@@ -296,6 +300,64 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   ok(seenP.length === 2 && seenP[1].get("c").scale === 0.6, "delade platser når lärarens panel (en gång per ändring)");
   ok(mem.has("classroom:local:widgets/QA-PL/_placement"), "lagras lokalt (classroom:local:), aldrig i molnet");
   offP();
+}
+
+// ---------------------------------------------------------------------------
+// Elevskärm-dockan viker undan (issue #120)
+// ---------------------------------------------------------------------------
+{
+  const { dockPlace, publishDockCovered, watchDockCovered, DOCK_COVERED_TEXT } = await import("../js/lib/dock.js");
+  const R = (left, top, right, bottom) => ({ left, top, right, bottom });
+  const opt = { minTop: 56, minLeft: 8, gap: 8 };
+  const still = { dx: 0, dy: 0, covered: [] };
+  // 1920×1080: docka nere till höger, widget L i br, kortet i mitten, Bra jobbat till höger.
+  const collapsed = R(1608, 1032, 1908, 1068);  // hopfälld 300×36
+  const open = R(1608, 698, 1908, 1068);        // utfälld 300×370
+  const br = R(1575, 840, 1888, 1048);
+  const card = R(540, 355, 1290, 772);
+  const board = R(1512, 382, 1888, 745);
+  const block = [card, board];
+  ok(eq(dockPlace(collapsed, opt), still), "docka: inget att undvika → vanlig plats");
+  ok(eq(dockPlace(collapsed, { ...opt, avoid: [R(400, 840, 700, 1048)], block }), still),
+    "docka: widget nere till vänster → vanlig plats (inget ändras)");
+  ok(eq(dockPlace(open, { ...opt, avoid: [], block }), still),
+    "docka: ligger den bara över kortet/tavlan står den kvar (som förut)");
+  // Hopfälld: åt vänster längs nederkanten, 8 px från widgeten.
+  const c = dockPlace(collapsed, { ...opt, avoid: [br], block });
+  ok(c.dx === 1575 - 8 - 1908 && c.dy === 0 && !c.covered.length, "docka: hopfälld flyttas åt vänster, 8 px från widgeten");
+  // Utfälld: vänster skulle skymma kortets hörn, upp Bra jobbat → står kvar, widgeten skymd.
+  const o = dockPlace(open, { ...opt, avoid: [br], block });
+  ok(eq(o, { dx: 0, dy: 0, covered: [0] }), "docka: utfälld — vänster skymmer kortet, upp tavlan → står kvar + skymd");
+  // Kandidat som överlappar kortet förkastas, även om upp skulle gå: här finns ingen tavla.
+  const up = dockPlace(open, { ...opt, avoid: [br], block: [card] });
+  ok(up.dx === 0 && up.dy === 832 - 1068 && !up.covered.length, "docka: vänster skymmer kortet → upp ovanför widgeten");
+  // Lägre kort och tavla: vänster ryms.
+  const left = dockPlace(open, { ...opt, avoid: [br], block: [R(540, 355, 1200, 690), R(1512, 382, 1888, 690)] });
+  ok(left.dx === 1575 - 8 - 1908 && left.dy === 0, "docka: utfälld åt vänster när kortet inte är i vägen");
+  // Båda ryms → vänster.
+  const tie = dockPlace(collapsed, { ...opt, avoid: [br] });
+  ok(tie.dy === 0 && tie.dx < 0, "docka: båda ryms → vänster");
+  // Vänster förbi två widgets i rad.
+  const two = dockPlace(collapsed, { ...opt, avoid: [br, R(1300, 1000, 1560, 1060)] });
+  ok(two.dx === 1300 - 8 - 1908 && !two.covered.length, "docka: åt vänster förbi två widgets i rad");
+  // Gränser: upp in i verktygsraden, vänster förbi lärarpanelen → står kvar.
+  const br720 = R(1040, 550, 1250, 690);
+  const tall = dockPlace(R(968, 100, 1268, 708), { ...opt, minLeft: 900, avoid: [br720] });
+  ok(eq(tall, { dx: 0, dy: 0, covered: [0] }), "docka: verktygsraden och vänstergränsen respekteras");
+  // 1280×720 utfälld med en klocka uppe till höger → ingen plats → står kvar, br skymd.
+  const stay = dockPlace(R(968, 338, 1268, 708), { ...opt, minLeft: 340, avoid: [R(1000, 80, 1250, 300), br720], block: [R(330, 220, 860, 548)] });
+  ok(eq(stay, { dx: 0, dy: 0, covered: [1] }), "docka: ryms ingenstans → vanlig plats, widgeten i br rapporteras skymd");
+  // Publicering av skymda id:n: bara vid ändring.
+  const seen = [];
+  const off = watchDockCovered((ids) => seen.push(ids.join(",")));
+  publishDockCovered(["b", "a"]);
+  publishDockCovered(["a", "b"]);
+  publishDockCovered([]);
+  off();
+  publishDockCovered(["c"]);
+  ok(eq(seen, ["", "a,b", ""]), "docka: skymda id:n publiceras sorterade, bara vid ändring");
+  publishDockCovered([]);
+  ok(/Elevskärm-panelen/.test(DOCK_COVERED_TEXT), "docka: panelens rad nämner Elevskärm-panelen");
 }
 
 // ---------------------------------------------------------------------------

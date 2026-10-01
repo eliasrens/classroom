@@ -27,6 +27,7 @@ import {
 import { openBgPicker, closeBgPicker } from "../ui/bg-picker.js";
 import { collapsibleHTML, mountCollapsibles } from "../ui/collapsible.js";
 import { createCornerLayer, createPlacementSharer, watchStudentPlacement } from "../widgets/host.js";
+import { watchDockCovered, DOCK_BLOCK_ATTR, DOCK_WALL_ATTR } from "../lib/dock.js";
 import { isPreviewWindow } from "../sync.js";
 import { mountWidgetSettings, widgetsSummary } from "../widgets/settings-ui.js";
 import { normalizeMorningWidgets } from "../widgets/registry.js";
@@ -95,6 +96,13 @@ export default {
       onPlaced: (placed) => { widgetsUI?.setPlacement(placed); sharePlacement?.(placed); },
     });
     this._corners = corners;
+    // Elevskärm-dockan viker undan för widgetarna (host.js) — men aldrig in
+    // över kortet, Bra jobbat-tavlan eller lärarpanelen (#120, js/lib/dock.js).
+    // Deras storleksändringar når dockan via hörnens layout (ResizeObserver ovan).
+    if (isTeacher) {
+      for (const x of [$(".morgon__card"), board.el]) x?.setAttribute(DOCK_BLOCK_ATTR, "");
+      $(".morgon__panel")?.setAttribute(DOCK_WALL_ATTR, "");
+    }
     // Kortets och tavlans storlek ändras med innehållet → lägg ut hörnen igen.
     if (typeof ResizeObserver === "function") {
       let frame = 0;
@@ -483,6 +491,8 @@ export default {
       this._placementStops = [
         watchStudentPlacement(classId, (map) => { studentPlaced = map; showStudent(); }),
         ctx.store?.subscribe(["studentOpen"], showStudent),
+        // Elevskärm-dockan lyfts över widgetarna; ryms den inte säger panelen till (#120).
+        watchDockCovered((ids) => widgetsUI.setDockCovered(ids)),
       ];
       const syncWidgets = () => {
         const key = JSON.stringify(settings.widgets);

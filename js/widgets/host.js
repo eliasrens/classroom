@@ -14,11 +14,13 @@
  *    krymps i sitt hörn, och flyttas till närmaste lediga plats först när
  *    inte ens S ryms (resolveSlots, #119).
  *
- * Lärarens förhandsvisning och elevskärmen kör exakt samma kod.
+ * Lärarens förhandsvisning och elevskärmen kör exakt samma kod. I lärarvyn
+ * märks hörnens widgets så att Elevskärm-dockan viker undan för dem (#120).
  */
 
 import { chipWidgets, normalizeLessonWidgets, widgetType, resolveSlots, SLOTS } from "./registry.js";
 import { readRuntime, writeRuntime, watchRuntime } from "./runtime.js";
+import { DOCK_AVOID_ATTR, requestDockLayout } from "../lib/dock.js";
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -147,6 +149,8 @@ export function createCornerLayer(stage, { view, classId, sync = null, obstacles
       el.className = `mw mw--${item.size}`;
       el.dataset.widgetType = item.type;
       el.dataset.slot = item.slot;
+      // Elevskärm-dockan (bara i lärarvyn) får inte skymma widgeten (#120).
+      if (view === "teacher") el.setAttribute(DOCK_AVOID_ATTR, item.id);
       layer.append(el);
       boxes.set(item.id, { el, destroy: mountOne(el, item, "large", base) });
     }
@@ -158,7 +162,7 @@ export function createCornerLayer(stage, { view, classId, sync = null, obstacles
    * och flyttas först när inte ens storlek S ryms (resolveSlots, #119).
    */
   function layout() {
-    if (!layer.isConnected || !items.length) { onPlaced(new Map()); return; }
+    if (!layer.isConnected || !items.length) { onPlaced(new Map()); requestDockLayout(); return; }
     const L = layer.getBoundingClientRect();
     if (!L.width || !L.height) return;
     const names = obstacleNames();
@@ -210,6 +214,7 @@ export function createCornerLayer(stage, { view, classId, sync = null, obstacles
       el.classList.toggle("mw--moved", !!at?.slot && at.slot !== item.slot);
     }
     onPlaced(placed);
+    requestDockLayout();
   }
 
   return {
@@ -220,6 +225,7 @@ export function createCornerLayer(stage, { view, classId, sync = null, obstacles
       for (const b of boxes.values()) b.destroy();
       boxes.clear();
       layer.remove();
+      requestDockLayout();
     },
   };
 }

@@ -12,12 +12,16 @@
  *    i helskärm; Esc/avslutad helskärm tar läraren tillbaka
  *
  * Panelen renderas bara i lärarvyn (döljs helt när view = student).
+ *
+ * Den viker undan för element märkta `data-dock-avoid` (Morgonskärmens
+ * hörnwidgets, issue #120) — se js/lib/dock.js.
  */
 
 import { icon } from "../lib/icons.js";
 import { DEFAULT_MODE_ID, isStudentMode, getMode } from "../modes/registry.js";
 import { isExactlyPresented, presentedLabel } from "../lib/present.js";
 import { SINGLESCREEN_RETURN_KEY } from "../sync.js";
+import { DOCK_AVOID_ATTR, DOCK_BLOCK_ATTR, DOCK_WALL_ATTR, dockPlace, onDockLayoutRequest, publishDockCovered } from "../lib/dock.js";
 
 const COLLAPSED_KEY = "classroom:ui:studentPanelCollapsed";
 const RETURN_KEY = SINGLESCREEN_RETURN_KEY; // sessionStorage: lärarens läge att återvända till
@@ -165,10 +169,64 @@ export function initStudentPanel({ store, openStudentWindow, present }) {
   el.querySelector(".student-panel__open").addEventListener("click", openStudentWindow);
   el.querySelector(".student-panel__fullscreen").addEventListener("click", enterSingleScreen);
 
+  // ---- Vik undan för widgets (issue #120) ----
+  //
+  // En widget i hörnet nere till höger på Morgonskärmen ska synas även i
+  // lärarvyn. Dockan förskjuts (transform, så den vanliga platsen går att
+  // mäta mitt i en övergång) åt vänster eller uppåt, bort från allt märkt
+  // DOCK_AVOID_ATTR (js/lib/dock.js). Inget annat flyttas: elevskärmen har
+  // ingen docka och ritar samma sak.
+
+  let placeFrame = 0;
+  function requestPlace() {
+    cancelAnimationFrame(placeFrame);
+    placeFrame = requestAnimationFrame(placeDock);
+  }
+
+  const visible = (x) => !x.hidden && x.getClientRects().length > 0;
+  const rects = (sel) => [...document.querySelectorAll(sel)].filter(visible);
+
+  function placeDock() {
+    const r = el.getBoundingClientRect();
+    if (el.hidden || !r.width || !r.height) {
+      el.style.removeProperty("--dock-x");
+      el.style.removeProperty("--dock-y");
+      el.dataset.moved = "false";
+      publishDockCovered([]);
+      return;
+    }
+    // Nuvarande (ev. pågående) förskjutning → den vanliga platsen.
+    let m = { m41: 0, m42: 0 };
+    try { m = new DOMMatrixReadOnly(getComputedStyle(el).transform); } catch { /* ingen transform */ }
+    const dock = { left: r.left - m.m41, right: r.right - m.m41, top: r.top - m.m42, bottom: r.bottom - m.m42 };
+    const avoidEls = rects(`[${DOCK_AVOID_ATTR}]`);
+    const topbar = document.getElementById("topbar");
+    // Väggar (lärarpanelen) till vänster om dockan: den går aldrig in över dem.
+    const walls = rects(`[${DOCK_WALL_ATTR}]`).map((x) => x.getBoundingClientRect()).filter((w) => w.right <= dock.left);
+    const { dx, dy, covered } = dockPlace(dock, {
+      avoid: avoidEls.map((x) => x.getBoundingClientRect()),
+      block: rects(`[${DOCK_BLOCK_ATTR}]`).map((x) => x.getBoundingClientRect()),
+      minTop: (topbar && visible(topbar) ? topbar.getBoundingClientRect().bottom : 0) + 8,
+      minLeft: Math.max(0, ...walls.map((w) => w.right)) + 8,
+      gap: 8,
+    });
+    const set = (name, v) => (v ? el.style.setProperty(name, `${Math.round(v)}px`) : el.style.removeProperty(name));
+    set("--dock-x", dx);
+    set("--dock-y", dy);
+    el.dataset.moved = String(!!(dx || dy));
+    publishDockCovered(covered.map((i) => avoidEls[i].getAttribute(DOCK_AVOID_ATTR)));
+  }
+
+  onDockLayoutRequest(requestPlace);
+  window.addEventListener("resize", requestPlace);
+  // Ut-/ihopfälld panel har en annan höjd.
+  if (typeof ResizeObserver === "function") new ResizeObserver(requestPlace).observe(el);
+
   // Panelen (och dess iframe) finns bara i lärarvyn — hård spärr.
   store.subscribe(["view"], ({ view }) => {
     el.hidden = view !== "teacher";
     updatePreview();
+    requestPlace();
   });
 
   // ---- Enskärmsläge ----

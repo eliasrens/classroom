@@ -249,11 +249,29 @@ resultat lokalt (`createPlacementSharer` → körtillståndets nyckel
 
 I ett upptaget hörn går det att välja en widget — de två byter plats.
 
+### Elevskärm-dockan (#120)
+
+I lärarvyn ligger Elevskärm-panelen (`js/ui/student-panel.js`) fast nere
+till höger. Hörnlagret märker varje widget med `data-dock-avoid="<id>"`
+(bara i lärarvyn) och anropar `requestDockLayout()` efter varje layout —
+också när kortet eller tavlan ändrar storlek (samma ResizeObserver som
+hörnen). Morgonskärmen märker kortet och Bra jobbat-tavlan `data-dock-block`
+och lärarpanelen `data-dock-wall`. Skymmer dockan en widget flyttas den
+(`dockPlace`, `js/lib/dock.js`) åt vänster bredvid widgeten, annars upp
+ovanför den — men en plats som skymmer kortet eller tavlan, går in över
+lärarpanelen eller upp i verktygsraden ryms inte. Ryms ingen står dockan
+kvar och panelen skriver under widgeten "Delvis dold av Elevskärm-panelen
+här — syns fullt på elevskärmen." (`watchDockCovered` →
+`ui.setDockCovered(ids)`): hellre en skymd widget i lärarvyn än ett skymt
+kort. Widgetarna flyttas aldrig för dockans skull, så elevskärmen ritar
+samma sak. Utan märkta widgets (alla andra lägen) står dockan exakt som förut.
+
 ## Test
 
 `node docs/test-widgets.mjs` — normalisering, `normalizePlan`, kopior,
 platskrockar (krymp i hörnet före flytt, rund klocka, panelens rader,
-elevskärmens delade platser) och runtime-tidsstämplar. Varje ny del lägger till en egen svit:
+elevskärmens delade platser), Elevskärm-dockan (`dockPlace`, #120) och
+runtime-tidsstämplar. Varje ny del lägger till en egen svit:
 `node docs/test-clock-widgets.mjs` (#116) — visarvinklar, formatering,
 inställningar, ritsignalen och att `destroy` inte lämnar några timrar.
 `node docs/test-timers.mjs` (#117) — kvarvarande tid, paus/fortsätt,
