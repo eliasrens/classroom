@@ -32,12 +32,16 @@
  *                                  "Redan dragna" och scenen — namn → bara lokalt.
  *   classes/{cid}/karta          — Tankekartorna (issue #53): bubblorna kan
  *                                  innehålla elevnamn → bara lokalt.
+ *   classes/{cid}/klassrad       — Klassråden (issue #125): ordförande,
+ *                                  sekreterare och elevernas synpunkter →
+ *                                  bara lokalt. (Mallen ligger privat per
+ *                                  lärare i molnet och har ingen elevdata.)
  */
 
 const PREFIX = "classroom:local:";
 
 /** Samlings-suffix (sista path-segmentet under classes/{cid}/) som är lokala. */
-const LOCAL_ONLY = new Set(["students", "notes", "praise", "praiseArchive", "privacy", "reports", "skriv", "lotta", "karta"]);
+const LOCAL_ONLY = new Set(["students", "notes", "praise", "praiseArchive", "privacy", "reports", "skriv", "lotta", "karta", "klassrad"]);
 
 /** Är detta en samling som bara får finnas lokalt? */
 export function isLocalOnlyPath(path) {

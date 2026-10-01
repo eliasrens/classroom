@@ -83,6 +83,9 @@ js/
                         karta.js = Tankekarta — moln i mitten, bubblor runt om, flera kartor per klass
                         (karta/scene.js = scenen, karta/print.js = utskrift A3/A4, karta/palette.js =
                         färger för bubblor, grenar och molnet, karta/tree.js = grenarnas trädlogik)
+                        klassrad.js = Klassråd — dagordning på elevskärmen, anteckningar live, arkiv och mall
+                        (klassrad/template-dialog.js = "Redigera mall…")
+  lib/klassrad.js       klassrådets logik: mallen, mötet, "förra klassrådet", sekreterarens förval, Tab-flödet
   lib/karta-layout.js   tankekartans layout: ringar runt molnet, grenar utåt från sin förälder
                         (radiell trädlayout), inga överlapp, samma bild i alla storlekar
   lib/lotta.js          lottningens logik: rättvis slump, listor, "inga upprepningar", animationsmål

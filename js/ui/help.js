@@ -12,9 +12,12 @@
 
 import { icon } from "../lib/icons.js";
 import { shortTitle } from "../modes/registry.js";
-import { shortcutModes } from "./shortcuts.js";
+import { shortcutModes, shortcutKey } from "./shortcuts.js";
 
 const modeCount = () => shortcutModes().length;
+/** Sifferintervallet som byter läge: "1–8" eller, med tio lägen, "1–9, 0". */
+const digitKeys = () => (modeCount() <= 9 ? ["1", "–", String(modeCount())] : ["1", "–", "9", ",", "0"]);
+const digitText = () => digitKeys().join("").replace(",", ", ");
 
 /**
  * SANNINGSKÄLLA för genvägarna. shortcuts.js implementerar de globala;
@@ -26,8 +29,8 @@ export const shortcutGroups = () => [
     title: "Överallt",
     items: [
       // Siffrorna följer listans ordning (rutiner, verktyg, Lärare ▾) — oberoende av vad som är fäst.
-      { keys: ["1", "–", String(modeCount())], text: `Byt läge: ${shortcutModes()
-        .map((m, i) => `${i + 1} ${shortTitle(m)}`).join(" · ")}` },
+      { keys: digitKeys(), text: `Byt läge: ${shortcutModes()
+        .map((m, i) => `${shortcutKey(i)} ${shortTitle(m)}`).join(" · ")}` },
       { keys: ["E"], text: "Öppna eller fokusera elevskärmen" },
       { keys: ["F9"], text: "Snabbanteckning om en elev" },
       { keys: ["?"], text: "Visa den här genvägslistan" },
@@ -55,9 +58,17 @@ export const shortcutGroups = () => [
     ],
   },
   {
+    title: "Klassråd",
+    items: [
+      { keys: ["Tab"], text: "I slutet av ett anteckningsfält: nästa punkt (även Ctrl+Enter); Shift+Tab tillbaka" },
+      { keys: ["PageUp", "PageDown"], text: "Visa föregående / nästa punkt för eleverna (pilarna när du inte skriver)" },
+      { keys: ["F"], text: "Fokusläge — bara punkterna och anteckningarna" },
+    ],
+  },
+  {
     title: "Elevlista — Registrera",
     items: [
-      { keys: ["Elevens tangent"], text: `Snabbnotering på eleven (1–${modeCount()} och E byter inte läge här — klicka i menyn)` },
+      { keys: ["Elevens tangent"], text: `Snabbnotering på eleven (${digitText()} och E byter inte läge här — klicka i menyn)` },
       { keys: ["Shift", "+", "tangent"], text: "Positiv notering i stället" },
       { keys: ["Ctrl", "+", "Z"], text: "Ångra senaste noteringen" },
     ],
@@ -75,7 +86,7 @@ export function initHelp({ store }) {
     const rows = g.items.map((it) => `
       <div class="help__row">
         <dt class="help__keys">${it.keys.map((k) =>
-          k === "+" || k === "–" ? `<span class="help__sep">${k}</span>` : `<kbd>${k}</kbd>`
+          k === "+" || k === "–" || k === "," ? `<span class="help__sep">${k}</span>` : `<kbd>${k}</kbd>`
         ).join(" ")}</dt>
         <dd class="help__desc">${it.text}</dd>
       </div>`).join("");

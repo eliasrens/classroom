@@ -166,6 +166,28 @@ bara "Visa på elevskärm" gör det.
 `rev` ordnar bussen mot storage-eventet som hos Skrivtavlan. Elevskärmen
 får bara rubriken och bubblorna — aldrig kartlistan eller namnen i den.
 
+Klassrådet (`js/modes/klassrad.js`, issue #125) skickar det UTSKICKADE
+klassrådet (issue #88, som Tankekartan) vid varje ändring — anteckningarna
+medan läraren skriver, huvudfälten, vilken punkt som visas, "Visa alla",
+avbockningar och "Visa på elevskärm":
+
+```js
+ctx.sync.publish("klassrad:state", {
+  cid,
+  meeting: { id, date, chair, secretary, points, shown, followDone } | null,
+  prev: { from: { id, date }, groups: [{ role, title, items: [{ key, text }] }] } | null,
+  rev,
+});
+// shown: punktens id eller "all" (översikten). prev = "Från förra klassrådet"
+// (js/lib/klassrad.js previousFollowUp), null = inget tidigare klassråd.
+```
+
+Mötena sparas i den ENDAST LOKALA `classes/{cid}/klassrad` (debounce
+400 ms); en omladdad elevskärm läser `state.presented` och räknar `prev`
+själv ur samma lagring. `rev` ordnar bussen mot storage-eventet som hos
+Skrivtavlan. Elevskärmen får bara mötets innehåll — aldrig arkivet, mallen
+eller lärarens kontroller.
+
 Regler:
 
 1. Payload = ren JSON (structured clone — inga funktioner/DOM-noder).
@@ -217,7 +239,7 @@ mot `startedAt`, så den är korrekt även efter minuter i bakgrunden.
 Fyra lager, alla aktiva samtidigt:
 
 1. **Routern** vägrar montera annat än `STUDENT_MODE_IDS`
-   (`js/modes/registry.js`: morgon, lektion, trafikljus, skriv, karta, lotta, vecka) i elevvyn —
+   (`js/modes/registry.js`: morgon, lektion, trafikljus, skriv, karta, lotta, klassrad, vecka) i elevvyn —
    även om någon skriver `#/elev/elever` för hand.
 2. **Utskicks-logiken** (`present`) skickar bara ut elev-visningsbara
    lägen: "Visa på elevskärm" är avstängd på Elevlista/Översikt, och
