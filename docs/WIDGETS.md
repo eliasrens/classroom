@@ -24,6 +24,11 @@ Utan ikryssade widgets ser tavlan ut precis som förut.
   krymps den i det hörn du valt, och panelen säger till, t.ex. *"Mindre för
   att inte skymma kortet."* Bara om inte ens S ryms flyttas den till
   närmaste lediga hörn.
+- **Elevskärm-panelen** nere till höger flyttar sig åt sidan eller uppåt så
+  att en widget i hörnet nere till höger syns hos dig. Får den inte plats
+  (litet fönster) står panelen kvar och det står *"Delvis dold av
+  Elevskärm-panelen här — syns fullt på elevskärmen."* under widgeten. Fäll
+  ihop panelen så syns widgeten. Eleverna ser aldrig panelen.
 
 ## Klockor
 

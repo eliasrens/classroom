@@ -12,6 +12,7 @@
  *   const ui = mountWidgetSettings(root, { form: "lesson", get: () => list, set: (next) => save(next) });
  *   ui.render();           // när listan bytts utifrån (annan planering / annat fönster)
  *   ui.setPlacement(map);  // Morgonskärmen: faktisk plats/skala efter krockar (createCornerLayer)
+ *   ui.setDockCovered(ids); // Morgonskärmen: widgets som Elevskärm-dockan skymmer här (#120)
  *   ui.destroy();
  */
 
@@ -20,6 +21,7 @@ import {
   widgetTypes, widgetType, createLessonWidget, createMorningWidget, freeSlot,
   normalizeCfg, MAX_CHIPS, SLOTS, SLOT_LABELS, SIZES, SIZE_LABELS,
 } from "./registry.js";
+import { DOCK_COVERED_TEXT } from "../lib/dock.js";
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -86,6 +88,7 @@ export function mountWidgetSettings(root, { form = "lesson", get, set, ctx = {} 
   let bound = []; // cleanup från typernas bindSettings
   let placement = new Map();
   let studentPlacement = null; // elevskärmens platser när den är öppen (#119)
+  let dockCovered = new Set(); // widgets som Elevskärm-dockan skymmer i lärarvyn (#120)
 
   const list = () => (Array.isArray(get()) ? get() : []);
   // ctx till typernas settingsHTML/bindSettings. siblings() = alla widgets i
@@ -195,7 +198,8 @@ export function mountWidgetSettings(root, { form = "lesson", get, set, ctx = {} 
   function applyPlacement() {
     for (const p of root.querySelectorAll("[data-wplaced]")) {
       const w = list().find((x) => x.id === p.dataset.wplaced);
-      const text = w && placementLines(w, placement.get(w.id), studentPlacement?.get(w.id) ?? null, !!studentPlacement);
+      const lines = w && placementLines(w, placement.get(w.id), studentPlacement?.get(w.id) ?? null, !!studentPlacement);
+      const text = w && ([lines, dockCovered.has(w.id) && DOCK_COVERED_TEXT].filter(Boolean).join("\n") || null);
       p.hidden = !text;
       p.textContent = text ?? "";
     }
@@ -258,6 +262,8 @@ export function mountWidgetSettings(root, { form = "lesson", get, set, ctx = {} 
     setPlacement(map) { placement = map ?? new Map(); applyPlacement(); },
     /** Elevskärmens platser (null = ingen elevskärm öppen). */
     setStudentPlacement(map) { studentPlacement = map ?? null; applyPlacement(); },
+    /** Id:n som Elevskärm-dockan skymmer här (js/lib/dock.js) — bara när den inte kunde lyftas. */
+    setDockCovered(ids) { dockCovered = new Set(ids ?? []); applyPlacement(); },
     destroy() {
       root.removeEventListener("change", onChange);
       root.removeEventListener("click", onClick);
