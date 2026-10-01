@@ -31,11 +31,12 @@ const LOOK = {
 };
 
 /** Kort sammanfattning för en infälld sektion: "Klocka (digital)" / "Inga widgets". */
-export function widgetsSummary(list) {
+export function widgetsSummary(list, form = "lesson") {
   const names = [];
   for (const w of list ?? []) {
     const t = widgetType(w.type);
-    if (t && !names.includes(t.name)) names.push(t.name);
+    const name = t && (t.names?.[form] ?? t.name);
+    if (name && !names.includes(name)) names.push(name);
   }
   return names.length ? names.join(", ") : "Inga widgets";
 }
@@ -45,6 +46,8 @@ let uid = 0;
 export function mountWidgetSettings(root, { form = "lesson", get, set, ctx = {} }) {
   const look = LOOK[form] ?? LOOK.lesson;
   const isMorning = form === "morning";
+  // En typ kan heta olika i formulären (names: { morning: "…" }, issue #117).
+  const nameOf = (type) => type?.names?.[form] ?? type?.name;
   const group = `wset-${++uid}`;
   let bound = []; // cleanup från typernas bindSettings
   let placement = new Map();
@@ -59,7 +62,7 @@ export function mountWidgetSettings(root, { form = "lesson", get, set, ctx = {} 
     return `<div class="wset__slots" role="radiogroup" aria-label="Plats">
       ${SLOTS.map((s) => {
         const other = taken.get(s);
-        const title = other ? `${SLOT_LABELS[s]} — upptagen av ${widgetType(other.type)?.name ?? "en annan widget"}` : SLOT_LABELS[s];
+        const title = other ? `${SLOT_LABELS[s]} — upptagen av ${nameOf(widgetType(other.type)) ?? "en annan widget"}` : SLOT_LABELS[s];
         return `<label class="wset__slot wset__slot--${s}" title="${esc(title)}">
           <input type="radio" name="${group}-slot-${esc(w.id)}" value="${s}" data-wslot="${esc(w.id)}"
             aria-label="${esc(title)}"${w.slot === s ? " checked" : ""}${other ? " disabled" : ""}>
@@ -82,9 +85,9 @@ export function mountWidgetSettings(root, { form = "lesson", get, set, ctx = {} 
   function itemHTML(type, w, i, all) {
     const own = typeof type.settingsHTML === "function" ? type.settingsHTML(w.cfg, ownCtx(w)) : "";
     const head = type.multiple
-      ? `<div class="wset__itemhead"><span>${esc(type.name)} ${i + 1}</span>
+      ? `<div class="wset__itemhead"><span>${esc(nameOf(type))} ${i + 1}</span>
           <button type="button" class="btn btn--icon wset__remove" data-wremove="${esc(w.id)}"
-            title="Ta bort" aria-label="Ta bort ${esc(type.name)} ${i + 1}">${icon("x")}</button></div>`
+            title="Ta bort" aria-label="Ta bort ${esc(nameOf(type))} ${i + 1}">${icon("x")}</button></div>`
       : "";
     const place = isMorning
       ? `<div class="wset__place">
@@ -110,7 +113,7 @@ export function mountWidgetSettings(root, { form = "lesson", get, set, ctx = {} 
       return `<div class="${look.row}${on ? "" : " field-edit--off"}" data-wtype="${esc(type.id)}">
         <div class="${look.head}">
           <label><input type="checkbox" data-wtoggle="${esc(type.id)}"${on ? " checked" : ""}${disabled ? " disabled" : ""}>
-            ${icon(type.icon)} <span>${esc(type.name)}</span></label>
+            ${icon(type.icon)} <span>${esc(nameOf(type))}</span></label>
           ${add}
         </div>
         ${mine.map((w, i) => itemHTML(type, w, i, all)).join("")}

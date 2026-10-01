@@ -38,6 +38,7 @@ function widgetCtx(base, item, form) {
     size: item.size ?? null,
     sync: base.sync ?? null,
     siblings: () => base.siblings?.() ?? [],
+    lesson: base.lesson ?? null,
     runtime: {
       read: () => readRuntime(classId, item.id),
       write: (state) => writeRuntime(classId, item.id, state),
@@ -69,11 +70,14 @@ function mountOne(el, item, form, base) {
  * utan widgets. Instansernas data bärs som JSON i data-widget, så värden
  * och markup alltid hör ihop även när tavlan ritas om.
  */
-export function chipsHTML(list) {
+export function chipsHTML(list, lesson = null) {
   const chips = chipWidgets(list);
   if (!chips.length) return "";
   const siblings = normalizeLessonWidgets(list).map(({ id, type, cfg }) => ({ id, type, cfg }));
-  return `<div class="lb-widgets" data-siblings="${esc(JSON.stringify(siblings))}">${chips.map((w) =>
+  // Planeringens dag och tid ({ date, start, end }) → ctx.lesson i brickorna
+  // ("Kvar av lektionen", issue #117).
+  const when = lesson ? ` data-lesson="${esc(JSON.stringify({ date: lesson.date ?? "", start: lesson.start ?? "", end: lesson.end ?? "" }))}"` : "";
+  return `<div class="lb-widgets" data-siblings="${esc(JSON.stringify(siblings))}"${when}>${chips.map((w) =>
     `<div class="lb-chip" data-widget-type="${esc(w.type)}" data-widget="${esc(JSON.stringify(w))}"></div>`).join("")}</div>`;
 }
 
@@ -88,13 +92,15 @@ export function createChipHost(base) {
   return {
     mount(container) {
       clear();
+      let lesson = null;
+      try { lesson = JSON.parse(container.querySelector(".lb-widgets")?.dataset.lesson ?? "null"); } catch { /* ingen tid */ }
       let siblings = [];
       try { siblings = JSON.parse(container.querySelector(".lb-widgets")?.dataset.siblings ?? "[]"); } catch { /* ok */ }
-      const b = { ...base, siblings: () => siblings };
+      const at = { ...base, lesson, siblings: () => siblings };
       for (const el of container.querySelectorAll(".lb-chip[data-widget]")) {
         let item;
         try { item = JSON.parse(el.dataset.widget); } catch { continue; }
-        mounted.push(mountOne(el, item, "chip", b));
+        mounted.push(mountOne(el, item, "chip", at));
       }
     },
     destroy: clear,
