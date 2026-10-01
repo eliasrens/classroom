@@ -14,7 +14,8 @@
  *   Klick utanför, eller fokus som lämnar menyn, stänger den.
  *
  * Val med attributet hidden hoppas över (så kan samma lista användas
- * för "Mer ▾", där bara de lägen som inte ryms i raden visas).
+ * för "Mer ▾", där bara de lägen som inte ryms i raden visas). Val med
+ * aria-disabled="true" går att flytta till men stänger inte menyn.
  */
 
 export function createMenuButton({ root, button, menu }) {
@@ -100,8 +101,10 @@ export function createMenuButton({ root, button, menu }) {
 
   // Ett val → stäng (länken navigerar själv). Fokus till knappen, så att
   // tangentbordsanvändaren står kvar i menyn efter bytet.
+  // Ett avstängt val (aria-disabled, fokuserbart men inte valbart) lämnar menyn öppen.
   menu.addEventListener("click", (e) => {
-    if (e.target.closest('[role="menuitem"]')) close({ restoreFocus: true });
+    const item = e.target.closest('[role="menuitem"]');
+    if (item && item.getAttribute("aria-disabled") !== "true") close({ restoreFocus: true });
   });
 
   // Fokus som lämnar hela komponenten (t.ex. Shift+Tab) stänger menyn.

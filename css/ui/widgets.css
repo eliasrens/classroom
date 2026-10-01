@@ -370,7 +370,6 @@
 .wt-set__num input { width: 4.2em; }
 .wt-set__hint { margin: 0; color: var(--color-ink-soft); font-size: var(--text-s); }
 .wt-set__check { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; cursor: pointer; }
-.wt-set__check .wt-set__hint { flex-basis: 100%; padding-left: 1.6em; }
 .wt-set__check input { accent-color: var(--color-accent); }
 /* Utseende: tre valbara "piller" (radbryts snyggt i den smala panelen). */
 .wt-set__looks { display: inline-flex; flex-wrap: wrap; gap: 4px; }
@@ -385,38 +384,96 @@
 }
 .wt-set__look input:checked + span { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-ink); }
 .wt-set__look input:focus-visible + span { outline: 2px solid var(--color-accent); outline-offset: 1px; }
-.wt-set__run {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  padding: var(--space-2);
-  border-radius: var(--radius-m);
-  background: color-mix(in srgb, var(--color-ink) 6%, transparent);
-}
-.wt-set__status { font-variant-numeric: tabular-nums; font-weight: 600; }
-.wt-set__status[data-status="done"] { color: var(--color-danger); }
-.wt-set__btns { display: inline-flex; gap: var(--space-2); }
+/* Återställ (Start och Paus sitter på widgetens rad, issue #123). */
+.wt-set__run { display: flex; }
 .wt-set__btn { padding: 2px var(--space-2); font-size: var(--text-s); }
+.wt-set__btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* ---- Inställnings-UI (lektionens "Widgets" och morgonpanelens "Widgets") ---- */
-.wset-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
-.wset .field-edit__head,
-.wset__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
-.wset label:has(> [data-wtoggle]) { display: inline-flex; align-items: center; gap: var(--space-2); cursor: pointer; }
-.wset [data-wtoggle] { width: 1.05em; height: 1.05em; accent-color: var(--color-accent); cursor: pointer; }
-.wset [data-wtoggle]:disabled { cursor: not-allowed; }
-.wset__add { padding: 2px var(--space-2); font-size: var(--text-s); }
-.wset__item {
+/* ---- Inställnings-UI (lektionens "Widgets" och morgonpanelens "Widgets") ----
+   Kompakt (issue #123): en rad per aktiv widget med samma radhöjd och
+   typografi som raderna i "Att göra" på Morgonskärmen (.morgon__task). */
+.wset { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+.wset-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.wrow {
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.wrow__line { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.wrow__icon { display: inline-grid; place-items: center; flex: none; color: var(--color-ink-soft); }
+.wrow__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Statusraden under namnet — som "Eleverna ser: …" (.morgon__task-sub). */
+.wrow__sub {
+  padding-left: calc(1.2rem + var(--space-2));
+  font-size: var(--text-s);
+  color: var(--color-ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wrow__time { flex: none; font-variant-numeric: tabular-nums; font-weight: 600; }
+.wrow__time[data-status="paused"],
+.wrow__time[data-status="none"] { color: var(--color-ink-soft); }
+.wrow__time[data-status="done"] { color: var(--color-danger); }
+.wrow__btns { display: inline-flex; gap: 2px; flex: none; }
+/* Samma små ikonknappar som "Att göra" (.morgon__task-btn). */
+.wrow__btn {
+  display: inline-grid;
+  place-items: center;
+  padding: 3px;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-soft);
+  border-radius: var(--radius-s, 4px);
+  cursor: pointer;
+}
+.wrow__btn:hover,
+.wrow__btn[aria-expanded="true"] { background: var(--color-surface-alt); color: var(--color-ink); }
+.wrow__btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 0; }
+.wrow__body {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
-  margin-top: var(--space-2);
+  margin-top: var(--space-1);
   padding-top: var(--space-2);
+  padding-bottom: var(--space-1);
   border-top: 1px dashed var(--color-line);
 }
-.wset__itemhead { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: var(--text-s); }
+.wrow .wset__placed { margin-top: 2px; }
+
+/* "+ Lägg till widget" — knapp + meny i ⋯-menyns stil (.plan-more__menu, css/modes/lektion.css). */
+.wset-add { position: relative; justify-self: start; }
+.wset-add__btn { padding: 2px var(--space-2); font-size: var(--text-s); }
+.wset-add__btn:disabled { cursor: not-allowed; opacity: 0.7; }
+.wset-add .wset-add__menu { left: 0; right: auto; top: calc(100% + 4px); font-size: 1rem; }
+/* Sektionens innehåll klipps (overflow: hidden, för fäll-animationen) — bara
+   medan menyn är öppen får den gå utanför, så att den inte klipps av. */
+.collapsible[data-open="true"] > .collapsible__body > .collapsible__inner:has(.wset-add[data-open]) { overflow: visible; }
+.wset-add .plan-more__item[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+.wset-add .plan-more__item[aria-disabled="true"]:hover { background: none; }
+
+/* Statusraden efter ✕: "Nedräkning borttagen. Ångra". Tom = ingen höjd, men
+   kvar i DOM:en (role="status") så att skärmläsaren läser upp nästa text. */
+.wset__undo { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.wset__undo:not(:empty) { margin-top: var(--space-2); }
+.wset__undo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.wset__undo-btn:hover { background: var(--color-surface-alt); }
 .wset__warn { color: var(--color-warn, #b7791f); font-weight: 600; }
 .wset__placed { font-style: italic; white-space: pre-line; } /* två rader: elevskärmen + här */
 .wset__place { display: flex; align-items: center; gap: var(--space-2) var(--space-3); flex-wrap: wrap; }
@@ -457,13 +514,6 @@
 .wset__size input:checked + span { background: var(--color-accent); color: var(--color-accent-ink); }
 .wset__size input:focus-visible + span { outline: 2px solid var(--color-accent); outline-offset: -2px; }
 
-/* Morgonpanelen: raderna i samma lugna stil som övriga panelrader. */
-.wset--morning {
-  padding: var(--space-2);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-m);
-}
-.wset--morning .wset__head { font-weight: 600; }
 
 /* ============================================================
    LJUDNIVÅ (issue #118) — Ljudnivåskylt och Ljudmätare.

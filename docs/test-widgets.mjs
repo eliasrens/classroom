@@ -23,6 +23,10 @@
  *     förkastas; ingen plats → står kvar (→ skymda id:n + panelens rad)
  *   - runtime-tidsstämplar: paus + fortsätt ger rätt kvarvarande tid,
  *     endsAt, lokal lagring under classroom:local:…, lyssnare
+ *   - kompakt inställnings-UI (issue #123, settings-ui.js): sammanfattning
+ *     ("Klocka, Nedräkning" / "Inga"), radens namn och status (plats,
+ *     storlek, nivå, mikrofon, timerns tid), ▶/⏸, "+ Lägg till widget"
+ *     (Högst 3 i lektionen, Alla hörn är upptagna, en-gång-typer avstängda)
  */
 
 // ---- Attrapper för webbläsar-API:er som modulerna rör vid import/körning ----
@@ -411,6 +415,80 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   ok(seen.length === 2, "avregistrerad lyssnare får inget");
   mem.set(key, "{trasig");
   ok(rt.readRuntime("QA-TEST-1", "w1") === null, "trasig JSON → null");
+}
+
+// ---------------------------------------------------------------------------
+// Kompakt inställnings-UI (issue #123): radens namn och status, sammanfattning,
+// "+ Lägg till widget" (gränser och avstängda typer) — settings-ui.js
+// ---------------------------------------------------------------------------
+{
+  const ui = await import("../js/widgets/settings-ui.js");
+  const MIN = 60_000;
+  const cd = (id, title = "", extra = {}) => ({ id, type: "countdown", cfg: { title, minutes: 8, seconds: 0 }, ...extra });
+
+  // Sammanfattningen när sektionen är stängd.
+  ok(ui.widgetsSummary([]) === "Inga" && ui.widgetsSummary(undefined) === "Inga", "sammanfattning: inga → Inga");
+  ok(ui.widgetsSummary([{ type: "clock-analog" }, cd("a"), cd("b")]) === "Klocka, Nedräkning", "sammanfattning: Klocka, Nedräkning (unika)");
+  ok(ui.widgetsSummary([{ type: "clock-digital" }, { type: "clock-analog" }]) === "Klocka", "sammanfattning: två klockor → Klocka");
+  ok(ui.widgetsSummary([{ type: "time-left" }], "lesson") === "Kvar av lektionen", "sammanfattning: lektionens namn");
+  ok(ui.widgetsSummary([{ type: "time-left" }], "morning") === "Kvar till klockslag", "sammanfattning: Morgonskärmens namn");
+  ok(ui.widgetsSummary([{ type: "framtida-typ" }]) === "Inga", "sammanfattning: okänd typ räknas inte");
+
+  // Radens namn.
+  ok(ui.rowName(cd("a", "Läsning")) === "Nedräkning ”Läsning”", "namn: nedräkning med rubrik");
+  ok(ui.rowName(cd("a", "Läsning"), "morning") === "”Läsning”", "namn: Morgonskärmen visar bara rubriken (typen under)");
+  ok(ui.rowLabel(cd("a", "Läsning"), "morning") === "Nedräkning ”Läsning”", "hela namnet (skärmläsare) har typen även på Morgonskärmen");
+  const two = [cd("a"), cd("b")];
+  ok(ui.rowName(two[1], "lesson", two) === "Nedräkning 2" && ui.rowName(cd("a")) === "Nedräkning", "namn: flera utan rubrik numreras");
+  ok(ui.rowName({ id: "t", type: "time-left", cfg: { until: "10:40" } }, "morning") === "Kvar till 10:40", "namn: Kvar till 10:40");
+  ok(ui.rowName({ id: "t", type: "time-left", cfg: {} }, "lesson") === "Kvar av lektionen", "namn: Kvar av lektionen");
+  ok(ui.rowName({ id: "k", type: "clock-analog", cfg: {} }) === "Klocka (analog)", "namn: typens namn");
+
+  // Radens status.
+  const ma = { id: "m", type: "clock-analog", slot: "tl", size: "l", cfg: {} };
+  ok(eq(ui.rowMeta(ma, "morning"), ["uppe vänster", "L"]), "status: Morgonskärmen plats + storlek");
+  ok(eq(ui.rowMeta(ma, "lesson"), []), "status: lektionen har ingen plats");
+  ok(eq(ui.rowMeta(cd("c", "Läsning", { slot: "br", size: "m" }), "morning"), ["Nedräkning", "nere höger", "M"]), "status: rubricerad nedräkning har typen under");
+  const sign = { id: "s", type: "sound-sign", cfg: { names: ["", "", "Prata tyst"] } };
+  ok(eq(ui.rowMeta(sign, "lesson", { runtime: { level: 2 } }), ["2 Prata tyst"]), "status: skyltens valda nivå (eget namn)");
+  ok(eq(ui.rowMeta(sign, "lesson"), ["1 Viska"]), "status: skylten utan körtillstånd → standardnivån");
+  const meter = { id: "mm", type: "sound-meter", cfg: {} };
+  ok(eq(ui.rowMeta(meter, "lesson", { mic: { status: "on", owner: "mm" } }), ["Mäter"]), "status: mätaren mäter");
+  ok(eq(ui.rowMeta(meter, "lesson", { mic: { status: "on", owner: "annan" } }), ["Av"]), "status: annan mätare äger mikrofonen → Av");
+  ok(eq(ui.rowMeta(meter, "lesson", { mic: { status: "denied", owner: "mm" } }), ["Mikrofonen blockerad"]), "status: nekad");
+
+  // Timerns tid på raden.
+  const now0 = new Date(2026, 9, 1, 10, 10, 0).getTime();
+  ok(eq(ui.rowTime(cd("c"), "lesson", { now: now0 }), { text: "8:00", status: "idle", label: "" }), "tid: inte startad → inställd tid");
+  const running = rt.startTimer(8 * MIN, now0);
+  ok(ui.rowTime(cd("c"), "lesson", { runtime: running, now: now0 + 30_000 }).text === "7:30", "tid: kvarvarande");
+  ok(ui.rowTime(cd("c"), "lesson", { runtime: running, now: now0 + 9 * MIN }).label === "Tiden är ute", "tid: slut");
+  ok(ui.rowTime(cd("c"), "lesson", { runtime: rt.pauseTimer(running, now0 + MIN), now: now0 + 5 * MIN }).status === "paused", "tid: pausad");
+  ok(ui.rowTime({ id: "t", type: "time-left", cfg: { until: "10:40" } }, "morning", { now: now0 }).text === "30:00", "tid: Kvar till 10:40 på Morgonskärmen");
+  ok(ui.rowTime({ id: "t", type: "time-left", cfg: {} }, "lesson", { lesson: { end: "10:40" }, now: now0 }).text === "30:00", "tid: Kvar av lektionen mot planeringens sluttid");
+  ok(ui.rowTime(ma, "morning") === null, "tid: klockan har ingen");
+
+  // ▶ / ⏸
+  ok(ui.playButton("idle").act === "start" && ui.playButton("idle").icon === "play", "▶ startar");
+  ok(ui.playButton("running").act === "pause" && ui.playButton("running").icon === "pause", "⏸ pausar");
+  ok(ui.playButton("paused").act === "resume", "▶ fortsätter");
+  ok(ui.playButton("done").act === "start", "▶ startar om när tiden är ute");
+
+  // "+ Lägg till widget": gränser.
+  ok(eq(ui.addState([], "lesson"), { disabled: false, text: "Lägg till widget" }), "lägg till: lektion ledig");
+  ok(eq(ui.addState([cd("a"), cd("b"), cd("c")], "lesson"), { disabled: true, text: "Högst 3 i lektionen" }), "lägg till: tre brickor → Högst 3 i lektionen");
+  ok(!ui.addState([cd("a"), cd("b"), { id: "x", type: "framtida-typ" }], "lesson").disabled, "lägg till: okänd typ räknas inte som bricka");
+  const corners = reg.SLOTS.map((slot, i) => cd(`c${i}`, "", { slot }));
+  ok(eq(ui.addState(corners, "morning"), { disabled: true, text: "Alla hörn är upptagna" }), "lägg till: alla hörn tagna");
+  ok(!ui.addState(corners.slice(1), "morning").disabled, "lägg till: ett hörn ledigt");
+
+  // Menyns val: alla typer i registrets ordning; en-gång-typer avstängda när de finns.
+  const items = ui.addMenuItems([{ id: "k", type: "clock-analog" }, cd("a")], "lesson");
+  ok(eq(items.map((i) => i.id), reg.widgetTypes().map((t) => t.id)), "menyn: alla typer i ordning");
+  ok(eq(items.map((i) => i.name), ["Klocka (digital)", "Klocka (analog)", "Kvar av lektionen", "Nedräkning", "Ljudnivåskylt", "Ljudmätare"]), "menyn: namnen i lektionen");
+  ok(ui.addMenuItems([], "morning")[2].name === "Kvar till klockslag", "menyn: Kvar till klockslag på Morgonskärmen");
+  ok(items.find((i) => i.id === "clock-analog").disabled && !items.find((i) => i.id === "countdown").disabled
+    && !items.find((i) => i.id === "clock-digital").disabled, "menyn: analog finns → avstängd; nedräkning får finnas flera gånger");
 }
 
 console.log(`${passed} OK, ${failed} fel`);

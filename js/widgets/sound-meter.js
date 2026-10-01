@@ -36,7 +36,7 @@ import {
 export const SOUND_MSG = "widgets:sound";
 /** Elevvyn: ingen nivå på så här länge → mätaren döljs (läraren stängde fönstret e.d.). */
 export const STALE_MS = 2500;
-export const PRIVACY_TEXT = "Mikrofonen används bara för att mäta ljudnivån här och nu — inget spelas in eller sparas.";
+export const PRIVACY_TEXT = "Mikrofonen mäter bara ljudnivån här och nu — inget spelas in eller sparas.";
 
 const SIGN_TYPE = "sound-sign";
 
@@ -340,7 +340,7 @@ function bindSettings(root, cfg, onChange, ctx) {
     } else {
       out.textContent = pct(cur.limit);
       hint.hidden = !cur.linkSign;
-      hint.textContent = cur.linkSign ? "Kryssa i Ljudnivåskylt för att koppla — tills dess gäller reglaget." : "";
+      hint.textContent = cur.linkSign ? "Lägg till en Ljudnivåskylt för att koppla." : "";
     }
   }
 
