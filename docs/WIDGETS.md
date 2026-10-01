@@ -1,8 +1,8 @@
 # Widgets — guide för läraren
 
 Widgets är små hjälpmedel som eleverna ser på elevskärmen: klockor, timrar
-och ljudnivå. Du kryssar i dem; du drar dem aldrig. Elevskärmen visar alltid
-samma sak som din förhandsvisning.
+och ljudnivå. Du lägger till dem i panelen; du drar dem aldrig. Elevskärmen
+visar alltid samma sak som din förhandsvisning.
 
 ## Var hittar jag dem?
 
@@ -13,11 +13,28 @@ samma sak som din förhandsvisning.
 | Antal | Högst 3 brickor | En per hörn |
 | Sparas | I planeringen (följer med i Kopiera och Skicka kopia) | I klassens morgoninställningar |
 
-Utan ikryssade widgets ser tavlan ut precis som förut.
+Utan widgets ser tavlan ut precis som förut.
+
+## Sektionen Widgets
+
+Sektionen är stängd från början och visar då vilka du har, t.ex. *"Klocka,
+Nedräkning"* eller *"Inga"*. Öppen visar den en kort rad per widget:
+
+- **+ Lägg till widget** öppnar en meny med typerna. En typ som bara får
+  finnas en gång (t.ex. klockorna) är gråad när den redan finns. Knappen
+  stängs av vid tre widgets i lektionen (*"Högst 3 i lektionen"*) och när
+  alla fyra hörnen är tagna på Morgonskärmen (*"Alla hörn är upptagna"*).
+- **⚙** fäller ut widgetens inställningar under raden, en widget åt gången.
+  En ny widget öppnas utfälld.
+- **✕** tar bort widgeten direkt. Ångrar du dig trycker du **Ångra** i raden
+  under listan inom några sekunder.
+- Raden visar en kort status: timerns tid, skyltens nivå, om mätaren mäter
+  och på Morgonskärmen hörn och storlek.
+- Menyn går att styra med tangentbordet: pilarna, Enter och Esc.
 
 ## Morgonskärmen: plats och storlek
 
-- **Plats:** välj ett av de fyra hörnen i den lilla rutan. Väljer du ett
+- **Plats** (under ⚙): välj ett av de fyra hörnen i den lilla rutan. Väljer du ett
   hörn som redan är upptaget byter de två widgetarna plats.
 - **Storlek:** S, M eller L.
 - Kortet och Bra jobbat-tavlan skyms aldrig. Om widgeten inte får plats
@@ -43,13 +60,13 @@ Du kan ha flera timrar igång samtidigt.
 
 - **Kvar av lektionen:** räknar ned till lektionens sluttid (fältet *Tid* i
   planeringen). Före start står "Börjar om … min" och efter sluttiden "Slut".
-  På Morgonskärmen väljer du själv ett klockslag. Den behöver ingen
-  startknapp.
+  På Morgonskärmen heter den *Kvar till klockslag* och du väljer själv
+  klockslaget. Den behöver ingen startknapp.
 - **Nedräkning:** ange minuter (och sekunder) och skriv en egen rubrik om du
-  vill. Med **+ Lägg till** får du fler nedräkningar. Styr med **Start**,
-  **Paus**/**Fortsätt** och **Återställ**, antingen i inställningarna eller
-  med de små knapparna som visas när du för musen över brickan eller
-  widgeten. Knapparna syns bara hos dig, aldrig på elevskärmen.
+  vill. Med **+ Lägg till widget** får du fler nedräkningar. Starta och
+  pausa med **▶**/**⏸** på raden i panelen; **Återställ** finns under ⚙.
+  Samma knappar visas när du för musen över brickan eller widgeten. De syns
+  bara hos dig, aldrig på elevskärmen.
 - **Utseende** (välj per timer): *Siffror*, *Stapel* eller *Analog
   klocktimer* (en röd tårtbit som krymper mot 0, upp till 60 min).
 - **När tiden är ute** pulserar timern lugnt och visar "Tiden är ute".
@@ -64,11 +81,10 @@ tas sedan bort, men siffrorna står alltid kvar.
 ## Ljudnivå
 
 - **Ljudnivåskylt:** visar vilken nivå som gäller nu: 0 Tyst, 1 Viska,
-  2 Prata lågt, 3 Prata, 4 Redovisa. Byt nivå med ett klick i
-  inställningarna, eller med pilarna som visas när du för musen över
+  2 Prata lågt, 3 Prata, 4 Redovisa. Byt nivå med ett klick under ⚙, eller med pilarna som visas när du för musen över
   skylten. Under *Byt namn på nivåerna* kan du döpa om dem.
 - **Ljudmätare:** mäter ljudet i klassrummet med datorns mikrofon och visar
-  grönt, gult eller rött. Tryck **Starta** för att mäta och **Stoppa** när du
+  grönt, gult eller rött. Tryck **Starta** under ⚙ för att mäta och **Stoppa** när du
   är klar. Ställ in *Gräns för "för högt"* med reglaget, eller välj
   *Koppla till skylten* så att gränsen följer skyltens nivå. Ligger ljudet
   över gränsen i några sekunder blir mätaren lugnt röd. Den piper aldrig.

@@ -523,7 +523,7 @@ const CLASS = "4B";
 // ---------------------------------------------------------------------------
 {
   const html = meter.settingsHTML({ limit: 0.6 }, { view: "teacher", widgetId: "m", siblings: () => [] });
-  ok(html.includes("Mikrofonen används bara för att mäta ljudnivån här och nu — inget spelas in eller sparas."), "dataskyddstexten står i inställningarna");
+  ok(html.includes("Mikrofonen mäter bara ljudnivån här och nu — inget spelas in eller sparas."), "dataskyddstexten står i inställningarna");
   ok(html.includes("Koppla till skylten") && html.includes('type="range"') && html.includes("data-wsound-toggle"), "reglage, koppling och start-knapp");
   const sh = sign.settingsHTML({ names: ["", "Viskning"] }, { classId: CLASS, widgetId: "sign-1" });
   ok(sh.includes("Viskning") && sh.includes("Tyst") && sh.includes('data-wsign-level="4"'), "skyltens inställningar: nivåknappar och namn");

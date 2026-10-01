@@ -448,7 +448,7 @@ function fieldsSummary(rawPlan) {
   return names.length ? `${names.join(", ")} visas` : "Inga fält visas";
 }
 
-/** "Klocka (digital)" / "Inga widgets" — "Widgets" när blocket är infällt. */
+/** "Klocka, Nedräkning" / "Inga" — "Widgets" när blocket är infällt. */
 function lessonWidgetsSummary(rawPlan) {
   return rawPlan ? widgetsSummary(normalizePlan(rawPlan).widgets) : "";
 }
@@ -947,10 +947,17 @@ export default {
       return rows.join("");
     }
 
-    // -- Widgets (issue #115): kryssrutor + egna inställningar, sparas i planeringen --
+    // -- Widgets (issue #115, kompakt i #123): en rad per widget, sparas i planeringen --
     const widgetsUI = mountWidgetSettings(widgetsEl, {
       form: "lesson",
-      ctx: { view, classId: activeClass.id, sync },
+      ctx: {
+        view, classId: activeClass.id, sync,
+        // Radens "Kvar av lektionen" räknar mot planeringens tid.
+        lesson: () => {
+          const p = editingPlan() && normalizePlan(editingPlan());
+          return p ? { date: p.date, start: p.start, end: p.end } : null;
+        },
+      },
       get: () => (editingPlan() ? normalizePlan(editingPlan()).widgets : []),
       set: async (widgets) => {
         await patchEditing({ widgets });

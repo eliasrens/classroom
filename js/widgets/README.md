@@ -12,7 +12,7 @@ Del 2–4 (klockor, timrar, ljudnivå) bygger på det som står här.
 | `registry.js` | Typlistan (`TYPES`) + ren normalisering och platslogik (ingen DOM, testas i Node) |
 | `runtime.js` | Körtillstånd per klass + widget (timrar, vald ljudnivå) — lokalt, tidsstämplar |
 | `host.js` | Rendering: brickor i lektionens rubrikrad, hörn på Morgonskärmen |
-| `settings-ui.js` | Kryssrutor, "+ Lägg till", plats/storlek, typens egna inställningar |
+| `settings-ui.js` | En kompakt rad per aktiv widget (▶/⏸, ⚙, ✕ + Ångra), "+ Lägg till widget"-menyn, plats/storlek och typens egna inställningar under ⚙ (#123) |
 | `clock-digital.js` | Klocka (digital) — mall för nya typer (#115; sekunder/datum #116) |
 | `clock-analog.js` | Klocka (analog) — skolklocka i SVG (#116) |
 | `clock-shared.js` | Klockornas ritsignal (`createClockTicker`), svenska datum, av/på-kryssrutor |
@@ -32,9 +32,9 @@ Del 2–4 (klockor, timrar, ljudnivå) bygger på det som står här.
 ```js
 export default {
   id: "timer",                 // unikt, sparas i datan — byt aldrig
-  name: "Timer",               // visas i kryssrutan
+  name: "Timer",               // visas på raden och i "+ Lägg till widget"
   icon: "clock",               // namn i js/lib/icons.js
-  multiple: true,              // true = "+ Lägg till" (flera instanser)
+  multiple: true,              // true = flera instanser; false = avstängd i menyn när den finns
   defaults: () => ({ title: "", minutes: 5, sound: false }),
   normalize: (cfg) => ({ ... }),          // valfri; standard { ...defaults(), ...cfg }
 
@@ -120,11 +120,12 @@ export default {
   (`ctx.lesson` = `{ date, start, end }`, som `chipsHTML(list, plan)` bär på
   `.lb-widgets`). Före `start`: "Börjar om N min"; efter `end`: "Slut".
   Planering en annan dag: "Börjar fre 2/10" / "Slut" (ingen ton). På
-  Morgonskärmen: lärarens klockslag `until`. Typen heter "Nedräkning till
+  Morgonskärmen: lärarens klockslag `until`. Typen heter "Kvar till
   klockslag" där (`names: { morning }` — settings-ui visar `names[form]`).
-- **Nedräkning**: Start / Paus·Fortsätt / Återställ i inställningarna och som
-  små knappar på brickan (lager vid hover/fokus) och på den stora widgeten —
-  bara i lärarvyn. Återställ = `runtime.write(null)` (tillbaka till inställd tid).
+- **Nedräkning**: små knappar på brickan (lager vid hover/fokus) och på den
+  stora widgeten — bara i lärarvyn. I panelen (#123): EN ikonknapp ▶/⏸ på
+  widgetens rad och Återställ i ⚙-läget. Återställ = `runtime.write(null)`
+  (tillbaka till inställd tid).
 - **Vad som visas** räknas i `timer-logic.js` (`lessonLeftView`, `untilView`,
   `countdownView`) → `{ status, text, label, fraction, dial, endMs, alarm }`.
   Renderingen ritar bara ut den, var 250:e ms (`createClockTicker`).
@@ -159,7 +160,7 @@ export default {
   (`widgets:sound`); elevvyn öppnar aldrig mikrofonen och visar ingenting
   när mätaren inte går (av, nekad, ingen mikrofon, ingen nivå på 2,5 s).
   Mikrofonen stängs helt (tracks stoppas, ljudkontexten stängs) vid Stoppa,
-  när ingen vy av mätaren finns kvar (widgeten kryssas ur, läget byts) och
+  när ingen vy av mätaren finns kvar (widgeten tas bort, läget byts) och
   vid `pagehide`.
 - **Zoner**: rött från gränsen, gult 0,15 under den, grönt därunder.
   "Koppla till skylten" (och en skylt finns i samma lista): gränsen följer
@@ -192,7 +193,8 @@ fältet behåller fokus. Inställningar är ingen elevdata och inget körtillst�
   (`normalizePlan`, `js/modes/lektion.js`; standard `[]`). Följer med i
   Kopiera och Skicka kopia med **nya id:n** (`copyLessonWidgets`) så att
   kopian får eget körtillstånd. Högst 3 brickor visas (`MAX_CHIPS`, de
-  första i listan); formuläret varnar när fler är ikryssade.
+  första i listan); "+ Lägg till widget" stängs av vid tre ("Högst 3 i
+  lektionen") och formuläret varnar om äldre data har fler.
 - **Morgonskärmen** — `widgets = [{ id, type, slot, size, cfg }]` i klassens
   DELADE `settings/morningScreen` (`js/lib/morning.js`). `slot` ∈
   `tl | tr | bl | br`, `size` ∈ `s | m | l`. Två widgets har aldrig samma

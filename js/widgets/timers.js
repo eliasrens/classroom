@@ -12,9 +12,10 @@
  * så lärar- och elevfönster visar samma sak och en omladdning mitt i en
  * nedräkning fortsätter rätt. Tickern (createClockTicker) är bara en ritsignal.
  *
- * Styrning (Start, Paus/Fortsätt, Återställ) finns i widget-inställningarna
- * och som små knappar på brickan/widgeten — BARA i lärarvyn (ritas inte
- * alls i elevvyn och har dessutom .teacher-only).
+ * Styrning (Start, Paus/Fortsätt, Återställ) finns som små knappar på
+ * brickan/widgeten — BARA i lärarvyn (ritas inte alls i elevvyn och har
+ * dessutom .teacher-only). I panelen (#123): ▶/⏸ på widgetens rad
+ * (settings-ui.js) och Återställ i ⚙-läget.
  *
  * När tiden är ute: lugn pulsering + "Tiden är ute" (ingen puls med
  * prefers-reduced-motion — bara färgmarkeringen), och en mjuk ton om
@@ -102,9 +103,9 @@ export function countdownAct(act, cfg, rt) {
   else if (act === "reset") rt.write(null);
 }
 
-function ctlHTML(status, { withText = false, cls = "" } = {}) {
+function ctlHTML(status, { cls = "" } = {}) {
   return controlsFor(status).map((b) =>
-    `<button type="button" class="${cls}" data-wt-act="${b.act}" title="${b.label}" aria-label="${b.label}">${icon(b.icon)}${withText ? `<span>${b.label}</span>` : ""}</button>`).join("");
+    `<button type="button" class="${cls}" data-wt-act="${b.act}" title="${b.label}" aria-label="${b.label}">${icon(b.icon)}</button>`).join("");
 }
 
 // ---------------------------------------------------------------------------
@@ -259,9 +260,8 @@ function looksHTML(cfg, name) {
   </div>`;
 }
 
-const soundHTML = (cfg) => `<label class="wt-set__check">
+const soundHTML = (cfg) => `<label class="wt-set__check" title="En mjuk ton — spelas på elevskärmen om den är öppen, annars här">
   <input type="checkbox" data-wt="sound"${cfg.sound ? " checked" : ""}> Ljud när tiden är ute
-  <span class="wt-set__hint">(en mjuk ton — spelas på elevskärmen om den är öppen, annars här)</span>
 </label>`;
 
 /** Kopplar fälten med data-wt till cfg; onChange(ny cfg) för varje ändring. */
@@ -294,7 +294,7 @@ function bindFields(root, cfg, onChange, normalize) {
 export const timeLeft = {
   id: "time-left",
   name: "Kvar av lektionen",
-  names: { morning: "Nedräkning till klockslag" },
+  names: { morning: "Kvar till klockslag" },
   icon: "clock",
   multiple: false,
   defaults: () => normalizeTimeLeftCfg({}),
@@ -320,7 +320,7 @@ export const timeLeft = {
     const when = ctx.form === "morning"
       ? `<label class="wt-set__row"><span>Klockslag</span>
           <input type="time" class="input wt-set__time" data-wt="until" value="${esc(c.until)}" required></label>`
-      : `<p class="wt-set__hint">Räknar ned till planeringens sluttid (Tid). Före start visas "Börjar om … min", efter sluttiden "Slut".</p>`;
+      : `<p class="wt-set__hint">Räknar ned till lektionens sluttid.</p>`;
     return `<div class="wt-set">${when}
       <div class="wt-set__row"><span>Utseende</span>${looksHTML(c, name)}</div>
       ${soundHTML(c)}</div>`;
@@ -365,48 +365,36 @@ export const countdown = {
       </div>
       <div class="wt-set__row"><span>Utseende</span>${looksHTML(c, name)}</div>
       ${soundHTML(c)}
-      <div class="wt-set__run" data-wt-run>
-        <span class="wt-set__status" data-wt-status aria-live="polite"></span>
-        <span class="wt-set__btns" data-wt-btns></span>
+      <div class="wt-set__run">
+        <button type="button" class="btn wt-set__btn" data-wt-act="reset">${icon("reset")}<span>Återställ</span></button>
       </div>
     </div>`;
   },
 
-  /** Fälten + körknapparna (Start, Paus/Fortsätt, Återställ) med levande status. */
+  /**
+   * Fälten + Återställ (#123: Start och Paus sitter på widgetens rad i
+   * panelen, settings-ui.js). Återställ är avstängd när timern inte startats.
+   */
   bindSettings(root, cfg, onChange, ctx) {
     const f = bindFields(root, normalizeCountdownCfg(cfg), onChange, normalizeCountdownCfg);
     const rt = {
       read: () => readRuntime(ctx.classId, ctx.widgetId),
       write: (s) => writeRuntime(ctx.classId, ctx.widgetId, s),
     };
-    const statusEl = root.querySelector("[data-wt-status]");
-    const btnsEl = root.querySelector("[data-wt-btns]");
-    let lastStatus = null;
-    const paint = () => {
-      const v = countdownView(f.get(), rt.read(), serverNow());
-      const word = { idle: "Inte startad", running: "Går", paused: "Pausad", done: "Tiden är ute" }[v.status] ?? "";
-      const text = `${v.text} · ${word}`;
-      if (statusEl.textContent !== text) statusEl.textContent = text;
-      statusEl.dataset.status = v.status;
-      if (v.status !== lastStatus) {
-        lastStatus = v.status;
-        btnsEl.innerHTML = ctlHTML(v.status, { withText: true, cls: "btn wt-set__btn" });
-      }
-    };
+    const resetBtn = root.querySelector('[data-wt-act="reset"]');
+    const paint = () => { resetBtn.disabled = rt.read() == null; };
     const onClick = (e) => {
-      const b = e.target.closest("[data-wt-act]");
-      if (!b) return;
-      countdownAct(b.dataset.wtAct, f.get(), rt);
+      if (!e.target.closest('[data-wt-act="reset"]')) return;
+      countdownAct("reset", f.get(), rt);
       paint();
     };
-    btnsEl.addEventListener("click", onClick);
-    const stopTick = createClockTicker(() => paint(), { periodMs: 250, el: root });
+    resetBtn.addEventListener("click", onClick);
     const offWatch = watchRuntime(ctx.classId, ctx.widgetId, () => paint());
+    paint();
     return () => {
       f.off();
-      stopTick();
       offWatch();
-      btnsEl.removeEventListener("click", onClick);
+      resetBtn.removeEventListener("click", onClick);
     };
   },
 };
