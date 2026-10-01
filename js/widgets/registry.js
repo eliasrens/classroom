@@ -30,8 +30,10 @@
 
 import clockDigital from "./clock-digital.js";
 import clockAnalog from "./clock-analog.js";
+import soundSign from "./sound-sign.js";
+import soundMeter from "./sound-meter.js";
 
-const TYPES = [clockDigital, clockAnalog];
+const TYPES = [clockDigital, clockAnalog, soundSign, soundMeter];
 
 /** Högst så många brickor visas i lektionens rubrikrad. */
 export const MAX_CHIPS = 3;

@@ -50,6 +50,9 @@ export function mountWidgetSettings(root, { form = "lesson", get, set, ctx = {} 
   let placement = new Map();
 
   const list = () => (Array.isArray(get()) ? get() : []);
+  // ctx till typernas settingsHTML/bindSettings. siblings() = alla widgets i
+  // listan (#118: ljudmätaren letar upp ljudnivåskylten den kan kopplas till).
+  const ownCtx = (w) => ({ ...ctx, form, widgetId: w.id, siblings: () => list().map(({ id, type, cfg }) => ({ id, type, cfg })) });
 
   function slotPicker(w, all) {
     const taken = new Map(all.filter((x) => x.id !== w.id).map((x) => [x.slot, x]));
@@ -77,7 +80,7 @@ export function mountWidgetSettings(root, { form = "lesson", get, set, ctx = {} 
   }
 
   function itemHTML(type, w, i, all) {
-    const own = typeof type.settingsHTML === "function" ? type.settingsHTML(w.cfg, { ...ctx, form, widgetId: w.id }) : "";
+    const own = typeof type.settingsHTML === "function" ? type.settingsHTML(w.cfg, ownCtx(w)) : "";
     const head = type.multiple
       ? `<div class="wset__itemhead"><span>${esc(type.name)} ${i + 1}</span>
           <button type="button" class="btn btn--icon wset__remove" data-wremove="${esc(w.id)}"
@@ -140,7 +143,7 @@ export function mountWidgetSettings(root, { form = "lesson", get, set, ctx = {} 
       bound.push(type.bindSettings(own, w.cfg, (cfg) => {
         // Egna inställningar sparas utan att sektionen byggs om (fokus behålls).
         void set(list().map((x) => (x.id === w.id ? { ...x, cfg: normalizeCfg(x.type, cfg) } : x)));
-      }, { ...ctx, form, widgetId: w.id }));
+      }, ownCtx(w)));
     }
   }
 

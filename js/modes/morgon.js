@@ -84,7 +84,7 @@ export default {
     // skymmas — en widget som skulle göra det flyttas till närmaste lediga hörn.
     let widgetsUI = null;
     const corners = createCornerLayer(stage, {
-      view, classId,
+      view, classId, sync,
       obstacles: () => [$(".morgon__card"), board.el],
       onPlaced: (placed) => widgetsUI?.setPlacement(placed),
     });
@@ -461,7 +461,7 @@ export default {
       let widgetsKey = JSON.stringify(settings.widgets);
       widgetsUI = mountWidgetSettings(panel.querySelector(".morgon__widgets-set"), {
         form: "morning",
-        ctx: { view, classId },
+        ctx: { view, classId, sync },
         get: () => settings.widgets,
         set: (list) => {
           const next = clone();

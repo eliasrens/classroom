@@ -248,3 +248,249 @@
   border-radius: var(--radius-m);
 }
 .wset--morning .wset__head { font-weight: 600; }
+
+/* ============================================================
+   LJUDNIVÅ (issue #118) — Ljudnivåskylt och Ljudmätare.
+   Logik: js/widgets/sound-sign.js, sound-meter.js, sound-level.js.
+   ============================================================ */
+
+/* ---- Ljudnivåskylt ----
+   --lvl-color / --lvl-ink sätts av JS per nivå (sound-level.js LEVELS). */
+.wsign__dot {
+  flex: none;
+  display: inline-block;
+  width: 0.62em;
+  height: 0.62em;
+  border-radius: 50%;
+  background: var(--lvl-color);
+  box-shadow: 0 0 0 0.09em color-mix(in srgb, currentColor 45%, transparent);
+}
+.wsign__num { font-variant-numeric: tabular-nums; font-weight: 800; }
+.wsign__name { white-space: nowrap; }
+
+/* Bricka: "● 1 Viska" (+ små ‹ › i lärarvyn). */
+.wsign--chip { display: inline-flex; align-items: center; gap: 0.32em; height: 1.2em; }
+.wsign__steps { display: inline-flex; margin-left: 0.15em; }
+.wsign__btn {
+  display: inline-grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.wsign--chip .wsign__btn { font-size: 0.72em; width: 1.2em; height: 1.2em; border-radius: 50%; opacity: 0.55; }
+.wsign--chip .wsign__btn:hover { opacity: 1; background: color-mix(in srgb, currentColor 14%, transparent); }
+.wsign--chip .wsign__btn:disabled { opacity: 0.18; cursor: default; background: none; }
+.wsign__btn:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; opacity: 1; }
+
+/* Stor: rund färgskylt med symbolen, siffran och namnet. */
+.wsign--large { display: flex; flex-direction: column; align-items: center; gap: 0.2em; }
+.wsign__main { display: flex; align-items: center; gap: 0.32em; }
+.wsign__badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.75em;
+  height: 1.75em;
+  border-radius: 50%;
+  background: var(--lvl-color);
+  color: var(--lvl-ink);
+  box-shadow: 0 0 0 0.05em rgb(255 255 255 / 60%), 0 0.08em 0.3em rgb(0 0 0 / 35%);
+  transition: background-color 0.4s ease;
+}
+.wsign__svg { width: 80%; height: 80%; overflow: visible; }
+.wsign--large .wsign__text { display: flex; flex-direction: column; align-items: flex-start; gap: 0.06em; }
+.wsign--large .wsign__num { font-size: 1em; line-height: 0.9; }
+.wsign--large .wsign__name { font-size: 0.42em; font-weight: 700; letter-spacing: 0.01em; }
+/* Lärarvyns små nivåknappar under skylten. */
+.wsign__pick { display: flex; gap: 0.35em; font-size: 0.2em; text-shadow: none; }
+.wsign__pick .wsign__btn {
+  width: 1.9em;
+  height: 1.9em;
+  border-radius: 50%;
+  background: var(--lvl-color);
+  color: var(--lvl-ink);
+  font-weight: 800;
+  opacity: 0.45;
+  transition: opacity 0.2s;
+}
+.wsign__pick .wsign__btn:hover { opacity: 0.85; }
+.wsign__pick .wsign__btn[aria-pressed="true"] { opacity: 1; box-shadow: 0 0 0 0.14em #fff; }
+
+/* ---- Ljudmätare ----
+   --wsound-level / --wsound-limit / --wsound-warn (0–1) sätts av JS. */
+.wsound {
+  --wsound-green: #3fbf6f;
+  --wsound-yellow: #f2c230;
+  --wsound-red: #e0564b;
+  --wsound-color: var(--wsound-green);
+  --wsound-level: 0;
+  --wsound-limit: 0.6;
+  --wsound-warn: 0.45;
+}
+.wsound[data-zone="yellow"] { --wsound-color: var(--wsound-yellow); }
+.wsound[data-zone="red"] { --wsound-color: var(--wsound-red); }
+.wsound__bar {
+  position: relative;
+  display: block;
+  flex: none;
+  width: 3.2em;
+  height: 0.5em;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+}
+/* Zonerna som svag bakgrund: grön → gul (från --wsound-warn) → röd (från gränsen). */
+.wsound__zones {
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+  background: linear-gradient(to right,
+    var(--wsound-green) 0 calc(var(--wsound-warn) * 100%),
+    var(--wsound-yellow) calc(var(--wsound-warn) * 100%) calc(var(--wsound-limit) * 100%),
+    var(--wsound-red) calc(var(--wsound-limit) * 100%) 100%);
+}
+.wsound__fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: scaleX(var(--wsound-level));
+  background: var(--wsound-color);
+  border-radius: inherit;
+  transition: transform 0.12s linear, background-color 0.6s ease;
+}
+.wsound__mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--wsound-limit) * 100%);
+  width: 2px;
+  margin-left: -1px;
+  background: currentColor;
+  opacity: 0.75;
+}
+.wsound[data-status]:not([data-status="on"]) .wsound__fill { transform: scaleX(0); }
+.wsound__btn {
+  display: inline-grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.wsound__btn:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+
+/* Bricka: mikrofon + liten rörlig stapel (+ start/stopp i lärarvyn). */
+.wsound--chip { display: inline-flex; align-items: center; gap: 0.35em; height: 1.2em; }
+.wsound--chip > .icon { width: 0.95em; height: 0.95em; opacity: 0.8; }
+.wsound--chip .wsound__short { font-size: 0.72em; font-weight: 600; opacity: 0.85; }
+.wsound--chip .wsound__btn { font-size: 0.72em; width: 1.3em; height: 1.3em; border-radius: 50%; opacity: 0.6; }
+.wsound--chip .wsound__btn:hover { opacity: 1; background: color-mix(in srgb, currentColor 14%, transparent); }
+/* "För högt" en stund: brickan blir lugnt röd (ingen blinkning, inget ljud). */
+.lb-chip[data-widget-type="sound-meter"] { transition: background-color 1.2s ease, border-color 1.2s ease; }
+.lb-chip:has(.wsound[data-alert="true"]) {
+  background: color-mix(in srgb, var(--wsound-red, #e0564b) 38%, transparent);
+  border-color: #e0564b;
+}
+
+/* Stor: halvcirkelmätare (viewBox −100…100). */
+.wsound--large { display: flex; flex-direction: column; align-items: center; width: 3.4em; }
+.wsound__gauge { display: block; width: 100%; height: auto; overflow: visible; }
+.wsound__arc { fill: none; stroke-width: 15; opacity: 0.38; }
+.wsound__arc--green { stroke: var(--wsound-green); }
+.wsound__arc--yellow { stroke: var(--wsound-yellow); }
+.wsound__arc--red { stroke: var(--wsound-red); }
+.wsound__level { fill: none; stroke-width: 15; stroke: var(--wsound-color); transition: stroke 0.6s ease; }
+.wsound__needle { transform-box: view-box; transform-origin: 0 0; transition: transform 0.12s linear; }
+.wsound__needle line { stroke: #fff; stroke-width: 5; stroke-linecap: round; }
+.wsound__hub { fill: #fff; }
+.wsound--large[data-status]:not([data-status="on"]) .wsound__gauge { opacity: 0.55; }
+.wsound__msg {
+  max-width: 17em;
+  margin: 0.45em 0 0;
+  font-size: 0.17em;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: center;
+  white-space: normal;
+  text-shadow: none;
+}
+.wsound__msg[hidden] { display: none; }
+.wsound__btn--large {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  margin-top: 0.5em;
+  padding: 0.3em 0.9em;
+  border-radius: 999px;
+  font-size: 0.18em;
+  font-weight: 600;
+  text-shadow: none;
+  background: rgb(255 255 255 / 16%);
+  border: 1px solid rgb(255 255 255 / 28%);
+}
+.wsound__btn--large:hover { background: rgb(255 255 255 / 26%); }
+.mw[data-widget-type="sound-meter"] { transition: background-color 1.5s ease, border-color 1.5s ease; }
+.mw:has(.wsound[data-alert="true"]) {
+  background: rgb(150 36 32 / 62%);
+  border-color: rgb(255 130 120 / 60%);
+}
+/* Mjuk rörelse bara om användaren vill ha rörelse. */
+@media (prefers-reduced-motion: reduce) {
+  .wsound__fill, .wsound__needle, .wsign__badge { transition: none; }
+}
+
+/* Elevvyn: mätaren syns bara medan den går (mikrofonen av/nekad → ingenting). */
+.lb-chip:has(.wsound--student:not([data-status="on"])) { display: none; }
+.mw:has(.wsound--student:not([data-status="on"])) { visibility: hidden; }
+
+/* ---- Inställningar (skylt + mätare) ---- */
+.wsnd-set { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); font-size: var(--text-s); }
+.wsnd-set__label { font-weight: 600; color: var(--color-ink-soft); }
+.wsign-set__levels { display: flex; flex-wrap: wrap; gap: 4px; }
+.wsign-set__level {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  cursor: pointer;
+}
+.wsign-set__level:hover { border-color: var(--lvl-color); }
+.wsign-set__level[aria-pressed="true"] {
+  border-color: var(--lvl-color);
+  background: color-mix(in srgb, var(--lvl-color) 24%, var(--color-surface));
+  box-shadow: inset 0 0 0 1px var(--lvl-color);
+  font-weight: 700;
+}
+.wsign-set__level:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.wsign-set__n { font-weight: 800; font-variant-numeric: tabular-nums; }
+.wsign-set__names summary { cursor: pointer; color: var(--color-ink-soft); }
+.wsign-set__grid { display: grid; gap: 4px; margin-top: var(--space-2); }
+.wsign-set__name { display: grid; grid-template-columns: auto 1.2em minmax(0, 1fr); align-items: center; gap: 6px; font-weight: 700; }
+.wsign-set__name input { width: 100%; min-width: 0; font-weight: 400; }
+
+.wsound-set__run { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.wsound-set__btn { display: inline-flex; align-items: center; gap: var(--space-2); }
+.wsound--mini .wsound__bar { width: 8em; height: 0.6em; }
+.wsound-set__status { margin: 0; color: var(--color-warn); font-weight: 600; }
+.wsound-set__status[hidden] { display: none; }
+.wsound-set__privacy { display: flex; align-items: flex-start; gap: 6px; margin: 0; color: var(--color-ink-soft); }
+.wsound-set__privacy .icon { flex: none; width: 1.1em; height: 1.1em; margin-top: 0.1em; }
+.wsound-set__limit { display: grid; grid-template-columns: auto minmax(0, 1fr) 3.2em; align-items: center; gap: var(--space-2); }
+.wsound-set__limit input { width: 100%; accent-color: var(--color-accent); }
+.wsound-set__limit input:disabled { opacity: 0.5; }
+.wsound-set__limit output { font-variant-numeric: tabular-nums; text-align: right; }
+.wsound-set__hint { margin: 0; color: var(--color-ink-soft); font-style: italic; }
+.wsound-set__hint[hidden] { display: none; }
