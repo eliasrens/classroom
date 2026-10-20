@@ -83,7 +83,7 @@ export const SUBJECTS = [
   { id: "ke",     name: "Kemi",             color: NO_COLOR, group: "no" },
   { id: "fy",     name: "Fysik",            color: NO_COLOR, group: "no" },
   { id: "fytk",   name: "Fysik/Teknik",     color: NO_COLOR, group: "no" },
-  { id: "tk",     name: "Teknik",           color: NO_COLOR },
+  { id: "tk",     name: "Teknik",           color: NO_COLOR, group: "no" },
   { id: "idh",    name: "Idrott & hälsa",   color: "#eb9d8e" },
   { id: "bl",     name: "Bild",             color: "#84573f" },
   { id: "mu",     name: "Musik",            color: "#7d6e5f" },
