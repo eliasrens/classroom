@@ -10,7 +10,7 @@
  *   - färgfamiljerna följer skolans schema (Sv röd, So gul, Ma blå, No/Tk
  *     mörkgrön och samma färg, En lila, Idh rosa, Sl ljusgrön, Mentorstid grå)
  *   - SO-delämnena (re, hi, ge, sh) har EXAKT samma färg som SO och
- *     NO-delämnena (bi, ke, fy) samma som NO (issue #85) — i CSS genom att
+ *     NO-delämnena (bi, ke, fy, fytk, tk) samma som NO (issue #85, #130) — i CSS genom att
  *     --subject-re m.fl. refererar till huvudämnets token (var(--subject-so))
  *   - `group` binder delämnena till sina huvudämnen och groupedSubjects
  *     grupperar dem under rubriker
@@ -93,10 +93,10 @@ ok(Math.abs(mentor.r - mentor.g) < 20 && Math.abs(mentor.g - mentor.b) < 20,
 
 // --- Delämnen (issue #81 + #85): rätt grupp, EXAKT huvudämnets färg ------
 const SO_FAMILY = ["so", "re", "hi", "ge", "sh"];
-const NO_FAMILY = ["no", "bi", "ke", "fy"];
+const NO_FAMILY = ["no", "bi", "ke", "fy", "fytk", "tk"];
 const NAMES = {
   re: "Religionskunskap", hi: "Historia", ge: "Geografi", sh: "Samhällskunskap",
-  bi: "Biologi", ke: "Kemi", fy: "Fysik",
+  bi: "Biologi", ke: "Kemi", fy: "Fysik", fytk: "Fysik/Teknik", tk: "Teknik",
 };
 for (const [id, name] of Object.entries(NAMES)) {
   ok(get(id)?.name === name, `ämnet ${id}/${name} ska finnas`);
