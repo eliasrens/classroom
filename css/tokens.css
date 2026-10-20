@@ -38,6 +38,7 @@
   --subject-bi: var(--subject-no); /* Biologi — samma som NO (#85) */
   --subject-ke: var(--subject-no); /* Kemi — samma som NO (#85) */
   --subject-fy: var(--subject-no); /* Fysik — samma som NO (#85) */
+  --subject-fytk: var(--subject-no); /* Fysik/Teknik — samma som NO (#130) */
   --subject-so: #e2bc3f;     /* SO — citrongul */
   --subject-re: var(--subject-so); /* Religionskunskap — samma som SO (#85) */
   --subject-hi: var(--subject-so); /* Historia — samma som SO (#85) */
