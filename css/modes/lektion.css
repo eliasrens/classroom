@@ -483,6 +483,13 @@
 .lb-col--left  { flex: 2.5 1 0; }
 .lb-col--mid   { flex: 4.5 1 0; }
 .lb-col--right { flex: 3 1 0; }
+/* Issue #136: "Efter rasten" utan Lektionsordning — en smal kolumn bara för
+   rutan. Bredden (--lb-break-col, px) räknar fitBoard() ut efter rutans
+   rubrikrad, med golv och tak (BREAK_COL_FLOOR/CAP i js/modes/lektion.js);
+   sidokolumnerna tar resten. 30% är reserv innan fitBoard har kört. */
+.lb-col--mid.lb-col--break-only { flex: 0 0 var(--lb-break-col, 30%); }
+/* Utan sidokolumner finns inget att ge plats åt — då fyller den raden som förut. */
+.lb-col--mid.lb-col--break-only:only-child { flex: 1 1 0; }
 
 /* Bottenfält (~sjättedel): DU BEHÖVER vänster, MÅL höger */
 .lb-bottom {
@@ -567,6 +574,10 @@
    text krymps för den stora timerns skull. */
 .lb-break__head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 0.6em; overflow: hidden; }
 .lb-break__head > .lb-field__label { flex: 0 1 auto; min-width: 0; color: var(--lb-break-ink, var(--subj-deep)); }
+/* I rutans smala egen kolumn (issue #136) hamnar timern hellre på en egen
+   rad under etiketten än att etiketten bryts mitt i ett ord bakom timern. */
+.lb-col--break-only .lb-break__head { flex-wrap: wrap; row-gap: 0; }
+.lb-col--break-only .lb-break__head > .lb-field__label { min-width: auto; }
 .lb-break__text { margin: 0; }
 /* Ungefär dubbelt så hög som brödtexten (1.08em i mittenkolumnen). */
 .lb-break__time {

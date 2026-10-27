@@ -97,7 +97,7 @@ import {
   plansPath as plansPathFor, currentUid,
   lessonSettingsPath, LESSON_SETTINGS_DOC, getEditingPlanId, setEditingPlanId, presentedPlanOf,
 } from "../data/plans.js";
-import { fitMidColumn, searchScale } from "../lib/board-fit.js";
+import { fitBreakColumn, fitMidColumn, searchScale } from "../lib/board-fit.js";
 import { createPraiseBoard } from "../ui/praise-board.js";
 import { praiseEditorHTML, mountPraiseEditor } from "../ui/praise-editor.js";
 import { normalize as normalizeMorning, PRAISE_DOC, praisePath, currentPraise } from "../lib/morning.js";
@@ -325,9 +325,10 @@ function boardHTML(rawPlan, subjects, { praise = false, breakBox = "" } = {}) {
   const leftCol = leftKeys.length
     ? `<div class="lb-col lb-col--left">${leftKeys.map((k) => fieldHTML(part(k), plan)).join("")}</div>`
     : "";
-  // "Efter rasten" ligger överst i samma kolumn som Lektionsordning.
+  // "Efter rasten" ligger överst i samma kolumn som Lektionsordning. Utan
+  // Lektionsordning får rutan en egen smal kolumn (issue #136, fitBoard).
   const midCol = show.attGora || breakBox
-    ? `<div class="lb-col lb-col--mid">${breakBox}${show.attGora ? fieldHTML(part("attGora"), plan) : ""}</div>`
+    ? `<div class="lb-col lb-col--mid${show.attGora ? "" : " lb-col--break-only"}">${breakBox}${show.attGora ? fieldHTML(part("attGora"), plan) : ""}</div>`
     : "";
   const rightCol = show.narKlar || praise
     ? `<div class="lb-col lb-col--right${praise ? " lb-col--has-praise" : ""}">${show.narKlar ? fieldHTML(part("narKlar"), plan) : ""}${praise ? `<div class="lb-praise-slot"></div>` : ""}</div>`
@@ -360,13 +361,37 @@ function boardHTML(rawPlan, subjects, { praise = false, breakBox = "" } = {}) {
    reservfallet även rutans (--lb-break-scale) — logiken i
    js/lib/board-fit.js. Nedräkningens sekundtick byter bara text med
    fast bredd och anpassar aldrig om.
+   Utan Lektionsordning (issue #136) har rutan en egen smal kolumn
+   (.lb-col--break-only). Den tas ut ur tavlan under sökningen, så
+   --lb-scale är samma som utan rutan; sedan får kolumnen bredd efter
+   rutans rubrikrad (BREAK_COL_FLOOR–BREAK_COL_CAP av mittenraden) och ger
+   upp bredd om sidokolumnerna inte ryms (fitBreakColumn).
    ============================================================ */
+
+/* Den smala kolumnens bredd, som andel av mittenraden. Taket 0.30 är
+   tydligt smalare än kolumnen med Lektionsordning (4.5 av 10 = 0.45) men
+   rymmer etiketten och timern på en rad i de flesta fall. Golvet 0.16
+   rymmer timern vid tavlans vanliga skalor; blir det trångare krymps
+   rutans egen text (--lb-break-scale) i stället för tavlans. */
+const BREAK_COL_CAP = 0.30;
+const BREAK_COL_FLOOR = 0.16;
 
 const OVERFLOW_NODES = ".lb-top, .lb-break, .lb-break__head, .lb-field__body";
 
-function overflows(el) {
-  const nodes = [el, ...el.querySelectorAll(OVERFLOW_NODES)];
+/** Svämmar något över? `skip` (valfri) = ett delträd som inte räknas. */
+function overflows(el, skip = null) {
+  const nodes = [el, ...el.querySelectorAll(OVERFLOW_NODES)].filter((n) => !skip?.contains(n));
   return nodes.some((n) => n.scrollHeight > n.clientHeight + 1 || n.scrollWidth > n.clientWidth + 1);
+}
+
+/** Bredden kolumnen behöver för att rutans rubrikrad (etikett + timer) ska stå på en rad. */
+function breakHeadWidth(colEl, breakEl) {
+  const head = breakEl.querySelector(".lb-break__head");
+  const chrome = colEl.getBoundingClientRect().width - head.getBoundingClientRect().width;
+  head.style.width = "max-content";
+  const w = head.getBoundingClientRect().width;
+  head.style.removeProperty("width");
+  return Math.ceil(w + chrome + 1);
 }
 
 /** Ryms Bra jobbat-rutan (efter att komponenten lagt ut namnen)? */
@@ -392,14 +417,20 @@ function fitBoard(fitEl, praiseBoard = null) {
   const midEl = boardEl.querySelector(".lb-col--mid");
   const breakEl = midEl?.querySelector(".lb-break");
   const stepsEl = midEl?.querySelector(".lb-field--attGora");
-  // Mittenkolumnens egna skalor börjar om på 1 (även när rutan har tonats bort).
+  const breakOnly = midEl?.classList.contains("lb-col--break-only");
+  // Mittenkolumnens egna skalor (och den smala kolumnens bredd) börjar om
+  // (även när rutan har tonats bort).
   midEl?.style.removeProperty("--lb-steps-scale");
   midEl?.style.removeProperty("--lb-break-scale");
-  if (midEl) { delete midEl.dataset.stepsScale; delete midEl.dataset.breakScale; }
+  midEl?.style.removeProperty("--lb-break-col");
+  if (midEl) { delete midEl.dataset.stepsScale; delete midEl.dataset.breakScale; delete midEl.dataset.breakCol; }
 
-  // 1. Tavlans skala — utan rutan. Kolumnen står kvar (tom om den bara
-  //    hade rutan), så kolumnbredderna är desamma som när rutan syns.
-  if (breakEl) breakEl.style.display = "none";
+  // 1. Tavlans skala — utan rutan. Med Lektionsordning står kolumnen kvar,
+  //    så kolumnbredderna är desamma som när rutan syns. Utan (issue #136)
+  //    tas hela kolumnen ut, så tavlan mäts exakt som samma planering utan rutan.
+  const midSpot = breakOnly ? [midEl.parentElement, midEl.nextSibling] : null;
+  if (breakOnly) midEl.remove();
+  else if (breakEl) breakEl.style.display = "none";
   let scale = searchScale(1, () => !overflows(boardEl), setScale);
   if (withPraise) {
     praiseBoard.fit();
@@ -409,6 +440,11 @@ function fitBoard(fitEl, praiseBoard = null) {
     }
   }
   boardEl.dataset.scale = scale.toFixed(2);
+  if (breakOnly) {
+    // Kolumnen utan ruta (den har tonats bort) kommer inte tillbaka.
+    if (breakEl) fitBreakOnly(boardEl, midEl, breakEl, midSpot, withPraise ? praiseBoard : null);
+    return;
+  }
   if (!breakEl) return;
   breakEl.style.display = "";
 
@@ -423,6 +459,33 @@ function fitBoard(fitEl, praiseBoard = null) {
     setBreak: setVar("--lb-break-scale"),
   });
   midEl.dataset.stepsScale = steps.toFixed(2);
+  if (brk < 1) midEl.dataset.breakScale = brk.toFixed(2);
+}
+
+/**
+ * Issue #136: rutan utan Lektionsordning, efter att tavlans skala satts.
+ * Kolumnen sätts tillbaka med bredden rutans rubrikrad behöver (inom golv
+ * och tak), ger upp bredd om sidokolumnerna inte ryms och krymper till sist
+ * bara rutans egen text — logiken i fitBreakColumn (js/lib/board-fit.js).
+ */
+function fitBreakOnly(boardEl, midEl, breakEl, [parent, next], praiseBoard) {
+  parent.insertBefore(midEl, next);
+  const row = parent.clientWidth;
+  const floor = row * BREAK_COL_FLOOR;
+  const want = Math.min(row * BREAK_COL_CAP, Math.max(floor, breakHeadWidth(midEl, breakEl)));
+  const setPx = (name) => (v) => midEl.style.setProperty(name, `${v.toFixed(1)}px`);
+  const { width, brk } = fitBreakColumn({
+    want, floor,
+    sidesFit: () => !overflows(boardEl, midEl) && (!praiseBoard || (praiseBoard.fit(), praiseFits(praiseBoard))),
+    setWidth: setPx("--lb-break-col"),
+    fits: () => !overflows(midEl),
+    setBreak: (s) => {
+      if (s >= 1) midEl.style.removeProperty("--lb-break-scale");
+      else midEl.style.setProperty("--lb-break-scale", s.toFixed(3));
+    },
+  });
+  praiseBoard?.fit(); // lagd för kolumnens slutliga bredd
+  midEl.dataset.breakCol = (width / row).toFixed(3);
   if (brk < 1) midEl.dataset.breakScale = brk.toFixed(2);
 }
 
@@ -469,7 +532,8 @@ function watchBreakFade(brk, fitEl) {
   const finish = () => {
     if (!el.isConnected) return; // omritad under tiden — den nya rutan har egen avslutning
     clearTimeout(brk.fadeTimer);
-    el.remove();
+    // Rutans egen smala kolumn (issue #136) går med den, så sidokolumnerna breddas.
+    (el.closest(".lb-col--break-only") || el).remove();
     brk.leaving = null;
     brk.refit();
   };

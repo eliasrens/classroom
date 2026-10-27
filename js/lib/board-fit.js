@@ -8,6 +8,8 @@
  *   kolumnen. Tavlans --lb-scale räknas UTAN rutan; ryms sedan inte rutan +
  *   Lektionsordning krymps först bara Lektionsordnings text, och bara så
  *   mycket som behövs.
+ * - fitBreakColumn (issue #136): rutan utan Lektionsordning, i en egen smal
+ *   kolumn — kolumnen ger upp bredd, sedan krymps bara rutans text.
  */
 
 export const FIT_MIN = 0.45;
@@ -51,4 +53,24 @@ export function fitMidColumn({ fits, setSteps, setBreak, min = FIT_MIN, precisio
   if (steps > min || fits()) return { steps, brk: 1 };
   const brk = searchScale(1, fits, setBreak, { min, precision });
   return { steps, brk };
+}
+
+/**
+ * "Efter rasten" utan Lektionsordning (issue #136): rutan har en egen smal
+ * mittenkolumn. Tavlans --lb-scale är redan satt (räknad utan kolumnen).
+ * `want` = kolumnens önskade bredd, `floor` = dess golv (px).
+ *
+ * 1. Kolumnen ger upp bredd (ner till `floor`) tills sidokolumnerna ryms
+ *    (`sidesFit`) — tavlans text krymps aldrig för rutans skull.
+ * 2. Ryms rutan sedan inte i kolumnen (`fits`) krymps bara rutans text
+ *    (`setBreak`), i [min, 1]. Klipps först om inte ens det räcker.
+ *
+ * → { width, brk } — bredden och rutans skala som sattes.
+ */
+export function fitBreakColumn({ want, floor, sidesFit, setWidth, fits, setBreak, min = FIT_MIN, precision = FIT_PRECISION }) {
+  setBreak(1);
+  const lo = want > 0 ? Math.min(1, floor / want) : 1;
+  const f = searchScale(1, sidesFit, (t) => setWidth(want * t), { min: lo, precision });
+  const brk = searchScale(1, fits, setBreak, { min, precision });
+  return { width: want * f, brk };
 }

@@ -1,5 +1,5 @@
 /**
- * TEST — lektionstavlans skallogik (issue #134), js/lib/board-fit.js.
+ * TEST — lektionstavlans skallogik (issue #134, #136), js/lib/board-fit.js.
  *
  *   node docs/test-board-fit.mjs
  *
@@ -8,9 +8,11 @@
  *   - fitMidColumn: ryms kolumnen står båda skalorna på 1
  *   - ryms den inte krymps bara Lektionsordning, och bara så mycket som behövs
  *   - reserv: ryms den inte ens med Lektionsordning på min krymps rutan också
+ *   - fitBreakColumn (#136): rutans smala kolumn ger upp bredd (ner till
+ *     golvet) innan rutans text krymps; sidokolumnernas skala rörs aldrig
  */
 
-const { FIT_MIN, FIT_PRECISION, searchScale, fitMidColumn } = await import("../js/lib/board-fit.js");
+const { FIT_MIN, FIT_PRECISION, searchScale, fitMidColumn, fitBreakColumn } = await import("../js/lib/board-fit.js");
 
 let failed = 0;
 let passed = 0;
@@ -91,6 +93,51 @@ function column({ box, steps, room }) {
     setBreak: (v) => { st.brk = v; },
   });
   ok(r.brk < 1 && 120 * r.brk <= 100, "bara rutan i kolumnen → rutan krymps i reserv");
+}
+
+// --- fitBreakColumn (issue #136) ----------------------------------------------
+// Mittenraden är 1000 px. Sidokolumnerna ryms om de får minst `sides` px;
+// rutan ryms om dess bredd (natural px vid skala 1) får plats i kolumnen.
+function breakCol({ sides, box, row = 1000 }) {
+  const st = { width: null, brk: 1 };
+  return {
+    st,
+    sidesFit: () => row - st.width >= sides,
+    setWidth: (v) => { st.width = v; },
+    fits: () => box * st.brk <= st.width,
+    setBreak: (v) => { st.brk = v; },
+  };
+}
+{
+  const c = breakCol({ sides: 600, box: 250 });
+  const r = fitBreakColumn({ want: 300, floor: 160, ...c });
+  ok(r.width === 300 && c.st.width === 300, "sidorna ryms → kolumnen får sin önskade bredd");
+  ok(r.brk === 1 && c.st.brk === 1, "… och rutans text krymps inte");
+}
+{
+  const c = breakCol({ sides: 760, box: 280 });
+  const r = fitBreakColumn({ want: 300, floor: 160, ...c });
+  ok(r.width <= 240 && r.width > 240 - 300 * FIT_PRECISION, `sidorna ryms inte → kolumnen ger upp bredd, så lite som möjligt (fick ${r.width})`);
+  ok(c.st.width === r.width && c.sidesFit(), "bredden är satt och sidorna ryms");
+  const need = r.width / 280;
+  ok(r.brk <= need && r.brk > need - FIT_PRECISION && c.fits(), `rutan krymps bara så mycket som behövs (fick ${r.brk})`);
+}
+{
+  const c = breakCol({ sides: 950, box: 200 });
+  const r = fitBreakColumn({ want: 300, floor: 160, ...c });
+  ok(r.width === 160 && c.st.width === 160, "kolumnen går aldrig under golvet");
+  ok(c.fits(), "rutan ryms på golvbredd tack vare sin egen skala");
+}
+{
+  const c = breakCol({ sides: 600, box: 1000 });
+  const r = fitBreakColumn({ want: 300, floor: 160, ...c });
+  ok(r.brk === FIT_MIN, "ryms inte ens på golvskalan → FIT_MIN (klipps)");
+}
+{
+  // Önskad bredd under golvet (rubrikraden är kort) — ingen sökning nedåt.
+  const c = breakCol({ sides: 950, box: 100 });
+  const r = fitBreakColumn({ want: 120, floor: 160, ...c });
+  ok(r.width === 120 && r.brk === 1, "want < floor → want gäller som den är");
 }
 
 console.log(`\n${passed} OK, ${failed} fel`);
