@@ -73,7 +73,10 @@
  *   still) och fitBoard körs om EFTER toningen, så att texten växer
  *   tillbaka. Rutan krymper aldrig hela tavlan (issue #134): --lb-scale
  *   räknas utan den, och ryms inte mittenkolumnen krymps bara
- *   Lektionsordnings text (--lb-steps-scale). Lärarvyn bockar då ur delen (en gång); elevvyn skriver
+ *   Lektionsordnings text (--lb-steps-scale). Utan Lektionsordning får rutan
+ *   en smal egen kolumn; bara om sidokolumnerna inte ryms ens när den är som
+ *   smalast sänks --lb-scale, precis så mycket som behövs (issue #136).
+ *   Lärarvyn bockar då ur delen (en gång); elevvyn skriver
  *   aldrig. "+1 min" och "Dölj nu" sitter vid rutan i lärarvyn.
  *
  * Kontrakt: docs/MODULKONTRAKT.md. Data: DATAMODELL.md.
@@ -365,7 +368,9 @@ function boardHTML(rawPlan, subjects, { praise = false, breakBox = "" } = {}) {
    (.lb-col--break-only). Den tas ut ur tavlan under sökningen, så
    --lb-scale är samma som utan rutan; sedan får kolumnen bredd efter
    rutans rubrikrad (BREAK_COL_FLOOR–BREAK_COL_CAP av mittenraden) och ger
-   upp bredd om sidokolumnerna inte ryms (fitBreakColumn).
+   upp bredd om sidokolumnerna inte ryms. Räcker inte ens golvet sänks
+   --lb-scale bara så mycket som behövs (fitBreakColumn) — sidokolumnerna
+   klipps aldrig — och går tillbaka när rutan tonats bort.
    ============================================================ */
 
 /* Den smala kolumnens bredd, som andel av mittenraden. Taket 0.30 är
@@ -445,7 +450,7 @@ function fitBoard(fitEl, praiseBoard = null) {
   boardEl.dataset.scale = scale.toFixed(2);
   if (breakOnly) {
     // Kolumnen utan ruta (den har tonats bort) kommer inte tillbaka.
-    if (breakEl) fitBreakOnly(boardEl, midEl, breakEl, midSpot, withPraise ? praiseBoard : null);
+    if (breakEl) fitBreakOnly(boardEl, midEl, breakEl, midSpot, { scale, setScale, praiseBoard: withPraise ? praiseBoard : null });
     return;
   }
   if (!breakEl) return;
@@ -472,17 +477,19 @@ function fitBoard(fitEl, praiseBoard = null) {
 /**
  * Issue #136: rutan utan Lektionsordning, efter att tavlans skala satts.
  * Kolumnen sätts tillbaka med bredden rutans rubrikrad behöver (inom golv
- * och tak), ger upp bredd om sidokolumnerna inte ryms och krymper till sist
- * bara rutans egen text — logiken i fitBreakColumn (js/lib/board-fit.js).
+ * och tak) och ger upp bredd om sidokolumnerna inte ryms. Räcker inte
+ * golvet sänks --lb-scale bara så mycket som behövs (sidokolumnerna klipps
+ * aldrig); när rutan tonats bort räknas skalan om utan kolumnen. Till sist
+ * krymps bara rutans egen text — logiken i fitBreakColumn (js/lib/board-fit.js).
  */
-function fitBreakOnly(boardEl, midEl, breakEl, [parent, next], praiseBoard) {
+function fitBreakOnly(boardEl, midEl, breakEl, [parent, next], { scale, setScale, praiseBoard }) {
   parent.insertBefore(midEl, next);
   const row = parent.clientWidth;
   const floor = row * BREAK_COL_FLOOR;
   const want = Math.min(row * BREAK_COL_CAP, Math.max(floor, breakHeadWidth(midEl, breakEl)));
   const setPx = (name) => (v) => midEl.style.setProperty(name, `${v.toFixed(1)}px`);
-  const { width, brk } = fitBreakColumn({
-    want, floor,
+  const r = fitBreakColumn({
+    want, floor, scale, setScale,
     sidesFit: () => !overflows(boardEl, midEl) && (!praiseBoard || (praiseBoard.fit(), praiseFits(praiseBoard))),
     setWidth: setPx("--lb-break-col"),
     fits: () => !overflows(midEl),
@@ -492,8 +499,9 @@ function fitBreakOnly(boardEl, midEl, breakEl, [parent, next], praiseBoard) {
     },
   });
   praiseBoard?.fit(); // lagd för kolumnens slutliga bredd
-  midEl.dataset.breakCol = (width / row).toFixed(3);
-  if (brk < 1) midEl.dataset.breakScale = brk.toFixed(2);
+  boardEl.dataset.scale = r.scale.toFixed(2);
+  midEl.dataset.breakCol = (r.width / row).toFixed(3);
+  if (r.brk < 1) midEl.dataset.breakScale = r.brk.toFixed(2);
 }
 
 /**

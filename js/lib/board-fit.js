@@ -9,7 +9,8 @@
  *   Lektionsordning krymps först bara Lektionsordnings text, och bara så
  *   mycket som behövs.
  * - fitBreakColumn (issue #136): rutan utan Lektionsordning, i en egen smal
- *   kolumn — kolumnen ger upp bredd, sedan krymps bara rutans text.
+ *   kolumn — kolumnen ger upp bredd, först därefter sänks tavlans skala
+ *   (sidokolumnerna klipps aldrig); rutans text krymps med egen skala.
  */
 
 export const FIT_MIN = 0.45;
@@ -62,20 +63,25 @@ export function fitMidColumn({ fits, breakFits = () => true, setSteps, setBreak,
 
 /**
  * "Efter rasten" utan Lektionsordning (issue #136): rutan har en egen smal
- * mittenkolumn. Tavlans --lb-scale är redan satt (räknad utan kolumnen).
+ * mittenkolumn. Tavlans skala `scale` är redan satt (räknad utan kolumnen).
  * `want` = kolumnens önskade bredd, `floor` = dess golv (px).
  *
  * 1. Kolumnen ger upp bredd (ner till `floor`) tills sidokolumnerna ryms
- *    (`sidesFit`) — tavlans text krymps aldrig för rutans skull.
- * 2. Ryms rutan sedan inte i kolumnen (`fits`) krymps bara rutans text
+ *    (`sidesFit`) — tavlans text krymps inte för rutans skull om det räcker.
+ * 2. Ryms sidokolumnerna inte ens med kolumnen på golvet sänks tavlans
+ *    skala (`setScale`) bara så mycket som behövs — sidokolumnerna klipps
+ *    aldrig. (Tavlan räknas annars fram till största skalan som ryms, så
+ *    det här händer så snart texten redan är krympt.)
+ * 3. Ryms rutan sedan inte i kolumnen (`fits`) krymps bara rutans text
  *    (`setBreak`), i [min, 1]. Klipps först om inte ens det räcker.
  *
- * → { width, brk } — bredden och rutans skala som sattes.
+ * → { width, scale, brk } — bredden och skalorna som sattes.
  */
-export function fitBreakColumn({ want, floor, sidesFit, setWidth, fits, setBreak, min = FIT_MIN, precision = FIT_PRECISION }) {
+export function fitBreakColumn({ want, floor, scale, sidesFit, setWidth, setScale, fits, setBreak, min = FIT_MIN, precision = FIT_PRECISION }) {
   setBreak(1);
   const lo = want > 0 ? Math.min(1, floor / want) : 1;
   const f = searchScale(1, sidesFit, (t) => setWidth(want * t), { min: lo, precision });
+  if (!sidesFit()) scale = searchScale(scale, sidesFit, setScale, { min, precision });
   const brk = searchScale(1, fits, setBreak, { min, precision });
-  return { width: want * f, brk };
+  return { width: want * f, scale, brk };
 }

@@ -486,7 +486,8 @@
 /* Issue #136: "Efter rasten" utan Lektionsordning — en smal kolumn bara för
    rutan. Bredden (--lb-break-col, px) räknar fitBoard() ut efter rutans
    rubrikrad, med golv och tak (BREAK_COL_FLOOR/CAP i js/modes/lektion.js);
-   sidokolumnerna tar resten. 30% är reserv innan fitBoard har kört. */
+   sidokolumnerna tar resten (räcker inte golvet sänks --lb-scale lite).
+   30% är reserv innan fitBoard har kört. */
 .lb-col--mid.lb-col--break-only { flex: 0 0 var(--lb-break-col, 30%); }
 /* Utan sidokolumner finns inget att ge plats åt — då fyller den raden som förut. */
 .lb-col--mid.lb-col--break-only:only-child { flex: 1 1 0; }

@@ -9,7 +9,10 @@
  *   - ryms den inte krymps bara Lektionsordning, och bara så mycket som behövs
  *   - reserv: ryms den inte ens med Lektionsordning på min krymps rutan också
  *   - fitBreakColumn (#136): rutans smala kolumn ger upp bredd (ner till
- *     golvet) innan rutans text krymps; sidokolumnernas skala rörs aldrig
+ *     golvet); räcker inte golvet sänks tavlans skala bara så mycket som
+ *     behövs (sidokolumnerna klipps aldrig); rutans text krymps med egen skala
+ *   - fitMidColumn (#136): kolumn som redan ryms ger steps = 1; horisontellt
+ *     överflöd i rutan krymper inte Lektionsordning
  */
 
 const { FIT_MIN, FIT_PRECISION, searchScale, fitMidColumn, fitBreakColumn } = await import("../js/lib/board-fit.js");
@@ -118,14 +121,17 @@ function column({ box, steps, room }) {
 }
 
 // --- fitBreakColumn (issue #136) ----------------------------------------------
-// Mittenraden är 1000 px. Sidokolumnerna ryms om de får minst `sides` px;
-// rutan ryms om dess bredd (natural px vid skala 1) får plats i kolumnen.
-function breakCol({ sides, box, row = 1000 }) {
-  const st = { width: null, brk: 1 };
+// Mittenraden är 1000 px. Sidokolumnerna behöver `sides` px vid tavlans
+// skala 1 (proportionellt mot skalan); rutan ryms om dess bredd (natural px
+// vid skala 1) får plats i kolumnen.
+function breakCol({ sides, box, row = 1000, scale = 1 }) {
+  const st = { width: null, brk: 1, scale, scaleSets: 0 };
   return {
     st,
-    sidesFit: () => row - st.width >= sides,
+    scale,
+    sidesFit: () => row - st.width >= sides * st.scale,
     setWidth: (v) => { st.width = v; },
+    setScale: (v) => { st.scale = v; st.scaleSets++; },
     fits: () => box * st.brk <= st.width,
     setBreak: (v) => { st.brk = v; },
   };
@@ -135,19 +141,26 @@ function breakCol({ sides, box, row = 1000 }) {
   const r = fitBreakColumn({ want: 300, floor: 160, ...c });
   ok(r.width === 300 && c.st.width === 300, "sidorna ryms → kolumnen får sin önskade bredd");
   ok(r.brk === 1 && c.st.brk === 1, "… och rutans text krymps inte");
+  ok(r.scale === 1 && c.st.scaleSets === 0, "… och tavlans skala rörs inte");
 }
 {
   const c = breakCol({ sides: 760, box: 280 });
   const r = fitBreakColumn({ want: 300, floor: 160, ...c });
   ok(r.width <= 240 && r.width > 240 - 300 * FIT_PRECISION, `sidorna ryms inte → kolumnen ger upp bredd, så lite som möjligt (fick ${r.width})`);
   ok(c.st.width === r.width && c.sidesFit(), "bredden är satt och sidorna ryms");
+  ok(r.scale === 1 && c.st.scaleSets === 0, "… utan att tavlans skala rörs");
   const need = r.width / 280;
   ok(r.brk <= need && r.brk > need - FIT_PRECISION && c.fits(), `rutan krymps bara så mycket som behövs (fick ${r.brk})`);
 }
 {
-  const c = breakCol({ sides: 950, box: 200 });
+  // Tavlan står redan på sin största skala som ryms (0.8): med kolumnen på
+  // golvet ryms sidorna bara vid 0.8 · 840/950 ≈ 0.707.
+  const c = breakCol({ sides: 950 / 0.8, box: 200, scale: 0.8 });
   const r = fitBreakColumn({ want: 300, floor: 160, ...c });
+  const need = 840 / (950 / 0.8);
   ok(r.width === 160 && c.st.width === 160, "kolumnen går aldrig under golvet");
+  ok(c.sidesFit(), "sidokolumnerna klipps aldrig — tavlans skala sänks i stället");
+  ok(r.scale <= need && r.scale > need - FIT_PRECISION && c.st.scale === r.scale, `… bara så mycket som behövs (fick ${r.scale}, behövs ${need.toFixed(3)})`);
   ok(c.fits(), "rutan ryms på golvbredd tack vare sin egen skala");
 }
 {
@@ -156,10 +169,10 @@ function breakCol({ sides, box, row = 1000 }) {
   ok(r.brk === FIT_MIN, "ryms inte ens på golvskalan → FIT_MIN (klipps)");
 }
 {
-  // Önskad bredd under golvet (rubrikraden är kort) — ingen sökning nedåt.
-  const c = breakCol({ sides: 950, box: 100 });
-  const r = fitBreakColumn({ want: 120, floor: 160, ...c });
-  ok(r.width === 120 && r.brk === 1, "want < floor → want gäller som den är");
+  // Önskad bredd lika med golvet (rubrikraden är kort) — ingen sökning nedåt.
+  const c = breakCol({ sides: 800, box: 100 });
+  const r = fitBreakColumn({ want: 160, floor: 160, ...c });
+  ok(r.width === 160 && r.brk === 1 && r.scale === 1, "want = floor → bredden står kvar");
 }
 
 console.log(`\n${passed} OK, ${failed} fel`);
