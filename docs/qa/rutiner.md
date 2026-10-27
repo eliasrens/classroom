@@ -56,6 +56,10 @@ elevvyns tavla är alltid ljus.
   Matematik · sön 27 sep.", "Vad, Lektionsordning, Mål visas" — delen
   hette "Att göra" före issue #132). ✔
 - Fält-kryssrutorna slår av/på fält och layouten omfördelar sig utan hål. ✔
+- Efter rasten: "+1 min" (bara med timern på) och "Dölj nu" står i panelens
+  "Efter rasten"-del, inte i rutan på tavlan (issue #144), så rutan är
+  densamma i förhandsvisningen och på elevskärmen. "+1 min" förlänger
+  nedräkningen på båda, "Dölj nu" bockar ur kryssrutan och tonar bort rutan. ✔
 - Mina ämnen: dialogen sparar valet, väljaren visar bara mina + "Visa alla
   ämnen…" (visar hela paletten tillfälligt utan att röra planeringen),
   hinten "Lägg till 'Engelska' i mina ämnen" när planeringens ämne inte är

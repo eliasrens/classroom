@@ -77,7 +77,8 @@
  *   en smal egen kolumn; bara om sidokolumnerna inte ryms ens när den är som
  *   smalast sänks --lb-scale, precis så mycket som behövs (issue #136).
  *   Lärarvyn bockar då ur delen (en gång); elevvyn skriver
- *   aldrig. "+1 min" och "Dölj nu" sitter vid rutan i lärarvyn.
+ *   aldrig. "+1 min" och "Dölj nu" sitter i sidopanelens "Efter rasten"-
+ *   del (issue #144), så rutan på tavlan är densamma i båda vyerna.
  *
  * Kontrakt: docs/MODULKONTRAKT.md. Data: DATAMODELL.md.
  * Planeringar OCH presentedPlanId är PRIVATA per lärare
@@ -251,16 +252,18 @@ function stepsHTML(items) {
   return `<ol class="lb-steps">${rows.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>`;
 }
 
+/* Ren text ligger i ett eget block (.lb-text) — ser likadant ut, men ger
+   fitBoard() en layoutunderkant att mäta mot (issue #144, contentBottom). */
 function listHTML(value) {
   const rows = String(value ?? "").split("\n").map((s) => s.trim()).filter(Boolean);
   if (rows.length === 0) return `<div class="lb-empty">—</div>`;
-  if (rows.length === 1) return esc(rows[0]);
+  if (rows.length === 1) return `<div class="lb-text">${esc(rows[0])}</div>`;
   return `<ul class="lb-list">${rows.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>`;
 }
 
 function textHTML(value) {
   const v = String(value ?? "").trim();
-  return v ? esc(v).replace(/\n/g, "<br>") : `<div class="lb-empty">—</div>`;
+  return v ? `<div class="lb-text">${esc(v).replace(/\n/g, "<br>")}</div>` : `<div class="lb-empty">—</div>`;
 }
 
 function fieldHTML(part, plan) {
@@ -279,28 +282,22 @@ function fieldHTML(part, plan) {
    Rutan överst i mittenkolumnen. `leavingMs` (≠ null) = rutan tonas bort
    och har hunnit så här långt — den negativa animation-delay låter en
    omritning mitt i toningen fortsätta där den var i stället för att
-   börja om. Knapparna "+1 min"/"Dölj nu" finns bara i lärarvyn. */
+   börja om. Rutan är exakt likadan i förhandsvisningen och på elevskärmen
+   — lärarens "+1 min"/"Dölj nu" sitter i sidopanelen (issue #144). */
 const BREAK_FADE_MS = 500;
 
-function breakBoxHTML(plan, now, { teacher = false, leavingMs = null } = {}) {
-  // Utan timer (issue #139): ingen nedräkning, ingen klocka och inget "+1 min".
+function breakBoxHTML(plan, now, { leavingMs = null } = {}) {
+  // Utan timer (issue #139): ingen nedräkning och ingen klocka.
   const timer = breakHasTimer(plan.fields);
   const c = timer ? breakCountdown(plan, now) : { phase: "off", text: "" };
   const body = breakBodyHTML(plan.fields.efterRasten) || `<div class="lb-empty">—</div>`;
   const leaving = leavingMs != null;
-  const tools = teacher
-    ? `<div class="lb-break__tools teacher-only">
-        ${timer ? `<button type="button" class="lb-break__btn" data-act="brk-plus" title="Förläng nedräkningen med en minut"${leaving ? " disabled" : ""}>+1 min</button>` : ""}
-        <button type="button" class="lb-break__btn" data-act="brk-hide" title="Dölj rutan nu — kryssrutan bockas ur"${leaving ? " disabled" : ""}>Dölj nu</button>
-      </div>`
-    : "";
   return `<div class="lb-break${leaving ? " lb-break--leaving" : ""}" data-phase="${c.phase}"${leaving ? ` style="animation-delay:${-Math.round(leavingMs)}ms"` : ""}>
     <div class="lb-break__head">
       <div class="lb-field__label">${esc(breakLabel(plan.fields).toUpperCase())}</div>
       ${timer ? `<div class="lb-break__time" role="timer" aria-label="Tid kvar">${icon("clock")}<span data-el="brk-time">${c.text}</span></div>` : ""}
     </div>
     <div class="lb-field__body lb-break__body">${body}</div>
-    ${tools}
   </div>`;
 }
 
@@ -366,10 +363,14 @@ function boardHTML(rawPlan, subjects, { praise = false, breakBox = "" } = {}) {
    kolumnen krymps bara Lektionsordnings text (--lb-steps-scale), i
    reservfallet även rutans (--lb-break-scale) — logiken i
    js/lib/board-fit.js. Gränsen är sista stegets underkant mot kolumnens
-   nederkant — utan bottenrad tavlans ram (issue #138). Lärarens knapprad
-   i rutan mäts bort, så förhandsvisningen får elevskärmens skalor; raden
-   får sedan plats genom rutans egen skala (issue #142). Nedräkningens
-   sekundtick byter bara text med fast bredd och anpassar aldrig om.
+   nederkant — utan bottenrad tavlans ram (issue #138). Rutan är exakt
+   densamma i förhandsvisningen och på elevskärmen — lärarens "+1 min"/
+   "Dölj nu" sitter i sidopanelen (issue #144, tidigare mättes knappraden
+   bort i #142) — så båda vyerna får samma skalor. Höjden mäts
+   geometriskt — blockens underkanter, inte scrollHeight — så glyfer som
+   sticker ut ur sina rader (Segoe UI på Windows) aldrig räknas som
+   överflöd (issue #144, contentBottom). Nedräkningens sekundtick byter
+   bara text med fast bredd och anpassar aldrig om.
    Utan Lektionsordning (issue #136) har rutan en egen smal kolumn
    (.lb-col--break-only). Den tas ut ur tavlan under sökningen, så
    --lb-scale är samma som utan rutan; sedan får kolumnen bredd efter
@@ -389,13 +390,35 @@ const BREAK_COL_FLOOR = 0.16;
 
 const OVERFLOW_NODES = ".lb-top, .lb-break, .lb-break__head, .lb-field__body";
 
+/* Höjden mäts geometriskt (issue #144): innehållets underkant = sista
+   synliga barnets layoutunderkant (contentBottom), mot rutans inre
+   nederkant (innerBottom). scrollHeight duger inte: med typsnitt vars
+   glyfer är högre än raden (Segoe UI på Windows: 1.33 em mot line-height
+   1.2–1.28) räknar Chrome glyferna som överflöd i VARJE skala, så
+   "ryms" blev aldrig sant och allt krympte till golvet. Ett blocks
+   underkant påverkas inte av glyferna — därför ligger all ren text i ett
+   eget block (.lb-text, textHTML/listHTML). Bredden mäts som förut. */
+function contentBottom(el) {
+  for (let n = el.lastElementChild; n; n = n.previousElementSibling) {
+    const r = n.getBoundingClientRect();
+    if (r.height > 0 || r.width > 0) return r.bottom;
+  }
+  return el.getBoundingClientRect().top;
+}
+function innerBottom(el) {
+  const cs = getComputedStyle(el);
+  return el.getBoundingClientRect().bottom - parseFloat(cs.borderBottomWidth) - parseFloat(cs.paddingBottom);
+}
+// Bortmätta noder (display:none, t.ex. rutan under steg 1) har ingen låda och ryms.
+const clipsY = (el) => el.getClientRects().length > 0 && !stepsWithin(contentBottom(el), innerBottom(el));
+
 /**
  * Svämmar något över? `skip` (valfri) = ett delträd som inte räknas;
  * `x: false` = bara på höjden.
  */
 function overflows(el, skip = null, { x = true } = {}) {
   const nodes = [el, ...el.querySelectorAll(OVERFLOW_NODES)].filter((n) => !skip?.contains(n));
-  return nodes.some((n) => n.scrollHeight > n.clientHeight + 1 || (x && n.scrollWidth > n.clientWidth + 1));
+  return nodes.some((n) => clipsY(n) || (x && n.scrollWidth > n.clientWidth + 1));
 }
 
 /** Bredden kolumnen behöver för att rutans rubrikrad (etikett + timer) ska stå på en rad. */
@@ -444,7 +467,10 @@ function fitBoard(fitEl, praiseBoard = null) {
   //    tas hela kolumnen ut, så tavlan mäts exakt som samma planering utan rutan.
   const midSpot = breakOnly ? [midEl.parentElement, midEl.nextSibling] : null;
   if (breakOnly) midEl.remove();
-  else if (breakEl) breakEl.style.display = "none";
+  // Klassen (inte bara display:none) så att #138-regeln i CSS (stegfältets
+  // luft tas bort när rutan står i kolumnen) inte gäller under mätningen —
+  // annars blev --lb-scale olika med och utan ruta (issue #144).
+  else if (breakEl) breakEl.classList.add("lb-break--off");
   let scale = searchScale(1, () => !overflows(boardEl), setScale);
   if (withPraise) {
     praiseBoard.fit();
@@ -460,7 +486,7 @@ function fitBoard(fitEl, praiseBoard = null) {
     return;
   }
   if (!breakEl) return;
-  breakEl.style.display = "";
+  breakEl.classList.remove("lb-break--off");
 
   // 2. Rutan + Lektionsordning i mittenkolumnen: bara de krymps.
   const setVar = (name) => (s) => {
@@ -476,24 +502,13 @@ function fitBoard(fitEl, praiseBoard = null) {
   const fits = () => !overflows(midEl, null, { x: false })
     && (!lastStep || stepsWithin(lastStep.getBoundingClientRect().bottom, midEl.getBoundingClientRect().bottom));
   const breakFits = () => !overflows(breakEl);
-  const setBreak = setVar("--lb-break-scale");
-  // Lärarens knappar ("+1 min"/"Dölj nu") finns bara i förhandsvisningen
-  // och gjorde rutan en rad högre där än på elevskärmen, så samma planering
-  // fick olika skalor (issue #142). De mäts bort: Lektionsordning och rutan
-  // får exakt elevskärmens skalor …
-  const toolsEl = breakEl.querySelector(".lb-break__tools");
-  if (toolsEl) toolsEl.style.display = "none";
-  let { steps, brk } = fitMidColumn({
+  // Rutan är densamma i förhandsvisningen och på elevskärmen (lärarens
+  // knappar sitter i sidopanelen sedan issue #144), så skalorna blir lika.
+  const { steps, brk } = fitMidColumn({
     fits, breakFits,
     setSteps: stepsEl ? setVar("--lb-steps-scale") : () => {},
-    setBreak,
+    setBreak: setVar("--lb-break-scale"),
   });
-  if (toolsEl) {
-    // … och raden får sedan plats genom att bara rutans egen text krymps
-    // (som i reservfallet), aldrig Lektionsordning. Elevskärmen påverkas inte.
-    toolsEl.style.removeProperty("display");
-    brk = searchScale(brk, () => fits() && breakFits(), setBreak);
-  }
   midEl.dataset.stepsScale = steps.toFixed(2);
   if (brk < 1) midEl.dataset.breakScale = brk.toFixed(2);
 }
@@ -535,9 +550,9 @@ function fitBreakOnly(boardEl, midEl, breakEl, [parent, next], { scale, setScale
  * bort; när toningen är klar tas den bort och `refit` körs, så texten växer
  * tillbaka till största storlek som ryms.
  */
-function createBreakState({ teacher, refit }) {
+function createBreakState({ refit }) {
   return {
-    teacher, refit,
+    refit,
     shownFor: null,  // planeringens id om rutan syntes vid förra ritningen
     leaving: null,   // { planId, at } medan rutan tonas bort
     fadeTimer: 0,
@@ -551,7 +566,7 @@ function breakForRender(brk, plan, now) {
   if (breakVisible(plan, now)) {
     brk.shownFor = plan.id;
     brk.leaving = null;
-    return breakBoxHTML(plan, now, { teacher: brk.teacher });
+    return breakBoxHTML(plan, now);
   }
   if (brk.shownFor === plan.id && brk.leaving?.planId !== plan.id) {
     brk.leaving = { planId: plan.id, at: performance.now() };
@@ -560,7 +575,7 @@ function breakForRender(brk, plan, now) {
   if (brk.leaving?.planId !== plan.id) { brk.leaving = null; return ""; }
   const elapsed = performance.now() - brk.leaving.at;
   if (elapsed >= BREAK_FADE_MS) { brk.leaving = null; return ""; }
-  return breakBoxHTML(plan, now, { teacher: brk.teacher, leavingMs: elapsed });
+  return breakBoxHTML(plan, now, { leavingMs: elapsed });
 }
 
 /** Rutan har tonats bort: ta bort den och anpassa texten igen (inte under toningen). */
@@ -863,7 +878,7 @@ export default {
       const stage = el.querySelector(".lesson-stage-student");
       // "Efter rasten": elevvyn döljer rutan själv när tiden är ute men
       // skriver aldrig — urbockningen kommer från lärarvyn via sync.
-      const brk = createBreakState({ teacher: false, refit: () => refitBoard(stage, { board: praiseBoard }) });
+      const brk = createBreakState({ refit: () => refitBoard(stage, { board: praiseBoard }) });
       this._offs.push(() => brk.destroy());
       const renderStudent = () => {
         if (!stage.isConnected) return;
@@ -1209,7 +1224,9 @@ export default {
       return rows.join("");
     }
 
-    /** "Efter rasten" (issue #132): rubrik (issue #139), minuter + text, bara synliga när rutan är ikryssad. */
+    /** "Efter rasten" (issue #132): rubrik (issue #139), minuter + text, bara
+        synliga när rutan är ikryssad. Lärarens "+1 min" (bara med timer) och
+        "Dölj nu" står här sedan issue #144 — inte i rutan på tavlan. */
     function breakFieldHTML(plan, on) {
       const label = breakLabel(plan.fields);
       const words = BREAK_WORDS.map((w) =>
@@ -1227,6 +1244,10 @@ export default {
             <label class="field-label field-edit__min" data-el="break-min"${plan.fields.efterRastenTimer ? "" : " hidden"}>Minuter
               <input type="number" data-field="efterRastenMin" min="${BREAK_MIN_MIN}" max="${BREAK_MIN_MAX}" step="1" inputmode="numeric" value="${plan.fields.efterRastenMin}">
             </label>
+            <span class="field-edit__break-acts">
+              <button type="button" class="btn" data-act="brk-plus" data-el="brk-plus" title="Förläng nedräkningen med en minut"${plan.fields.efterRastenTimer ? "" : " hidden"}>+1 min</button>
+              <button type="button" class="btn" data-act="brk-hide" title="Dölj rutan nu — kryssrutan bockas ur">Dölj nu</button>
+            </span>
           </div>
           <textarea data-field="efterRasten" rows="3" aria-label="${esc(label)}">${esc(plan.fields.efterRasten)}</textarea>
           <p class="field-edit__hint">En rad per sak. Börja raden med - för en punkt.</p>
@@ -1464,7 +1485,7 @@ export default {
     observeStage(stageEl);
 
     // ---- "Efter rasten" (issue #132) i förhandsvisningen ----
-    const brk = createBreakState({ teacher: true, refit: () => refitBoard(stageEl, { board: praiseBoard }) });
+    const brk = createBreakState({ refit: () => refitBoard(stageEl, { board: praiseBoard }) });
     this._offs.push(() => brk.destroy());
     // Urbockningen när tiden är ute: bara härifrån (lärarvyn), en gång.
     // Var vyn stängd när tiden gick ut sker den när planeringen öppnas igen.
@@ -1496,18 +1517,6 @@ export default {
       if (e.target.closest('[data-act="goto-presented"]')) {
         const p = presentedPlan();
         if (p) { setEditing(p.id); renderAll(); }
-        return;
-      }
-      // "+1 min" / "Dölj nu" vid Efter rasten-rutan — sparas i planeringen
-      // och når elevskärmen via datalagret.
-      const act = e.target.closest("[data-act]")?.dataset.act;
-      if (act === "brk-plus") {
-        const p = editingPlan();
-        if (!p) return;
-        await patchEditing({ fields: plusOneMinute(normalizePlan(p).fields) });
-        renderPreview();
-      } else if (act === "brk-hide") {
-        await hideBreak();
       }
     });
 
@@ -1657,6 +1666,14 @@ export default {
       const act = e.target.closest("[data-act]")?.dataset.act;
       if (!act) return;
       if (act === "new") await createPlan();
+      // "+1 min" / "Dölj nu" i Efter rasten-delen (issue #144) — sparas i
+      // planeringen och når elevskärmen via datalagret.
+      else if (act === "brk-plus") {
+        const p = editingPlan();
+        if (!p) return;
+        await patchEditing({ fields: plusOneMinute(normalizePlan(p).fields) });
+        renderPreview();
+      } else if (act === "brk-hide") await hideBreak();
       else if (act === "class-action") {
         // Den öppna planeringen förväljs som lektion (issue #34); utan
         // datum → den pågående lektionen enligt schemat.
@@ -1815,6 +1832,8 @@ export default {
         const on = e.target.checked;
         const minEl = fieldsEl.querySelector('[data-el="break-min"]');
         if (minEl) minEl.hidden = !on;
+        const plusEl = fieldsEl.querySelector('[data-el="brk-plus"]');
+        if (plusEl) plusEl.hidden = !on;
         const np = normalizePlan(p);
         const next = on
           ? enableBreakFields({ ...np, fields: { ...fields, efterRastenTimer: true } }, serverNow())

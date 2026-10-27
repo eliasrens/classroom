@@ -406,6 +406,10 @@
 .field-edit__break[hidden] { display: none; }
 .field-edit__break textarea { margin-top: 0; }
 .field-edit__min { max-width: 7rem; }
+/* "+1 min" / "Dölj nu" (issue #144) — sist på raden, samma höjd som fälten. */
+.field-edit__break-acts { display: inline-flex; gap: var(--space-1); margin-left: auto; }
+.field-edit__break-acts .btn { padding-inline: var(--space-2); white-space: nowrap; }
+.field-edit__break-acts .btn[hidden] { display: none; }
 /* Issue #139: rubrikvalet ("Efter rasten"/"Efter pausen") bredvid minuterna. */
 .field-edit__break-row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-end; }
 /* "Visa timer" (issue #139): utan timer döljs Minuter. */
@@ -553,7 +557,7 @@
 /* Issue #138: utan bottenrad går mittenkolumnen ända ner till tavlans ram,
    och med rutan får sista steget sluta vid ramen — fältets luft under det
    ska inte tvinga Lektionsordning att krympa. */
-.lesson-board:not(:has(> .lb-bottom)) .lb-col--mid:has(> .lb-break) > .lb-field--attGora { padding-bottom: 0; }
+.lesson-board:not(:has(> .lb-bottom)) .lb-col--mid:has(> .lb-break:not(.lb-break--off)) > .lb-field--attGora { padding-bottom: 0; }
 
 /* ---- EFTER RASTEN (issue #132) — överst i mittenkolumnen ----
    Tydligt annorlunda än de andra fälten: tjock ram i ämnesfärgen, rundade
@@ -561,8 +565,9 @@
    js/lib/color.js); etikett och timer i --lb-break-ink, som klarar AA mot
    just den tonen. Pappret är vitt i alla teman, så det gäller ljust, mörkt
    och elevtemat. Nedräkningen står i rubrikraden uppe till höger — texten
-   börjar under den och täcks aldrig. Lärarens knappar ligger på en egen
-   liten rad nederst till höger. tabular-nums ger fast bredd, så sekundticket aldrig ändrar
+   börjar under den och täcks aldrig. Lärarens "+1 min"/"Dölj nu" sitter i
+   sidopanelen (issue #144), så rutan är densamma i båda vyerna.
+   tabular-nums ger fast bredd, så sekundticket aldrig ändrar
    layouten (och aldrig anpassar om texten).
    Tavlans storlek, kolumnbredder och --lb-scale beror inte på rutan
    (issue #134) — när den tonas bort (lb-break-out) flyttar bara
@@ -581,6 +586,11 @@
   overflow: hidden;
   font-size: calc(1em * var(--lb-break-scale, 1));
 }
+/* Under fitBoards steg 1 (tavlans skala utan rutan) är rutan bortmätt med
+   klassen lb-break--off: #138-regeln ovan (stegfältets luft) gäller då inte,
+   så --lb-scale blir exakt som utan ruta (issue #144). Efter .lb-break så
+   att den vinner över display: flex. */
+.lb-break.lb-break--off { display: none; }
 /* Rubrikraden: etiketten till vänster, nedräkningen till höger. I en smal
    mittenkolumn bryts etiketten hellre på två rader än att hela tavlans
    text krymps för den stora timerns skull. */
@@ -601,8 +611,8 @@
   align-items: center;
   gap: 0.15em;
   font-size: 2.1em;
-  /* Inte 1: siffrornas glyfer sticker då ut ur raden och fitBoard tror
-     att rubrikraden svämmar över. */
+  /* Siffrornas glyfer sticker ut ur raden (med Segoe UI på Windows även
+     vid 1.2) — fitBoard mäter därför block, inte scrollHeight (issue #144). */
   line-height: 1.2;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -610,23 +620,6 @@
   color: var(--lb-break-ink, var(--subj-deep));
 }
 .lb-break__time .icon { width: 0.8em; height: 0.8em; }
-/* "+1 min" / "Dölj nu" — små lärarknappar (teacher-only, aldrig i elevvyn). */
-.lb-break__tools { flex: none; align-self: flex-end; display: flex; gap: 0.3em; }
-.lb-break__btn {
-  padding: 0.15em 0.45em;
-  border: 1px solid color-mix(in srgb, var(--lb-break-ink, var(--subj)) 45%, transparent);
-  border-radius: var(--radius-s);
-  background: var(--lb-paper);
-  color: var(--lb-break-ink, var(--lb-ink));
-  font: inherit;
-  font-size: 0.5em;
-  font-weight: 600;
-  line-height: 1.2;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.lb-break__btn:hover { background: var(--lb-break-bg, var(--lb-paper)); }
-.lb-break__btn:focus-visible { outline: 2px solid var(--lb-break-ink, var(--subj)); outline-offset: 1px; }
 .lb-break--leaving { animation: lb-break-out 0.5s ease forwards; pointer-events: none; }
 @keyframes lb-break-out { to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
