@@ -716,10 +716,10 @@ export default {
       let frame = 0;
       const ro = new ResizeObserver(() => {
         cancelAnimationFrame(frame);
-        frame = requestAnimationFrame(() => refitBoard(stage, praiseBoard));
+        frame = requestAnimationFrame(() => refitBoard(stage, { board: praiseBoard }));
       });
       ro.observe(stage);
-      document.fonts?.ready?.then(() => refitBoard(stage, praiseBoard));
+      document.fonts?.ready?.then(() => refitBoard(stage, { board: praiseBoard }));
       this._offs.push(() => { cancelAnimationFrame(frame); ro.disconnect(); });
     };
 
@@ -736,7 +736,7 @@ export default {
       const stage = el.querySelector(".lesson-stage-student");
       // "Efter rasten": elevvyn döljer rutan själv när tiden är ute men
       // skriver aldrig — urbockningen kommer från lärarvyn via sync.
-      const brk = createBreakState({ teacher: false, refit: () => refitBoard(stage, praiseBoard) });
+      const brk = createBreakState({ teacher: false, refit: () => refitBoard(stage, { board: praiseBoard }) });
       this._offs.push(() => brk.destroy());
       const renderStudent = () => {
         if (!stage.isConnected) return;
@@ -1328,7 +1328,7 @@ export default {
     observeStage(stageEl);
 
     // ---- "Efter rasten" (issue #132) i förhandsvisningen ----
-    const brk = createBreakState({ teacher: true, refit: () => refitBoard(stageEl, praiseBoard) });
+    const brk = createBreakState({ teacher: true, refit: () => refitBoard(stageEl, { board: praiseBoard }) });
     this._offs.push(() => brk.destroy());
     // Urbockningen när tiden är ute: bara härifrån (lärarvyn), en gång.
     // Var vyn stängd när tiden gick ut sker den när planeringen öppnas igen.
