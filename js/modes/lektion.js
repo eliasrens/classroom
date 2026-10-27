@@ -366,8 +366,10 @@ function boardHTML(rawPlan, subjects, { praise = false, breakBox = "" } = {}) {
    kolumnen krymps bara Lektionsordnings text (--lb-steps-scale), i
    reservfallet även rutans (--lb-break-scale) — logiken i
    js/lib/board-fit.js. Gränsen är sista stegets underkant mot kolumnens
-   nederkant — utan bottenrad tavlans ram (issue #138). Nedräkningens sekundtick byter bara text med
-   fast bredd och anpassar aldrig om.
+   nederkant — utan bottenrad tavlans ram (issue #138). Lärarens knapprad
+   i rutan mäts bort, så förhandsvisningen får elevskärmens skalor; raden
+   får sedan plats genom rutans egen skala (issue #142). Nedräkningens
+   sekundtick byter bara text med fast bredd och anpassar aldrig om.
    Utan Lektionsordning (issue #136) har rutan en egen smal kolumn
    (.lb-col--break-only). Den tas ut ur tavlan under sökningen, så
    --lb-scale är samma som utan rutan; sedan får kolumnen bredd efter
@@ -468,16 +470,30 @@ function fitBoard(fitEl, praiseBoard = null) {
   // Sista steget mäts mot kolumnens nederkant — utan bottenraden tavlans
   // inre ram (issue #138; fältets luft under steget tas bort i CSS).
   const lastStep = stepsEl?.querySelector(".lb-steps > li:last-child");
-  const { steps, brk } = fitMidColumn({
-    // Lektionsordning krymps bara när kolumnens innehåll når förbi dess
-    // nederkant — ett horisontellt överflöd i rutan (t.ex. den stora
-    // timern) är rutans sak, inte stegens.
-    fits: () => !overflows(midEl, null, { x: false })
-      && (!lastStep || stepsWithin(lastStep.getBoundingClientRect().bottom, midEl.getBoundingClientRect().bottom)),
-    breakFits: () => !overflows(breakEl),
+  // Lektionsordning krymps bara när kolumnens innehåll når förbi dess
+  // nederkant — ett horisontellt överflöd i rutan (t.ex. den stora
+  // timern) är rutans sak, inte stegens.
+  const fits = () => !overflows(midEl, null, { x: false })
+    && (!lastStep || stepsWithin(lastStep.getBoundingClientRect().bottom, midEl.getBoundingClientRect().bottom));
+  const breakFits = () => !overflows(breakEl);
+  const setBreak = setVar("--lb-break-scale");
+  // Lärarens knappar ("+1 min"/"Dölj nu") finns bara i förhandsvisningen
+  // och gjorde rutan en rad högre där än på elevskärmen, så samma planering
+  // fick olika skalor (issue #142). De mäts bort: Lektionsordning och rutan
+  // får exakt elevskärmens skalor …
+  const toolsEl = breakEl.querySelector(".lb-break__tools");
+  if (toolsEl) toolsEl.style.display = "none";
+  let { steps, brk } = fitMidColumn({
+    fits, breakFits,
     setSteps: stepsEl ? setVar("--lb-steps-scale") : () => {},
-    setBreak: setVar("--lb-break-scale"),
+    setBreak,
   });
+  if (toolsEl) {
+    // … och raden får sedan plats genom att bara rutans egen text krymps
+    // (som i reservfallet), aldrig Lektionsordning. Elevskärmen påverkas inte.
+    toolsEl.style.removeProperty("display");
+    brk = searchScale(brk, () => fits() && breakFits(), setBreak);
+  }
   midEl.dataset.stepsScale = steps.toFixed(2);
   if (brk < 1) midEl.dataset.breakScale = brk.toFixed(2);
 }
