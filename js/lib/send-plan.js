@@ -52,7 +52,8 @@ export function buildCopy(plan, when = {}, uid = currentUid()) {
     subjectId: src.subjectId ?? "so",
     start: when.start ?? src.start ?? "",
     end: when.end ?? src.end ?? "",
-    // Alla fält följer med, även "Efter rasten" (text + minuter, issue #132)
+    // Alla fält följer med, även "Efter rasten" (text + minuter, issue #132;
+    // rubrikens ord, issue #139)
     // — men inte nedräkningens körtillstånd ("+1 min", omstart).
     fields: resetBreakRun(clone(src.fields)),
     show: clone(src.show),

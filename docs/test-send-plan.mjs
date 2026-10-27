@@ -109,6 +109,21 @@ const SRC = {
     "Efter rasten: fälten sparas i målklassen");
 }
 
+// --- rubrikens ord, "Efter pausen" (issue #139) ------------------------------
+{
+  const src = { ...SRC, fields: { ...SRC.fields, efterRasten: "- Läsa", efterRastenOrd: "pausen" }, show: { ...SRC.show, efterRasten: true } };
+  const c = buildCopy(src, { date: "2026-09-30" });
+  ok(c.fields.efterRastenOrd === "pausen", "Efter pausen: ordet följer med i kopian");
+  const data = fakeData({ [plansPath("4b")]: [] });
+  const [id] = await sendPlanCopies(data, { targetCid: "4b", copies: [c], subjects: SUBJECTS });
+  const saved = await data.get(plansPath("4b"), id);
+  ok(saved.fields.efterRastenOrd === "pausen", "Efter pausen: ordet sparas i målklassen");
+  const noTimer = buildCopy({ ...src, fields: { ...src.fields, efterRastenTimer: false } }, { date: "2026-09-30" });
+  ok(noTimer.fields.efterRastenTimer === false, "timer av: valet följer med i kopian");
+  const old = buildCopy(SRC, { date: "2026-09-30" });
+  ok(!("efterRastenOrd" in (old.fields ?? {})) || old.fields.efterRastenOrd === "rasten", "gammal planering utan ordet: inget pausen dyker upp");
+}
+
 // --- datum och tider från dialogen ------------------------------------------
 {
   const c = buildCopy(SRC, { date: "2026-10-01", start: "10:10", end: "11:00" });

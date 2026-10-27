@@ -406,6 +406,11 @@
 .field-edit__break[hidden] { display: none; }
 .field-edit__break textarea { margin-top: 0; }
 .field-edit__min { max-width: 7rem; }
+/* Issue #139: rubrikvalet ("Efter rasten"/"Efter pausen") bredvid minuterna. */
+.field-edit__break-row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-end; }
+/* "Visa timer" (issue #139): utan timer döljs Minuter. */
+.field-edit__timer { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 2.25rem; font-size: 0.8rem; cursor: pointer; }
+.lesson-panel label.field-edit__min[hidden] { display: none; }
 
 /* ============================================================
    TAVLAN — 6-fältslayout. Delas av lärarförhandsvisning och elevvy.
@@ -585,6 +590,9 @@
    rad under etiketten än att etiketten bryts mitt i ett ord bakom timern. */
 .lb-col--break-only .lb-break__head { flex-wrap: wrap; row-gap: 0; }
 .lb-col--break-only .lb-break__head > .lb-field__label { min-width: auto; }
+/* Utan timer (issue #139) står etiketten på en rad, som med timern: ryms
+   den inte krymps rutans text (--lb-break-scale) i stället. */
+.lb-col--break-only .lb-break[data-phase="off"] .lb-break__head > .lb-field__label { white-space: nowrap; }
 .lb-break__text { margin: 0; }
 /* Ungefär dubbelt så hög som brödtexten (1.08em i mittenkolumnen). */
 .lb-break__time {
