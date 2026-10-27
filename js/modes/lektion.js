@@ -286,14 +286,12 @@ function breakBoxHTML(plan, now, { teacher = false, leavingMs = null } = {}) {
       </div>`
     : "";
   return `<div class="lb-break${leaving ? " lb-break--leaving" : ""}" data-phase="${c.phase}"${leaving ? ` style="animation-delay:${-Math.round(leavingMs)}ms"` : ""}>
-    <div class="lb-break__main">
+    <div class="lb-break__head">
       <div class="lb-field__label">${esc(PARTS.find((p) => p.key === "efterRasten").label.toUpperCase())}</div>
-      <div class="lb-field__body lb-break__body">${body}</div>
-    </div>
-    <div class="lb-break__side">
       <div class="lb-break__time" role="timer" aria-label="Tid kvar">${icon("clock")}<span data-el="brk-time">${c.text}</span></div>
-      ${tools}
     </div>
+    <div class="lb-field__body lb-break__body">${body}</div>
+    ${tools}
   </div>`;
 }
 
@@ -361,7 +359,7 @@ const FIT_MIN = 0.45;
 const FIT_PRECISION = 0.01;
 
 function boardOverflows(boardEl) {
-  const nodes = [boardEl, ...boardEl.querySelectorAll(".lb-top, .lb-break, .lb-field__body")];
+  const nodes = [boardEl, ...boardEl.querySelectorAll(".lb-top, .lb-break, .lb-break__head, .lb-field__body")];
   return nodes.some((n) => n.scrollHeight > n.clientHeight + 1 || n.scrollWidth > n.clientWidth + 1);
 }
 
@@ -492,9 +490,11 @@ function tickBreak(container, brk, rawPlan, rerender) {
   const plan = normalizePlan(rawPlan);
   const now = serverNow();
   if (brk.shownFor !== plan.id || !breakVisible(plan, now)) { rerender(); return; }
-  const timeEl = container.querySelector('.lb-break:not(.lb-break--leaving) [data-el="brk-time"]');
-  const text = breakCountdown(plan, now).text;
-  if (timeEl && timeEl.textContent !== text) timeEl.textContent = text;
+  const box = container.querySelector(".lb-break:not(.lb-break--leaving)");
+  const timeEl = box?.querySelector('[data-el="brk-time"]');
+  const c = breakCountdown(plan, now);
+  if (timeEl && timeEl.textContent !== c.text) timeEl.textContent = c.text;
+  if (box && box.dataset.phase !== c.phase) box.dataset.phase = c.phase;
 }
 
 /** Anpassa om efter storleksändring (samma innehåll). */
