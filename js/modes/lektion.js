@@ -467,7 +467,10 @@ function fitBoard(fitEl, praiseBoard = null) {
   //    tas hela kolumnen ut, så tavlan mäts exakt som samma planering utan rutan.
   const midSpot = breakOnly ? [midEl.parentElement, midEl.nextSibling] : null;
   if (breakOnly) midEl.remove();
-  else if (breakEl) breakEl.style.display = "none";
+  // Klassen (inte bara display:none) så att #138-regeln i CSS (stegfältets
+  // luft tas bort när rutan står i kolumnen) inte gäller under mätningen —
+  // annars blev --lb-scale olika med och utan ruta (issue #144).
+  else if (breakEl) breakEl.classList.add("lb-break--off");
   let scale = searchScale(1, () => !overflows(boardEl), setScale);
   if (withPraise) {
     praiseBoard.fit();
@@ -483,7 +486,7 @@ function fitBoard(fitEl, praiseBoard = null) {
     return;
   }
   if (!breakEl) return;
-  breakEl.style.display = "";
+  breakEl.classList.remove("lb-break--off");
 
   // 2. Rutan + Lektionsordning i mittenkolumnen: bara de krymps.
   const setVar = (name) => (s) => {

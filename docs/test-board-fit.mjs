@@ -254,5 +254,22 @@ function glyphColumn({ box, steps, room, glyph }) {
   ok(stepsWithin(672.9, 672.5) && !stepsWithin(674, 672.5), "#144: 1 px tolerans för subpixel, inte mer");
 }
 
+// --- Steg 1 mäts exakt som utan ruta (issue #144) ---------------------------------
+// #138-regeln (stegfältets luft tas bort när rutan står i kolumnen) matchade
+// även en ruta som bara var display:none under fitBoards steg 1, så
+// --lb-scale blev 0.923 med ruta mot 0.897 utan (8 steg). Rutan mäts därför
+// bort med klassen lb-break--off, som regeln utesluter. Kontrollen läser
+// CSS:en och fitBoard eftersom logiken sitter i väljaren, inte i board-fit.js.
+{
+  const { readFileSync } = await import("node:fs");
+  const css = readFileSync(new URL("../css/modes/lektion.css", import.meta.url), "utf8");
+  const js = readFileSync(new URL("../js/modes/lektion.js", import.meta.url), "utf8");
+  const rule = css.match(/\.lesson-board:not\(:has\(> \.lb-bottom\)\) \.lb-col--mid:has\((.*?)\) > \.lb-field--attGora \{ padding-bottom: 0; \}/);
+  ok(rule && rule[1] === "> .lb-break:not(.lb-break--off)", `#144: #138-regeln utesluter rutan som är bortmätt (lb-break--off) (fick ${rule?.[1]})`);
+  ok(/\.lb-break\.lb-break--off \{ display: none; \}/.test(css), "#144: lb-break--off döljer rutan");
+  ok(/breakEl\.classList\.add\("lb-break--off"\)/.test(js) && /breakEl\.classList\.remove\("lb-break--off"\)/.test(js), "#144: fitBoard mäter bort rutan med klassen under steg 1 och tar bort den efteråt");
+  ok(!/breakEl\.style\.display/.test(js), "#144: … inte med display:none (som #138-regeln fortfarande matchar)");
+}
+
 console.log(`\n${passed} OK, ${failed} fel`);
 if (failed > 0) process.exit(1);

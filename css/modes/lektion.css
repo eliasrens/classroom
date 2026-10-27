@@ -557,7 +557,7 @@
 /* Issue #138: utan bottenrad går mittenkolumnen ända ner till tavlans ram,
    och med rutan får sista steget sluta vid ramen — fältets luft under det
    ska inte tvinga Lektionsordning att krympa. */
-.lesson-board:not(:has(> .lb-bottom)) .lb-col--mid:has(> .lb-break) > .lb-field--attGora { padding-bottom: 0; }
+.lesson-board:not(:has(> .lb-bottom)) .lb-col--mid:has(> .lb-break:not(.lb-break--off)) > .lb-field--attGora { padding-bottom: 0; }
 
 /* ---- EFTER RASTEN (issue #132) — överst i mittenkolumnen ----
    Tydligt annorlunda än de andra fälten: tjock ram i ämnesfärgen, rundade
@@ -586,6 +586,11 @@
   overflow: hidden;
   font-size: calc(1em * var(--lb-break-scale, 1));
 }
+/* Under fitBoards steg 1 (tavlans skala utan rutan) är rutan bortmätt med
+   klassen lb-break--off: #138-regeln ovan (stegfältets luft) gäller då inte,
+   så --lb-scale blir exakt som utan ruta (issue #144). Efter .lb-break så
+   att den vinner över display: flex. */
+.lb-break.lb-break--off { display: none; }
 /* Rubrikraden: etiketten till vänster, nedräkningen till höger. I en smal
    mittenkolumn bryts etiketten hellre på två rader än att hela tavlans
    text krymps för den stora timerns skull. */
