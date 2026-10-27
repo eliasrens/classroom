@@ -406,6 +406,10 @@
 .field-edit__break[hidden] { display: none; }
 .field-edit__break textarea { margin-top: 0; }
 .field-edit__min { max-width: 7rem; }
+/* "+1 min" / "Dölj nu" (issue #144) — sist på raden, samma höjd som fälten. */
+.field-edit__break-acts { display: inline-flex; gap: var(--space-1); margin-left: auto; }
+.field-edit__break-acts .btn { padding-inline: var(--space-2); white-space: nowrap; }
+.field-edit__break-acts .btn[hidden] { display: none; }
 /* Issue #139: rubrikvalet ("Efter rasten"/"Efter pausen") bredvid minuterna. */
 .field-edit__break-row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-end; }
 /* "Visa timer" (issue #139): utan timer döljs Minuter. */
@@ -561,8 +565,9 @@
    js/lib/color.js); etikett och timer i --lb-break-ink, som klarar AA mot
    just den tonen. Pappret är vitt i alla teman, så det gäller ljust, mörkt
    och elevtemat. Nedräkningen står i rubrikraden uppe till höger — texten
-   börjar under den och täcks aldrig. Lärarens knappar ligger på en egen
-   liten rad nederst till höger. tabular-nums ger fast bredd, så sekundticket aldrig ändrar
+   börjar under den och täcks aldrig. Lärarens "+1 min"/"Dölj nu" sitter i
+   sidopanelen (issue #144), så rutan är densamma i båda vyerna.
+   tabular-nums ger fast bredd, så sekundticket aldrig ändrar
    layouten (och aldrig anpassar om texten).
    Tavlans storlek, kolumnbredder och --lb-scale beror inte på rutan
    (issue #134) — när den tonas bort (lb-break-out) flyttar bara
@@ -610,23 +615,6 @@
   color: var(--lb-break-ink, var(--subj-deep));
 }
 .lb-break__time .icon { width: 0.8em; height: 0.8em; }
-/* "+1 min" / "Dölj nu" — små lärarknappar (teacher-only, aldrig i elevvyn). */
-.lb-break__tools { flex: none; align-self: flex-end; display: flex; gap: 0.3em; }
-.lb-break__btn {
-  padding: 0.15em 0.45em;
-  border: 1px solid color-mix(in srgb, var(--lb-break-ink, var(--subj)) 45%, transparent);
-  border-radius: var(--radius-s);
-  background: var(--lb-paper);
-  color: var(--lb-break-ink, var(--lb-ink));
-  font: inherit;
-  font-size: 0.5em;
-  font-weight: 600;
-  line-height: 1.2;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.lb-break__btn:hover { background: var(--lb-break-bg, var(--lb-paper)); }
-.lb-break__btn:focus-visible { outline: 2px solid var(--lb-break-ink, var(--subj)); outline-offset: 1px; }
 .lb-break--leaving { animation: lb-break-out 0.5s ease forwards; pointer-events: none; }
 @keyframes lb-break-out { to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
