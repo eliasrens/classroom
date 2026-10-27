@@ -13,9 +13,11 @@
  *     behövs (sidokolumnerna klipps aldrig); rutans text krymps med egen skala
  *   - fitMidColumn (#136): kolumn som redan ryms ger steps = 1; horisontellt
  *     överflöd i rutan krymper inte Lektionsordning
+ *   - ingen bottenrad (#138): sista steget får sluta vid tavlans ram; få steg
+ *     krymps inte, många steg bara så att sista steget slutar vid ramen
  */
 
-const { FIT_MIN, FIT_PRECISION, searchScale, fitMidColumn, fitBreakColumn } = await import("../js/lib/board-fit.js");
+const { FIT_MIN, FIT_PRECISION, searchScale, fitMidColumn, fitBreakColumn, stepsWithin } = await import("../js/lib/board-fit.js");
 
 let failed = 0;
 let passed = 0;
@@ -173,6 +175,44 @@ function breakCol({ sides, box, row = 1000, scale = 1 }) {
   const c = breakCol({ sides: 800, box: 100 });
   const r = fitBreakColumn({ want: 160, floor: 160, ...c });
   ok(r.width === 160 && r.brk === 1 && r.scale === 1, "want = floor → bredden står kvar");
+}
+
+// --- Ingen bottenrad (issue #138) -----------------------------------------------
+// Utan "Du behöver"/"Mål" går mittenkolumnen ända ner till tavlans ram
+// (inre nederkant 1057 px, uppmätt på elevskärmen 1920×1080). Gränsen är
+// sista stegets underkant mot ramen — fältets luft under steget räknas inte.
+{
+  ok(stepsWithin(1057, 1057) && stepsWithin(1057.6, 1057), "steget som slutar vid ramen ryms (avrundning)");
+  ok(!stepsWithin(1060, 1057), "steget som går förbi ramen ryms inte");
+}
+// Kolumn utan bottenrad: rutan tar 520 px från kolumnens topp (187), Lektionsordning
+// (rubrik + steg) är `steps` px hög vid skala 1 och har 24 px luft under sig.
+function noBottomRow({ steps, frame = 1057, top = 187, box = 520, pad = 24 }) {
+  const st = { steps: 1, brk: 1 };
+  const lastStep = () => top + box * st.brk + steps * st.steps;
+  return {
+    st, lastStep, pad,
+    fits: () => stepsWithin(lastStep(), frame),
+    setSteps: (v) => { st.steps = v; },
+    setBreak: (v) => { st.brk = v; },
+  };
+}
+{
+  // Sista steget slutar exakt vid ramen: ryms — även om fältets luft under
+  // steget (24 px) inte gör det.
+  const c = noBottomRow({ steps: 1057 - 187 - 520 });
+  const r = fitMidColumn(c);
+  ok(r.steps === 1 && r.brk === 1, "få steg, ingen bottenrad: Lektionsordning krymps inte");
+  ok(c.lastStep() + c.pad > 1057, "… fast fältets luft under steget skulle ha gått förbi ramen");
+}
+{
+  // Många steg: krymps bara så att sista steget slutar vid ramen.
+  const c = noBottomRow({ steps: 600 });
+  const r = fitMidColumn(c);
+  const need = (1057 - 187 - 520) / 600;
+  ok(r.brk === 1, "många steg: rutan rörs inte");
+  ok(r.steps <= need + 1 / 600 && r.steps > need - FIT_PRECISION, `… stegen krymps bara så mycket som behövs (fick ${r.steps}, behövs ${need.toFixed(3)})`);
+  ok(1057 - c.lastStep() < 600 * FIT_PRECISION + 1, "… sista steget slutar vid ramen");
 }
 
 console.log(`\n${passed} OK, ${failed} fel`);

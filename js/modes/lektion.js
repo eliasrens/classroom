@@ -100,7 +100,7 @@ import {
   plansPath as plansPathFor, currentUid,
   lessonSettingsPath, LESSON_SETTINGS_DOC, getEditingPlanId, setEditingPlanId, presentedPlanOf,
 } from "../data/plans.js";
-import { fitBreakColumn, fitMidColumn, searchScale } from "../lib/board-fit.js";
+import { fitBreakColumn, fitMidColumn, searchScale, stepsWithin } from "../lib/board-fit.js";
 import { createPraiseBoard } from "../ui/praise-board.js";
 import { praiseEditorHTML, mountPraiseEditor } from "../ui/praise-editor.js";
 import { normalize as normalizeMorning, PRAISE_DOC, praisePath, currentPraise } from "../lib/morning.js";
@@ -362,7 +362,8 @@ function boardHTML(rawPlan, subjects, { praise = false, breakBox = "" } = {}) {
    den som samma planering utan rutan får. Ryms sedan inte mitten-
    kolumnen krymps bara Lektionsordnings text (--lb-steps-scale), i
    reservfallet även rutans (--lb-break-scale) — logiken i
-   js/lib/board-fit.js. Nedräkningens sekundtick byter bara text med
+   js/lib/board-fit.js. Gränsen är sista stegets underkant mot kolumnens
+   nederkant — utan bottenrad tavlans ram (issue #138). Nedräkningens sekundtick byter bara text med
    fast bredd och anpassar aldrig om.
    Utan Lektionsordning (issue #136) har rutan en egen smal kolumn
    (.lb-col--break-only). Den tas ut ur tavlan under sökningen, så
@@ -461,11 +462,15 @@ function fitBoard(fitEl, praiseBoard = null) {
     if (s >= 1) midEl.style.removeProperty(name);
     else midEl.style.setProperty(name, s.toFixed(3));
   };
+  // Sista steget mäts mot kolumnens nederkant — utan bottenraden tavlans
+  // inre ram (issue #138; fältets luft under steget tas bort i CSS).
+  const lastStep = stepsEl?.querySelector(".lb-steps > li:last-child");
   const { steps, brk } = fitMidColumn({
     // Lektionsordning krymps bara när kolumnens innehåll når förbi dess
     // nederkant — ett horisontellt överflöd i rutan (t.ex. den stora
     // timern) är rutans sak, inte stegens.
-    fits: () => !overflows(midEl, null, { x: false }),
+    fits: () => !overflows(midEl, null, { x: false })
+      && (!lastStep || stepsWithin(lastStep.getBoundingClientRect().bottom, midEl.getBoundingClientRect().bottom)),
     breakFits: () => !overflows(breakEl),
     setSteps: stepsEl ? setVar("--lb-steps-scale") : () => {},
     setBreak: setVar("--lb-break-scale"),
