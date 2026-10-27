@@ -36,22 +36,27 @@ export function searchScale(hi, fits, set, { min = FIT_MIN, precision = FIT_PREC
 
 /**
  * Mittenkolumnen med "Efter rasten"-rutan, efter att tavlans skala redan är
- * satt (räknad utan rutan). `fits()` = ryms kolumnen (ruta + Lektionsordning);
- * `setSteps`/`setBreak` sätter Lektionsordnings resp. rutans egen skala.
+ * satt (räknad utan rutan). `fits()` = når kolumnens innehåll (ruta +
+ * Lektionsordning) inte förbi dess nederkant; `breakFits()` (valfri) = ryms
+ * rutan på bredden också. `setSteps`/`setBreak` sätter Lektionsordnings
+ * (rubrik + steg) resp. rutans egen skala.
  *
  * 1. Ryms allt redan: båda står på 1 — inget krymps i onödan.
- * 2. Annars krymps bara Lektionsordning (binärsökning i [min, 1]).
- * 3. Reserv: ryms kolumnen inte ens med Lektionsordning på `min` krymps
- *    rutans text också — men fortfarande bara i mittenkolumnen, aldrig
- *    resten av tavlan.
+ * 2. Annars krymps bara Lektionsordning (binärsökning i [min, 1]), precis
+ *    så mycket att sista steget slutar vid nederkanten.
+ * 3. Reserv: ryms kolumnen inte ens med Lektionsordning på `min` (eller är
+ *    rutan för bred) krymps rutans text också — men fortfarande bara i
+ *    mittenkolumnen, aldrig resten av tavlan. Plats som rutans krympning
+ *    frigör går tillbaka till Lektionsordning (issue #136).
  *
  * → { steps, brk } — skalorna som sattes.
  */
-export function fitMidColumn({ fits, setSteps, setBreak, min = FIT_MIN, precision = FIT_PRECISION }) {
+export function fitMidColumn({ fits, breakFits = () => true, setSteps, setBreak, min = FIT_MIN, precision = FIT_PRECISION }) {
   setBreak(1);
-  const steps = searchScale(1, fits, setSteps, { min, precision });
-  if (steps > min || fits()) return { steps, brk: 1 };
-  const brk = searchScale(1, fits, setBreak, { min, precision });
+  let steps = searchScale(1, fits, setSteps, { min, precision });
+  if (breakFits() && (steps > min || fits())) return { steps, brk: 1 };
+  const brk = searchScale(1, () => fits() && breakFits(), setBreak, { min, precision });
+  if (brk < 1) steps = searchScale(1, fits, setSteps, { min, precision });
   return { steps, brk };
 }
 

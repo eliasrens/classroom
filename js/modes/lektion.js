@@ -378,10 +378,13 @@ const BREAK_COL_FLOOR = 0.16;
 
 const OVERFLOW_NODES = ".lb-top, .lb-break, .lb-break__head, .lb-field__body";
 
-/** Svämmar något över? `skip` (valfri) = ett delträd som inte räknas. */
-function overflows(el, skip = null) {
+/**
+ * Svämmar något över? `skip` (valfri) = ett delträd som inte räknas;
+ * `x: false` = bara på höjden.
+ */
+function overflows(el, skip = null, { x = true } = {}) {
   const nodes = [el, ...el.querySelectorAll(OVERFLOW_NODES)].filter((n) => !skip?.contains(n));
-  return nodes.some((n) => n.scrollHeight > n.clientHeight + 1 || n.scrollWidth > n.clientWidth + 1);
+  return nodes.some((n) => n.scrollHeight > n.clientHeight + 1 || (x && n.scrollWidth > n.clientWidth + 1));
 }
 
 /** Bredden kolumnen behöver för att rutans rubrikrad (etikett + timer) ska stå på en rad. */
@@ -454,7 +457,11 @@ function fitBoard(fitEl, praiseBoard = null) {
     else midEl.style.setProperty(name, s.toFixed(3));
   };
   const { steps, brk } = fitMidColumn({
-    fits: () => !overflows(midEl),
+    // Lektionsordning krymps bara när kolumnens innehåll når förbi dess
+    // nederkant — ett horisontellt överflöd i rutan (t.ex. den stora
+    // timern) är rutans sak, inte stegens.
+    fits: () => !overflows(midEl, null, { x: false }),
+    breakFits: () => !overflows(breakEl),
     setSteps: stepsEl ? setVar("--lb-steps-scale") : () => {},
     setBreak: setVar("--lb-break-scale"),
   });

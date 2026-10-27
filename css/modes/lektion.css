@@ -539,9 +539,11 @@
 .lb-col--mid .lb-field__body { font-size: 1.08em; }
 /* Issue #134: "Efter rasten"-rutan krymper aldrig hela tavlan. Ryms inte
    mittenkolumnen sätter fitBoard() --lb-steps-scale (< 1) på kolumnen, och
-   bara Lektionsordnings text blir mindre; i reservfallet även
+   bara Lektionsordnings text (och rubrik) blir mindre; i reservfallet även
    --lb-break-scale på rutan. Utan rutan är båda 1. */
 .lb-col--mid .lb-field--attGora > .lb-field__body { font-size: calc(1.08em * var(--lb-steps-scale, 1)); }
+/* Issue #136: rubriken LEKTIONSORDNING krymper lika mycket som stegen. */
+.lb-col--mid .lb-field--attGora > .lb-field__label { font-size: calc(0.9em * var(--lb-steps-scale, 1)); }
 
 /* ---- EFTER RASTEN (issue #132) — överst i mittenkolumnen ----
    Tydligt annorlunda än de andra fälten: tjock ram i ämnesfärgen, rundade

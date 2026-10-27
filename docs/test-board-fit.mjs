@@ -95,6 +95,28 @@ function column({ box, steps, room }) {
   ok(r.brk < 1 && 120 * r.brk <= 100, "bara rutan i kolumnen → rutan krymps i reserv");
 }
 
+{
+  // Issue #136: ryms kolumnen på höjden står Lektionsordning på 1, även med rutan.
+  const c = column({ box: 45, steps: 55, room: 100 });
+  const r = fitMidColumn({ ...c, breakFits: () => true });
+  ok(r.steps === 1 && r.brk === 1 && c.st.sets.every(([, v]) => v === 1), "#136: kolumn som redan ryms → steps = 1, inget sätts under 1");
+}
+{
+  // Rutan för bred (t.ex. timern) men kolumnen ryms på höjden → bara rutan krymps.
+  const c = column({ box: 30, steps: 60, room: 100 });
+  const r = fitMidColumn({ ...c, breakFits: () => c.st.brk <= 0.8 });
+  ok(r.steps === 1, "#136: horisontellt överflöd i rutan krymper inte Lektionsordning");
+  ok(r.brk <= 0.8 && r.brk > 0.8 - FIT_PRECISION, `#136: … rutan krymps precis så mycket som behövs (fick ${r.brk})`);
+}
+{
+  // Reserv: plats som rutans krympning frigör går tillbaka till Lektionsordning.
+  const c = column({ box: 80, steps: 100, room: 100 });
+  const r = fitMidColumn(c);
+  const room = 100 - 80 * r.brk;
+  ok(r.steps > FIT_MIN || room - 100 * FIT_MIN < 100 * FIT_PRECISION, `#136: stegen fyller platsen efter rutans krympning (steps ${r.steps}, brk ${r.brk})`);
+  ok(c.fits() && 80 * r.brk + 100 * (r.steps + FIT_PRECISION) > 100, "#136: … och slutar vid nederkanten (inget stort tomrum)");
+}
+
 // --- fitBreakColumn (issue #136) ----------------------------------------------
 // Mittenraden är 1000 px. Sidokolumnerna ryms om de får minst `sides` px;
 // rutan ryms om dess bredd (natural px vid skala 1) får plats i kolumnen.
