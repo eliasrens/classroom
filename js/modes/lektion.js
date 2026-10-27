@@ -71,7 +71,9 @@
  *   lektionens starttid. När tiden är ute tonas den bort (bara mitten-
  *   kolumnens innehåll flyttar upp — tavlan och övriga kolumner står
  *   still) och fitBoard körs om EFTER toningen, så att texten växer
- *   tillbaka. Lärarvyn bockar då ur delen (en gång); elevvyn skriver
+ *   tillbaka. Rutan krymper aldrig hela tavlan (issue #134): --lb-scale
+ *   räknas utan den, och ryms inte mittenkolumnen krymps bara
+ *   Lektionsordnings text (--lb-steps-scale). Lärarvyn bockar då ur delen (en gång); elevvyn skriver
  *   aldrig. "+1 min" och "Dölj nu" sitter vid rutan i lärarvyn.
  *
  * Kontrakt: docs/MODULKONTRAKT.md. Data: DATAMODELL.md.
@@ -95,6 +97,7 @@ import {
   plansPath as plansPathFor, currentUid,
   lessonSettingsPath, LESSON_SETTINGS_DOC, getEditingPlanId, setEditingPlanId, presentedPlanOf,
 } from "../data/plans.js";
+import { fitMidColumn, searchScale } from "../lib/board-fit.js";
 import { createPraiseBoard } from "../ui/praise-board.js";
 import { praiseEditorHTML, mountPraiseEditor } from "../ui/praise-editor.js";
 import { normalize as normalizeMorning, PRAISE_DOC, praisePath, currentPraise } from "../lib/morning.js";
@@ -350,16 +353,19 @@ function boardHTML(rawPlan, subjects, { praise = false, breakBox = "" } = {}) {
    mot tavlans bredd i CSS) och krymps i små steg via --lb-scale BARA
    om något fält inte ryms. Bra jobbat-rutan anpassar sig själv
    (kolumner, se js/ui/praise-board.js) och räknas inte här.
-   "Efter rasten"-rutan räknas in (dess text är ett .lb-field__body);
-   nedräkningens sekundtick byter bara text med fast bredd och anpassar
-   aldrig om.
+   "Efter rasten"-rutan (issue #134) räknas INTE in i --lb-scale: den
+   mäts bort (display:none) under sökningen, så tavlans skala är exakt
+   den som samma planering utan rutan får. Ryms sedan inte mitten-
+   kolumnen krymps bara Lektionsordnings text (--lb-steps-scale), i
+   reservfallet även rutans (--lb-break-scale) — logiken i
+   js/lib/board-fit.js. Nedräkningens sekundtick byter bara text med
+   fast bredd och anpassar aldrig om.
    ============================================================ */
 
-const FIT_MIN = 0.45;
-const FIT_PRECISION = 0.01;
+const OVERFLOW_NODES = ".lb-top, .lb-break, .lb-break__head, .lb-field__body";
 
-function boardOverflows(boardEl) {
-  const nodes = [boardEl, ...boardEl.querySelectorAll(".lb-top, .lb-break, .lb-break__head, .lb-field__body")];
+function overflows(el) {
+  const nodes = [el, ...el.querySelectorAll(OVERFLOW_NODES)];
   return nodes.some((n) => n.scrollHeight > n.clientHeight + 1 || n.scrollWidth > n.clientWidth + 1);
 }
 
@@ -376,33 +382,48 @@ function praiseFits(praiseBoard) {
  * `praiseBoard` (valfri): rutan i högerkolumnen. Den lägger ut sig själv i
  * kolumner och krymper sin egen text; räcker inte det krymps hela tavlan
  * lite till — alla namn ska alltid synas.
+ * Därefter mittenkolumnen med "Efter rasten"-rutan (fitMidColumn).
  */
 function fitBoard(fitEl, praiseBoard = null) {
   const boardEl = fitEl?.querySelector(".lesson-board");
   if (!boardEl?.isConnected) return;
   const withPraise = praiseBoard && fitEl.contains(praiseBoard.el);
   const setScale = (s) => boardEl.style.setProperty("--lb-scale", s.toFixed(3));
-  const search = (hi, fits) => {
-    setScale(hi);
-    if (fits()) return hi;
-    let lo = FIT_MIN;
-    while (hi - lo > FIT_PRECISION) {
-      const mid = (lo + hi) / 2;
-      setScale(mid);
-      if (fits()) lo = mid; else hi = mid;
-    }
-    setScale(lo);
-    return lo;
-  };
-  let scale = search(1, () => !boardOverflows(boardEl));
+  const midEl = boardEl.querySelector(".lb-col--mid");
+  const breakEl = midEl?.querySelector(".lb-break");
+  const stepsEl = midEl?.querySelector(".lb-field--attGora");
+  // Mittenkolumnens egna skalor börjar om på 1 (även när rutan har tonats bort).
+  midEl?.style.removeProperty("--lb-steps-scale");
+  midEl?.style.removeProperty("--lb-break-scale");
+  if (midEl) { delete midEl.dataset.stepsScale; delete midEl.dataset.breakScale; }
+
+  // 1. Tavlans skala — utan rutan. Kolumnen står kvar (tom om den bara
+  //    hade rutan), så kolumnbredderna är desamma som när rutan syns.
+  if (breakEl) breakEl.style.display = "none";
+  let scale = searchScale(1, () => !overflows(boardEl), setScale);
   if (withPraise) {
     praiseBoard.fit();
     if (!praiseFits(praiseBoard)) {
-      scale = search(scale, () => { praiseBoard.fit(); return praiseFits(praiseBoard); });
+      scale = searchScale(scale, () => { praiseBoard.fit(); return praiseFits(praiseBoard); }, setScale);
       praiseBoard.fit();
     }
   }
   boardEl.dataset.scale = scale.toFixed(2);
+  if (!breakEl) return;
+  breakEl.style.display = "";
+
+  // 2. Rutan + Lektionsordning i mittenkolumnen: bara de krymps.
+  const setVar = (name) => (s) => {
+    if (s >= 1) midEl.style.removeProperty(name);
+    else midEl.style.setProperty(name, s.toFixed(3));
+  };
+  const { steps, brk } = fitMidColumn({
+    fits: () => !overflows(midEl),
+    setSteps: stepsEl ? setVar("--lb-steps-scale") : () => {},
+    setBreak: setVar("--lb-break-scale"),
+  });
+  midEl.dataset.stepsScale = steps.toFixed(2);
+  if (brk < 1) midEl.dataset.breakScale = brk.toFixed(2);
 }
 
 /**
