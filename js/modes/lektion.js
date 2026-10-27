@@ -89,7 +89,7 @@ import { icon } from "../lib/icons.js";
 import { deepTextColor, groupedSubjects, mixHex, readableTextColor, SUBJECTS } from "../lib/color.js";
 import { createTicker } from "../lib/timer.js";
 import {
-  BREAK_MIN_MIN, BREAK_MIN_MAX, BREAK_WORDS, breakBodyHTML, breakCountdown, breakLabel, breakVisible, clampBreakMinutes,
+  BREAK_MIN_MIN, BREAK_MIN_MAX, BREAK_WORDS, breakBodyHTML, breakCountdown, breakHasTimer, breakLabel, breakVisible, clampBreakMinutes,
   createAutoHide, enableBreakFields, normalizeBreakFields, plusOneMinute, resetBreakRun,
 } from "../lib/efter-rasten.js";
 import {
@@ -283,19 +283,21 @@ function fieldHTML(part, plan) {
 const BREAK_FADE_MS = 500;
 
 function breakBoxHTML(plan, now, { teacher = false, leavingMs = null } = {}) {
-  const c = breakCountdown(plan, now);
+  // Utan timer (issue #139): ingen nedräkning, ingen klocka och inget "+1 min".
+  const timer = breakHasTimer(plan.fields);
+  const c = timer ? breakCountdown(plan, now) : { phase: "off", text: "" };
   const body = breakBodyHTML(plan.fields.efterRasten) || `<div class="lb-empty">—</div>`;
   const leaving = leavingMs != null;
   const tools = teacher
     ? `<div class="lb-break__tools teacher-only">
-        <button type="button" class="lb-break__btn" data-act="brk-plus" title="Förläng nedräkningen med en minut"${leaving ? " disabled" : ""}>+1 min</button>
+        ${timer ? `<button type="button" class="lb-break__btn" data-act="brk-plus" title="Förläng nedräkningen med en minut"${leaving ? " disabled" : ""}>+1 min</button>` : ""}
         <button type="button" class="lb-break__btn" data-act="brk-hide" title="Dölj rutan nu — kryssrutan bockas ur"${leaving ? " disabled" : ""}>Dölj nu</button>
       </div>`
     : "";
   return `<div class="lb-break${leaving ? " lb-break--leaving" : ""}" data-phase="${c.phase}"${leaving ? ` style="animation-delay:${-Math.round(leavingMs)}ms"` : ""}>
     <div class="lb-break__head">
       <div class="lb-field__label">${esc(breakLabel(plan.fields).toUpperCase())}</div>
-      <div class="lb-break__time" role="timer" aria-label="Tid kvar">${icon("clock")}<span data-el="brk-time">${c.text}</span></div>
+      ${timer ? `<div class="lb-break__time" role="timer" aria-label="Tid kvar">${icon("clock")}<span data-el="brk-time">${c.text}</span></div>` : ""}
     </div>
     <div class="lb-field__body lb-break__body">${body}</div>
     ${tools}
@@ -591,6 +593,7 @@ function tickBreak(container, brk, rawPlan, rerender) {
   const plan = normalizePlan(rawPlan);
   const now = serverNow();
   if (brk.shownFor !== plan.id || !breakVisible(plan, now)) { rerender(); return; }
+  if (!breakHasTimer(plan.fields)) return;
   const box = container.querySelector(".lb-break:not(.lb-break--leaving)");
   const timeEl = box?.querySelector('[data-el="brk-time"]');
   const c = breakCountdown(plan, now);
@@ -1199,7 +1202,8 @@ export default {
             <label class="field-label field-edit__word">Rubrik
               <select data-field="efterRastenOrd">${words}</select>
             </label>
-            <label class="field-label field-edit__min">Minuter
+            <label class="field-edit__timer"><input type="checkbox" data-field="efterRastenTimer"${plan.fields.efterRastenTimer ? " checked" : ""}> Visa timer</label>
+            <label class="field-label field-edit__min" data-el="break-min"${plan.fields.efterRastenTimer ? "" : " hidden"}>Minuter
               <input type="number" data-field="efterRastenMin" min="${BREAK_MIN_MIN}" max="${BREAK_MIN_MAX}" step="1" inputmode="numeric" value="${plan.fields.efterRastenMin}">
             </label>
           </div>
@@ -1783,6 +1787,19 @@ export default {
         fieldsEl.querySelector('textarea[data-field="efterRasten"]')?.setAttribute("aria-label", label);
         await patchEditing({ fields });
         renderSummaries(); renderPreview();
+        return;
+      } else if (fieldKey === "efterRastenTimer") {
+        // Timer på/av (issue #139). Påslagen igen: som en ny ikryssning —
+        // "+1 min" nollas och nedräkningen startar om om tiden redan gått ut.
+        const on = e.target.checked;
+        const minEl = fieldsEl.querySelector('[data-el="break-min"]');
+        if (minEl) minEl.hidden = !on;
+        const np = normalizePlan(p);
+        const next = on
+          ? enableBreakFields({ ...np, fields: { ...fields, efterRastenTimer: true } }, serverNow())
+          : { ...fields, efterRastenTimer: false };
+        await patchEditing({ fields: next });
+        renderPreview();
         return;
       } else {
         fields[fieldKey] = fieldKey === "attGora"

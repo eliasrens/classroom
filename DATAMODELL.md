@@ -468,6 +468,11 @@ teachers/{uid}/classes/{classId}/lessonPlans/{planId}
                          "Efter rasten" / "Efter pausen" i redigeringen och
                          på tavlan. Saknat eller okänt värde = "rasten" (äldre
                          planeringar, ingen migrering). Följer med i kopior.
+    efterRastenTimer   — visa nedräkningen (issue #139), boolean, saknat =
+                         true. false: ingen timer, klocka eller "+1 min";
+                         rutan tonas aldrig bort och bockas aldrig ur av sig
+                         själv — den står kvar tills läraren trycker "Dölj
+                         nu" eller bockar ur den. Följer med i kopior.
                        (Logik: js/lib/efter-rasten.js.)
   show: { … }        — vilka fält som visas på tavlan; show.praise = visa
                        "Bra jobbat"-rutan i högerkolumnen (namnen läses ur

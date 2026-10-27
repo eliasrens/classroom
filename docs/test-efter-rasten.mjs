@@ -182,5 +182,20 @@ const PLAN = {
   ok(JSON.stringify(plain) === JSON.stringify({ vad: "x" }), "gamla planeringar utan fälten får inga nya nycklar");
 }
 
+// --- timer på/av (issue #139) -------------------------------------------------
+{
+  ok(R.normalizeBreakFields({}).efterRastenTimer === true, "saknad timer → på");
+  ok(R.normalizeBreakFields({ efterRastenTimer: false }).efterRastenTimer === false, "timer av behålls");
+  ok(R.normalizeBreakFields({ efterRastenTimer: true }).efterRastenTimer === true, "timer på behålls");
+  ok(R.breakHasTimer({}) && R.breakHasTimer(undefined) && !R.breakHasTimer({ efterRastenTimer: false }), "breakHasTimer: saknat = på");
+  const off = { ...PLAN, fields: { ...PLAN.fields, efterRastenTimer: false } };
+  ok(R.breakVisible(off, at(9, 0)) && R.breakVisible(off, at(23, 0)), "timer av: rutan syns kvar efter att tiden gått ut");
+  ok(!R.breakVisible(PLAN, at(9, 0)), "timer på: rutan försvinner när tiden är ute (som förut)");
+  ok(!R.breakVisible({ ...off, show: { efterRasten: false } }, at(9, 0)), "timer av men urkryssad → syns inte");
+  const check = R.createAutoHide();
+  ok(check(off, at(9, 0)) === false && check(off, at(23, 0)) === false, "timer av: bockas aldrig ur automatiskt");
+  ok(R.resetBreakRun({ efterRastenTimer: false, efterRastenFrom: 5 }).efterRastenTimer === false, "kopians nollställning behåller timervalet");
+}
+
 console.log(`\n${passed} OK, ${failed} fel`);
 if (failed > 0) process.exit(1);

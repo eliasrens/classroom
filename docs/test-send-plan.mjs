@@ -118,6 +118,8 @@ const SRC = {
   const [id] = await sendPlanCopies(data, { targetCid: "4b", copies: [c], subjects: SUBJECTS });
   const saved = await data.get(plansPath("4b"), id);
   ok(saved.fields.efterRastenOrd === "pausen", "Efter pausen: ordet sparas i målklassen");
+  const noTimer = buildCopy({ ...src, fields: { ...src.fields, efterRastenTimer: false } }, { date: "2026-09-30" });
+  ok(noTimer.fields.efterRastenTimer === false, "timer av: valet följer med i kopian");
   const old = buildCopy(SRC, { date: "2026-09-30" });
   ok(!("efterRastenOrd" in (old.fields ?? {})) || old.fields.efterRastenOrd === "rasten", "gammal planering utan ordet: inget pausen dyker upp");
 }

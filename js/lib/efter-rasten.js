@@ -13,6 +13,10 @@
  *                        rutan igen efter att tiden redan gått ut.
  *   efterRastenOrd     — rubrikens ord, "rasten" | "pausen" (issue #139).
  *                        Saknat/okänt → "rasten".
+ *   efterRastenTimer   — visa nedräkningen (issue #139), standard true.
+ *                        false = ingen timer: rutan står kvar tills läraren
+ *                        trycker "Dölj nu" eller bockar ur den (ingen
+ *                        bortoning, ingen automatisk urbockning).
  *
  * Nedräkningen byggs på js/lib/timer.js (tidsstämplar — rätt i
  * bakgrundsflikar och på elevskärmen); `now` skickas in (serverNow()).
@@ -62,6 +66,7 @@ export function normalizeBreakFields(f = {}) {
     efterRastenPlusMin: Number.isFinite(plus) && plus > 0 ? plus : 0,
     efterRastenFrom: f.efterRastenFrom != null && Number.isFinite(from) && from > 0 ? from : null,
     efterRastenOrd: breakWord(f.efterRastenOrd),
+    efterRastenTimer: f.efterRastenTimer !== false,
   };
 }
 
@@ -134,9 +139,12 @@ export function breakCountdown(plan, now) {
   return { phase: left > 0 ? "running" : "done", remainingMs: left, endMs, text: formatMs(left) };
 }
 
-/** Ska rutan synas på tavlan just nu? (ikryssad och tiden inte ute) */
+/** Visas nedräkningen? (issue #139; saknat = ja) */
+export const breakHasTimer = (fields) => fields?.efterRastenTimer !== false;
+
+/** Ska rutan synas på tavlan just nu? (ikryssad och — med timer — tiden inte ute) */
 export const breakVisible = (plan, now) =>
-  !!plan?.show?.efterRasten && breakCountdown(plan, now).phase !== "done";
+  !!plan?.show?.efterRasten && (!breakHasTimer(plan.fields) || breakCountdown(plan, now).phase !== "done");
 
 /** "+1 min": de ändrade fälten (planeringens fields, sparas via datalagret). */
 export function plusOneMinute(fields) {
@@ -171,7 +179,7 @@ export function enableBreakFields(plan, now) {
 export function createAutoHide() {
   const done = new Set();
   return (plan, now) => {
-    if (!plan?.id || !plan.show?.efterRasten) return false;
+    if (!plan?.id || !plan.show?.efterRasten || !breakHasTimer(plan.fields)) return false;
     const c = breakCountdown(plan, now);
     if (c.phase !== "done") return false;
     const key = `${plan.id}|${c.endMs}`;
