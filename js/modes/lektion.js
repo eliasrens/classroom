@@ -3,7 +3,7 @@
  *
  * Ersätter lärarens PowerPoint-mall (Bilaga A) men behåller layouten
  * eleverna känner igen: toppfält (ämne + tid), tre kolumner
- * (VAD/HUR/VARFÖR · ATT GÖRA · NÄR DU ÄR KLAR) och bottenfält
+ * (VAD/HUR/VARFÖR · LEKTIONSORDNING · NÄR DU ÄR KLAR) och bottenfält
  * (DU BEHÖVER · MÅL). Finare typografi, mjukare former, ämnesfärg
  * som ram/band/accent mot ljus pappersyta.
  *
@@ -64,6 +64,16 @@
  *   den fällbara sektionen "Widgets" efter "Fält". Utan widgets är tavlans
  *   markup exakt som förut; brickorna påverkar aldrig fitBoard.
  *
+ * - "Att göra" heter "Lektionsordning" (issue #132) — bara etiketten;
+ *   datanyckeln är fortfarande `attGora`, så gamla planeringar visar sina steg.
+ * - "Efter rasten" (issue #132, logik i js/lib/efter-rasten.js): en ram-
+ *   markerad ruta överst i mittenkolumnen med stor nedräkning från
+ *   lektionens starttid. När tiden är ute tonas den bort (bara mitten-
+ *   kolumnens innehåll flyttar upp — tavlan och övriga kolumner står
+ *   still) och fitBoard körs om EFTER toningen, så att texten växer
+ *   tillbaka. Lärarvyn bockar då ur delen (en gång); elevvyn skriver
+ *   aldrig. "+1 min" och "Dölj nu" sitter vid rutan i lärarvyn.
+ *
  * Kontrakt: docs/MODULKONTRAKT.md. Data: DATAMODELL.md.
  * Planeringar OCH presentedPlanId är PRIVATA per lärare
  * (teachers/{uid}/classes/{id}/lessonPlans resp. …/settings/lektion, se
@@ -71,7 +81,12 @@
  */
 
 import { icon } from "../lib/icons.js";
-import { deepTextColor, groupedSubjects, readableTextColor, SUBJECTS } from "../lib/color.js";
+import { deepTextColor, groupedSubjects, mixHex, readableTextColor, SUBJECTS } from "../lib/color.js";
+import { createTicker } from "../lib/timer.js";
+import {
+  BREAK_MIN_MIN, BREAK_MIN_MAX, breakBodyHTML, breakCountdown, breakVisible, clampBreakMinutes,
+  createAutoHide, enableBreakFields, normalizeBreakFields, plusOneMinute, resetBreakRun,
+} from "../lib/efter-rasten.js";
 import {
   MY_SUBJECTS_DOC, mySubjectsPath, myIds, filterSubjects, withMine, saveMine,
 } from "../lib/my-subjects.js";
@@ -95,21 +110,23 @@ import { normalizeLessonWidgets, copyLessonWidgets } from "../widgets/registry.j
 import { chipsHTML, createChipHost } from "../widgets/host.js";
 import { mountWidgetSettings, widgetsSummary } from "../widgets/settings-ui.js";
 
-/* De nio av-/påslagbara delarna, i den ordning kryssrutorna visas.
-   `slot` säger var i tavlan de bor; `list` = flerradsfält. */
+/* De tio av-/påslagbara delarna, i den ordning kryssrutorna visas.
+   `slot` säger var i tavlan de bor; `list` = flerradsfält. "Lektionsordning"
+   har kvar datanyckeln `attGora` (issue #132) — byt den inte. */
 const PARTS = [
   { key: "subject",   label: "Ämne",          slot: "top",    kind: "subject" },
   { key: "time",      label: "Tid",           slot: "top",    kind: "time" },
   { key: "vad",       label: "Vad",           slot: "left",   kind: "text" },
   { key: "hur",       label: "Hur",           slot: "left",   kind: "text" },
   { key: "varfor",    label: "Varför",        slot: "left",   kind: "text" },
-  { key: "attGora",   label: "Att göra",      slot: "mid",    kind: "steps" },
+  { key: "efterRasten", label: "Efter rasten", slot: "mid",   kind: "break" },
+  { key: "attGora",   label: "Lektionsordning", slot: "mid",  kind: "steps" },
   { key: "narKlar",   label: "När du är klar", slot: "right",  kind: "list" },
   { key: "duBehover", label: "Du behöver",    slot: "bottom", kind: "list" },
   { key: "mal",       label: "Mål",           slot: "bottom", kind: "text" },
 ];
 
-const FIELD_KEYS = ["vad", "hur", "varfor", "attGora", "narKlar", "duBehover", "mal"];
+const FIELD_KEYS = ["vad", "hur", "varfor", "efterRasten", "attGora", "narKlar", "duBehover", "mal"];
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -188,6 +205,8 @@ function normalizePlan(plan) {
       vad: f.vad ?? "",
       hur: f.hur ?? "",
       varfor: f.varfor ?? "",
+      // "Efter rasten" (issue #132): text, minuter och nedräkningens körtillstånd.
+      ...normalizeBreakFields(f),
       attGora: Array.isArray(f.attGora) ? f.attGora : (f.attGora ? String(f.attGora).split("\n") : []),
       narKlar: f.narKlar ?? "",
       duBehover: f.duBehover ?? "",
@@ -199,6 +218,7 @@ function normalizePlan(plan) {
       vad: show.vad ?? false,
       hur: show.hur ?? false,
       varfor: show.varfor ?? false,
+      efterRasten: show.efterRasten ?? false,
       attGora: show.attGora ?? false,
       narKlar: show.narKlar ?? false,
       duBehover: show.duBehover ?? false,
@@ -248,8 +268,40 @@ function fieldHTML(part, plan) {
   </div>`;
 }
 
-/** `opts.praise` = rendera en plats för Bra jobbat-rutan (fylls i efteråt, se renderBoard). */
-function boardHTML(rawPlan, subjects, { praise = false } = {}) {
+/* ---- "Efter rasten" (issue #132) ----
+   Rutan överst i mittenkolumnen. `leavingMs` (≠ null) = rutan tonas bort
+   och har hunnit så här långt — den negativa animation-delay låter en
+   omritning mitt i toningen fortsätta där den var i stället för att
+   börja om. Knapparna "+1 min"/"Dölj nu" finns bara i lärarvyn. */
+const BREAK_FADE_MS = 500;
+
+function breakBoxHTML(plan, now, { teacher = false, leavingMs = null } = {}) {
+  const c = breakCountdown(plan, now);
+  const body = breakBodyHTML(plan.fields.efterRasten) || `<div class="lb-empty">—</div>`;
+  const leaving = leavingMs != null;
+  const tools = teacher
+    ? `<div class="lb-break__tools teacher-only">
+        <button type="button" class="lb-break__btn" data-act="brk-plus" title="Förläng nedräkningen med en minut"${leaving ? " disabled" : ""}>+1 min</button>
+        <button type="button" class="lb-break__btn" data-act="brk-hide" title="Dölj rutan nu — kryssrutan bockas ur"${leaving ? " disabled" : ""}>Dölj nu</button>
+      </div>`
+    : "";
+  return `<div class="lb-break${leaving ? " lb-break--leaving" : ""}" data-phase="${c.phase}"${leaving ? ` style="animation-delay:${-Math.round(leavingMs)}ms"` : ""}>
+    <div class="lb-break__main">
+      <div class="lb-field__label">${esc(PARTS.find((p) => p.key === "efterRasten").label.toUpperCase())}</div>
+      <div class="lb-field__body lb-break__body">${body}</div>
+    </div>
+    <div class="lb-break__side">
+      <div class="lb-break__time" role="timer" aria-label="Tid kvar">${icon("clock")}<span data-el="brk-time">${c.text}</span></div>
+      ${tools}
+    </div>
+  </div>`;
+}
+
+/**
+ * `opts.praise` = rendera en plats för Bra jobbat-rutan (fylls i efteråt, se renderBoard).
+ * `opts.breakBox` = färdig HTML för "Efter rasten"-rutan ("" = ingen), se renderBoard.
+ */
+function boardHTML(rawPlan, subjects, { praise = false, breakBox = "" } = {}) {
   const plan = normalizePlan(rawPlan);
   const st = styleFor(plan.subjectId, subjects);
   const show = plan.show;
@@ -272,8 +324,9 @@ function boardHTML(rawPlan, subjects, { praise = false } = {}) {
   const leftCol = leftKeys.length
     ? `<div class="lb-col lb-col--left">${leftKeys.map((k) => fieldHTML(part(k), plan)).join("")}</div>`
     : "";
-  const midCol = show.attGora
-    ? `<div class="lb-col lb-col--mid">${fieldHTML(part("attGora"), plan)}</div>`
+  // "Efter rasten" ligger överst i samma kolumn som Lektionsordning.
+  const midCol = show.attGora || breakBox
+    ? `<div class="lb-col lb-col--mid">${breakBox}${show.attGora ? fieldHTML(part("attGora"), plan) : ""}</div>`
     : "";
   const rightCol = show.narKlar || praise
     ? `<div class="lb-col lb-col--right${praise ? " lb-col--has-praise" : ""}">${show.narKlar ? fieldHTML(part("narKlar"), plan) : ""}${praise ? `<div class="lb-praise-slot"></div>` : ""}</div>`
@@ -286,7 +339,10 @@ function boardHTML(rawPlan, subjects, { praise = false } = {}) {
     ? `<div class="lb-bottom">${bottomKeys.map((k) => fieldHTML(part(k), plan)).join("")}</div>`
     : "";
 
-  return `<div class="lesson-board" style="--subj:${st.color};--subj-ink:${st.textColor};--subj-deep:${deepTextColor(st.color)}">
+  // Efter rasten-rutans svaga ton av ämnesfärgen på det vita pappret, och
+  // en etikett-/timerfärg som klarar AA mot just den tonen (color.js).
+  const breakBg = mixHex(st.color, "#ffffff", 0.12);
+  return `<div class="lesson-board" style="--subj:${st.color};--subj-ink:${st.textColor};--subj-deep:${deepTextColor(st.color)};--lb-break-bg:${breakBg};--lb-break-ink:${deepTextColor(st.color, { on: breakBg })}">
     ${top}${mid}${bottom}
   </div>`;
 }
@@ -296,13 +352,16 @@ function boardHTML(rawPlan, subjects, { praise = false } = {}) {
    mot tavlans bredd i CSS) och krymps i små steg via --lb-scale BARA
    om något fält inte ryms. Bra jobbat-rutan anpassar sig själv
    (kolumner, se js/ui/praise-board.js) och räknas inte här.
+   "Efter rasten"-rutan räknas in (dess text är ett .lb-field__body);
+   nedräkningens sekundtick byter bara text med fast bredd och anpassar
+   aldrig om.
    ============================================================ */
 
 const FIT_MIN = 0.45;
 const FIT_PRECISION = 0.01;
 
 function boardOverflows(boardEl) {
-  const nodes = [boardEl, ...boardEl.querySelectorAll(".lb-top, .lb-field__body")];
+  const nodes = [boardEl, ...boardEl.querySelectorAll(".lb-top, .lb-break, .lb-field__body")];
   return nodes.some((n) => n.scrollHeight > n.clientHeight + 1 || n.scrollWidth > n.clientWidth + 1);
 }
 
@@ -349,15 +408,70 @@ function fitBoard(fitEl, praiseBoard = null) {
 }
 
 /**
+ * "Efter rasten"-rutans tillstånd för EN yta (förhandsvisningen eller
+ * elevvyn), en per montering. Rutan som syntes vid förra ritningen och nu
+ * inte ska synas (tiden ute, "Dölj nu", urbockning — även via sync) tonas
+ * bort; när toningen är klar tas den bort och `refit` körs, så texten växer
+ * tillbaka till största storlek som ryms.
+ */
+function createBreakState({ teacher, refit }) {
+  return {
+    teacher, refit,
+    shownFor: null,  // planeringens id om rutan syntes vid förra ritningen
+    leaving: null,   // { planId, at } medan rutan tonas bort
+    fadeTimer: 0,
+    destroy() { clearTimeout(this.fadeTimer); },
+  };
+}
+
+/** HTML för rutan i den här ritningen ("" = ingen) — se createBreakState. */
+function breakForRender(brk, plan, now) {
+  if (!brk) return breakVisible(plan, now) ? breakBoxHTML(plan, now) : "";
+  if (breakVisible(plan, now)) {
+    brk.shownFor = plan.id;
+    brk.leaving = null;
+    return breakBoxHTML(plan, now, { teacher: brk.teacher });
+  }
+  if (brk.shownFor === plan.id && brk.leaving?.planId !== plan.id) {
+    brk.leaving = { planId: plan.id, at: performance.now() };
+  }
+  brk.shownFor = null;
+  if (brk.leaving?.planId !== plan.id) { brk.leaving = null; return ""; }
+  const elapsed = performance.now() - brk.leaving.at;
+  if (elapsed >= BREAK_FADE_MS) { brk.leaving = null; return ""; }
+  return breakBoxHTML(plan, now, { teacher: brk.teacher, leavingMs: elapsed });
+}
+
+/** Rutan har tonats bort: ta bort den och anpassa texten igen (inte under toningen). */
+function watchBreakFade(brk, fitEl) {
+  const el = fitEl.querySelector(".lb-break--leaving");
+  if (!brk || !el) return;
+  clearTimeout(brk.fadeTimer);
+  const finish = () => {
+    if (!el.isConnected) return; // omritad under tiden — den nya rutan har egen avslutning
+    clearTimeout(brk.fadeTimer);
+    el.remove();
+    brk.leaving = null;
+    brk.refit();
+  };
+  el.addEventListener("animationend", finish, { once: true });
+  // Reserv: animationend uteblir t.ex. i en bakgrundsflik eller med reducerad rörelse.
+  const left = BREAK_FADE_MS - (performance.now() - brk.leaving.at);
+  brk.fadeTimer = setTimeout(finish, Math.max(0, left) + 150);
+}
+
+/**
  * Ritar tavlan i `container` (lärarens förhandsvisning eller elevvyn),
  * hänger in Bra jobbat-rutan och anpassar texten.
  * `praise` = { board, names, emptyText } — board skapas en gång per montering.
  * `chips` = widgetbrickornas värd (js/widgets/host.js), en per montering.
+ * `brk` = "Efter rasten"-tillståndet (createBreakState), en per montering.
  */
-function renderBoard(container, rawPlan, subjects, praise, chips) {
+function renderBoard(container, rawPlan, subjects, praise, chips, brk) {
   const plan = normalizePlan(rawPlan);
   const withPraise = plan.show.praise && (praise.names.length > 0 || !!praise.emptyText);
-  container.innerHTML = `<div class="lb-fit">${boardHTML(plan, subjects, { praise: withPraise })}</div>`;
+  const breakBox = breakForRender(brk, plan, serverNow());
+  container.innerHTML = `<div class="lb-fit">${boardHTML(plan, subjects, { praise: withPraise, breakBox })}</div>`;
   const fitEl = container.firstElementChild;
   const slot = fitEl.querySelector(".lb-praise-slot");
   if (slot) {
@@ -366,6 +480,21 @@ function renderBoard(container, rawPlan, subjects, praise, chips) {
   }
   chips?.mount(fitEl);
   fitBoard(fitEl, slot ? praise.board : null);
+  watchBreakFade(brk, fitEl);
+}
+
+/**
+ * Nedräkningens tick (ritsignal, js/lib/timer.js): byter bara siffrorna —
+ * ingen omanpassning. När tiden går ut ritas tavlan om (rutan tonas bort).
+ */
+function tickBreak(container, brk, rawPlan, rerender) {
+  if (!rawPlan || brk.shownFor == null) return;
+  const plan = normalizePlan(rawPlan);
+  const now = serverNow();
+  if (brk.shownFor !== plan.id || !breakVisible(plan, now)) { rerender(); return; }
+  const timeEl = container.querySelector('.lb-break:not(.lb-break--leaving) [data-el="brk-time"]');
+  const text = breakCountdown(plan, now).text;
+  if (timeEl && timeEl.textContent !== text) timeEl.textContent = text;
 }
 
 /** Anpassa om efter storleksändring (samma innehåll). */
@@ -384,7 +513,7 @@ function searchText(p, subjects) {
   const d = parseISO(np.date);
   return [
     np.name, styleFor(np.subjectId, subjects).name, np.date, d ? fmtDay(d) : "",
-    np.fields.vad, np.fields.hur, np.fields.varfor, np.fields.attGora.join(" "),
+    np.fields.vad, np.fields.hur, np.fields.varfor, np.fields.efterRasten, np.fields.attGora.join(" "),
     np.fields.narKlar, np.fields.duBehover, np.fields.mal,
   ].join(" ").toLocaleLowerCase("sv");
 }
@@ -439,7 +568,7 @@ function aboutSummary(rawPlan, subjects) {
     .filter(Boolean).join(" · ");
 }
 
-/** "Vad, Att göra, Mål visas" — "Fält" när blocket är infällt. */
+/** "Vad, Lektionsordning, Mål visas" — "Fält" när blocket är infällt. */
 function fieldsSummary(rawPlan) {
   if (!rawPlan) return "";
   const show = normalizePlan(rawPlan).show;
@@ -605,12 +734,17 @@ export default {
     if (!isTeacher) {
       el.innerHTML = `<div class="lesson-stage-student"></div>`;
       const stage = el.querySelector(".lesson-stage-student");
+      // "Efter rasten": elevvyn döljer rutan själv när tiden är ute men
+      // skriver aldrig — urbockningen kommer från lärarvyn via sync.
+      const brk = createBreakState({ teacher: false, refit: () => refitBoard(stage, praiseBoard) });
+      this._offs.push(() => brk.destroy());
       const renderStudent = () => {
         if (!stage.isConnected) return;
         const p = presentedPlan();
-        if (p) renderBoard(stage, p, subjects, praise(), chipHost);
+        if (p) renderBoard(stage, p, subjects, praise(), chipHost, brk);
         else { chipHost.destroy(); stage.innerHTML = `<div class="lesson-empty"><h1>Ingen planering visas</h1><p>Läraren väljer en lektion att visa.</p></div>`; }
       };
+      this._offs.push(createTicker(() => tickBreak(stage, brk, presentedPlan(), renderStudent), { intervalMs: 250 }));
       observeStage(stage);
       this._offs.push(data.watch(plansPath, (docs) => { plans = docs; renderStudent(); }));
       watchPresented(renderStudent);
@@ -923,6 +1057,7 @@ export default {
       const rows = FIELD_KEYS.map((k) => {
         const part = PARTS.find((p) => p.key === k);
         const on = plan.show[k];
+        if (k === "efterRasten") return breakFieldHTML(plan, part, on);
         const val = k === "attGora" ? (plan.fields.attGora ?? []).join("\n") : plan.fields[k];
         const multi = part.kind === "steps" || part.kind === "list";
         const input = multi
@@ -945,6 +1080,22 @@ export default {
         <div class="field-edit__praise" data-el="praise-editor"${plan.show.praise ? "" : " hidden"}>${praiseEditorHTML()}</div>
       </div>`);
       return rows.join("");
+    }
+
+    /** "Efter rasten" (issue #132): minuter + text, bara synliga när rutan är ikryssad. */
+    function breakFieldHTML(plan, part, on) {
+      return `<div class="field-edit${on ? "" : " field-edit--off"}" data-fieldwrap="efterRasten">
+        <div class="field-edit__head">
+          <label><input type="checkbox" data-show="efterRasten" ${on ? "checked" : ""}> ${esc(part.label.toUpperCase())}</label>
+        </div>
+        <div class="field-edit__break" data-el="break-editor"${on ? "" : " hidden"}>
+          <label class="field-label field-edit__min">Minuter
+            <input type="number" data-field="efterRastenMin" min="${BREAK_MIN_MIN}" max="${BREAK_MIN_MAX}" step="1" inputmode="numeric" value="${plan.fields.efterRastenMin}">
+          </label>
+          <textarea data-field="efterRasten" rows="3" aria-label="Efter rasten">${esc(plan.fields.efterRasten)}</textarea>
+          <p class="field-edit__hint">En rad per sak. Börja raden med - för en punkt.</p>
+        </div>
+      </div>`;
     }
 
     // -- Widgets (issue #115, kompakt i #123): en rad per widget, sparas i planeringen --
@@ -1141,7 +1292,7 @@ export default {
     function renderPreview() {
       if (!stageEl.isConnected) return;
       const p = editingPlan();
-      if (p) renderBoard(stageEl, p, subjects, praise(), chipHost);
+      if (p) renderBoard(stageEl, p, subjects, praise(), chipHost, brk);
       else { chipHost.destroy(); stageEl.innerHTML = `<div class="lesson-empty"><h1>Ingen planering</h1><p>Skapa en ny planering för att börja.</p></div>`; }
       renderPresentState();
       renderSummaries();
@@ -1176,11 +1327,52 @@ export default {
     }
     observeStage(stageEl);
 
-    // "Gå dit" i förhandsramens etikett — öppna planeringen som eleverna ser.
-    stageEl.addEventListener("click", (e) => {
-      if (!e.target.closest('[data-act="goto-presented"]')) return;
-      const p = presentedPlan();
-      if (p) { setEditing(p.id); renderAll(); }
+    // ---- "Efter rasten" (issue #132) i förhandsvisningen ----
+    const brk = createBreakState({ teacher: true, refit: () => refitBoard(stageEl, praiseBoard) });
+    this._offs.push(() => brk.destroy());
+    // Urbockningen när tiden är ute: bara härifrån (lärarvyn), en gång.
+    // Var vyn stängd när tiden gick ut sker den när planeringen öppnas igen.
+    const autoHide = createAutoHide();
+    /** Kryssrutan i "Fält" följer med när rutan bockas ur härifrån. */
+    function setBreakCheckbox(on) {
+      const cb = fieldsEl.querySelector('[data-show="efterRasten"]');
+      if (!cb) return;
+      cb.checked = on;
+      cb.closest("[data-fieldwrap]")?.classList.toggle("field-edit--off", !on);
+      const body = fieldsEl.querySelector('[data-el="break-editor"]');
+      if (body) body.hidden = !on;
+    }
+    async function hideBreak() {
+      const p = editingPlan();
+      if (!p) return;
+      setBreakCheckbox(false);
+      await patchEditing({ show: { ...normalizePlan(p).show, efterRasten: false } });
+      renderPreview();
+    }
+    this._offs.push(createTicker(() => {
+      tickBreak(stageEl, brk, editingPlan(), renderPreview);
+      const p = editingPlan();
+      if (p && autoHide(normalizePlan(p), serverNow())) void hideBreak();
+    }, { intervalMs: 250 }));
+
+    stageEl.addEventListener("click", async (e) => {
+      // "Gå dit" i förhandsramens etikett — öppna planeringen som eleverna ser.
+      if (e.target.closest('[data-act="goto-presented"]')) {
+        const p = presentedPlan();
+        if (p) { setEditing(p.id); renderAll(); }
+        return;
+      }
+      // "+1 min" / "Dölj nu" vid Efter rasten-rutan — sparas i planeringen
+      // och når elevskärmen via datalagret.
+      const act = e.target.closest("[data-act]")?.dataset.act;
+      if (act === "brk-plus") {
+        const p = editingPlan();
+        if (!p) return;
+        await patchEditing({ fields: plusOneMinute(normalizePlan(p).fields) });
+        renderPreview();
+      } else if (act === "brk-hide") {
+        await hideBreak();
+      }
     });
 
     // Bygger om redigerarens fält. ANROPA BARA när den aktiva
@@ -1241,6 +1433,7 @@ export default {
       const copy = normalizePlan(src);
       delete copy.id;
       copy.widgets = copyLessonWidgets(copy.widgets);
+      copy.fields = resetBreakRun(copy.fields);
       copy.ownerUid = currentUid();
       copy.date = nextSameWeekday(copy.date);
       if (copy.date === src.date) copy.name = `${copy.name} (kopia)`;
@@ -1428,14 +1621,28 @@ export default {
       if (showKey) {
         const p = editingPlan();
         if (!p) return;
-        const show = { ...normalizePlan(p).show, [showKey]: e.target.checked };
-        await patchEditing({ show });
+        const np = normalizePlan(p);
+        const show = { ...np.show, [showKey]: e.target.checked };
+        // Efter rasten ikryssad: nollställ "+1 min" (och starta om nedräkningen
+        // om tiden redan gått ut idag), se enableBreakFields.
+        if (showKey === "efterRasten" && e.target.checked) {
+          await patchEditing({ show, fields: enableBreakFields(np, serverNow()) });
+        } else {
+          await patchEditing({ show });
+        }
         e.target.closest("[data-fieldwrap]")?.classList.toggle("field-edit--off", !e.target.checked);
-        if (showKey === "praise") {
-          const editor = fieldsEl.querySelector('[data-el="praise-editor"]');
+        if (showKey === "praise" || showKey === "efterRasten") {
+          const editor = fieldsEl.querySelector(`[data-el="${showKey === "praise" ? "praise-editor" : "break-editor"}"]`);
           if (editor) editor.hidden = !e.target.checked;
         }
         renderPreview();
+        return;
+      }
+
+      // Efter rasten: minuterna rättas till 1–60 när fältet lämnas.
+      if (e.target.dataset.field === "efterRastenMin") {
+        const p = editingPlan();
+        if (p) e.target.value = String(normalizePlan(p).fields.efterRastenMin);
       }
     });
 
@@ -1451,9 +1658,16 @@ export default {
       const p = editingPlan();
       if (!p) return;
       const fields = { ...normalizePlan(p).fields };
-      fields[fieldKey] = fieldKey === "attGora"
-        ? e.target.value.split("\n")
-        : e.target.value;
+      if (fieldKey === "efterRastenMin") {
+        // Ett halvskrivet/tomt tal sparas inte; ny längd nollar "+1 min".
+        if (e.target.value === "" || !Number.isFinite(Number(e.target.value))) return;
+        fields.efterRastenMin = clampBreakMinutes(e.target.value);
+        fields.efterRastenPlusMin = 0;
+      } else {
+        fields[fieldKey] = fieldKey === "attGora"
+          ? e.target.value.split("\n")
+          : e.target.value;
+      }
       await patchEditing({ fields });
       renderPreview();
     });

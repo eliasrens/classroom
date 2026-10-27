@@ -7,7 +7,7 @@
  * identiska utom klockslaget. En kopia skickas till en annan klass:
  *
  *  - Kopian är OBEROENDE: nytt id, ownerUid = nuvarande lärare. Namn,
- *    ämne, fält, show och widgets kopieras; datum och tider kommer från dialogen
+ *    ämne, fält (även "Efter rasten", utan körtillstånd), show och widgets kopieras; datum och tider kommer från dialogen
  *    (vid flera på en gång behåller varje planering sina egna).
  *  - Den sparas i målklassens PRIVATA plansPath(målCid) — det är samma
  *    lärares planeringar, bara i en annan klass.
@@ -28,6 +28,7 @@
 
 import { SUBJECTS } from "./color.js";
 import { copyLessonWidgets } from "../widgets/registry.js";
+import { resetBreakRun } from "./efter-rasten.js";
 import {
   currentUid, plansPath, lessonSettingsPath, LESSON_SETTINGS_DOC, presentedPlanOf,
 } from "../data/plans.js";
@@ -51,7 +52,9 @@ export function buildCopy(plan, when = {}, uid = currentUid()) {
     subjectId: src.subjectId ?? "so",
     start: when.start ?? src.start ?? "",
     end: when.end ?? src.end ?? "",
-    fields: clone(src.fields),
+    // Alla fält följer med, även "Efter rasten" (text + minuter, issue #132)
+    // — men inte nedräkningens körtillstånd ("+1 min", omstart).
+    fields: resetBreakRun(clone(src.fields)),
     show: clone(src.show),
     // Widgetbrickorna (issue #115) följer med — med nya id:n (eget körtillstånd).
     widgets: copyLessonWidgets(src.widgets),

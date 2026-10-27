@@ -53,7 +53,8 @@ elevvyns tavla är alltid ljus.
   och Arkiv (nyaste först) med veckogrupper, antal per vecka och fällbara
   block; vald flik sparas per dator. Testat med 36 planeringar. ✔
 - Fällbara "Om lektionen" och "Fält" med sammanfattningar ("Bråk intro ·
-  Matematik · sön 27 sep.", "Vad, Att göra, Mål visas"). ✔
+  Matematik · sön 27 sep.", "Vad, Lektionsordning, Mål visas" — delen
+  hette "Att göra" före issue #132). ✔
 - Fält-kryssrutorna slår av/på fält och layouten omfördelar sig utan hål. ✔
 - Mina ämnen: dialogen sparar valet, väljaren visar bara mina + "Visa alla
   ämnen…" (visar hela paletten tillfälligt utan att röra planeringen),
