@@ -62,6 +62,14 @@ export function fitMidColumn({ fits, breakFits = () => true, setSteps, setBreak,
 }
 
 /**
+ * Issue #138: slutar Lektionsordnings innehåll (sista stegets underkant)
+ * senast vid kolumnens nederkant? Utan bottenraden går kolumnen ända ner
+ * till tavlans ram, så gränsen är ramens inre nederkant — fältets egen
+ * luft under sista steget räknas inte. `tol` = avrundning i layouten (px).
+ */
+export const stepsWithin = (lastStepBottom, colBottom, tol = 1) => lastStepBottom <= colBottom + tol;
+
+/**
  * "Efter rasten" utan Lektionsordning (issue #136): rutan har en egen smal
  * mittenkolumn. Tavlans skala `scale` är redan satt (räknad utan kolumnen).
  * `want` = kolumnens önskade bredd, `floor` = dess golv (px).

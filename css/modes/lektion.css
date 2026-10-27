@@ -550,6 +550,10 @@
 .lb-col--mid .lb-field--attGora > .lb-field__body { font-size: calc(1.08em * var(--lb-steps-scale, 1)); }
 /* Issue #136: rubriken LEKTIONSORDNING krymper lika mycket som stegen. */
 .lb-col--mid .lb-field--attGora > .lb-field__label { font-size: calc(0.9em * var(--lb-steps-scale, 1)); }
+/* Issue #138: utan bottenrad går mittenkolumnen ända ner till tavlans ram,
+   och med rutan får sista steget sluta vid ramen — fältets luft under det
+   ska inte tvinga Lektionsordning att krympa. */
+.lesson-board:not(:has(> .lb-bottom)) .lb-col--mid:has(> .lb-break) > .lb-field--attGora { padding-bottom: 0; }
 
 /* ---- EFTER RASTEN (issue #132) — överst i mittenkolumnen ----
    Tydligt annorlunda än de andra fälten: tjock ram i ämnesfärgen, rundade
