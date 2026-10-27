@@ -15,6 +15,8 @@
  *   - presentedPlanId är orört (och en kopia tar aldrig över elevskärmens
  *     förval i en klass där läraren inte valt något)
  *   - presentedPlanOf (flyttad till js/data/plans.js)
+ *   - "Efter rasten" (issue #132): text, minuter och kryssval följer med,
+ *     nedräkningens körtillstånd ("+1 min", omstart) gör det inte
  */
 
 const {
@@ -84,6 +86,27 @@ const SRC = {
   c.fields.attGora.push("ändrad");
   c.show.vad = false;
   ok(SRC.fields.attGora.length === 2 && SRC.show.vad === true, "djup kopia — originalet påverkas inte");
+}
+
+// --- "Efter rasten" (issue #132) -------------------------------------------
+{
+  const src = {
+    ...SRC,
+    fields: { ...SRC.fields, efterRasten: "Välj mellan:\n- Läsa\n- Rita", efterRastenMin: 15, efterRastenPlusMin: 2, efterRastenFrom: 1_800_000_000_000 },
+    show: { ...SRC.show, efterRasten: true },
+  };
+  const c = buildCopy(src, { date: "2026-09-30" });
+  ok(c.fields.efterRasten === "Välj mellan:\n- Läsa\n- Rita", "Efter rasten: texten följer med");
+  ok(c.fields.efterRastenMin === 15, "Efter rasten: minuterna följer med");
+  ok(c.show.efterRasten === true, "Efter rasten: kryssvalet följer med");
+  ok(c.fields.efterRastenPlusMin === 0 && c.fields.efterRastenFrom === null,
+    "Efter rasten: körtillståndet (+1 min, omstart) följer inte med");
+  ok(src.fields.efterRastenPlusMin === 2, "Efter rasten: originalet påverkas inte");
+  const data = fakeData({ [plansPath("4b")]: [] });
+  const [id] = await sendPlanCopies(data, { targetCid: "4b", copies: [c], subjects: SUBJECTS });
+  const saved = await data.get(plansPath("4b"), id);
+  ok(saved.fields.efterRasten === c.fields.efterRasten && saved.fields.efterRastenMin === 15 && saved.show.efterRasten === true,
+    "Efter rasten: fälten sparas i målklassen");
 }
 
 // --- datum och tider från dialogen ------------------------------------------

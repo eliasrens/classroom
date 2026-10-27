@@ -125,6 +125,17 @@ export function deepTextColor(hex, { on = "#ffffff", min = 4.5 } = {}) {
   return out;
 }
 
+/**
+ * Blandar `hex` med `base` (andel `amount` av hex, 0–1) → "#rrggbb".
+ * T.ex. en svag ton av ämnesfärgen på tavlans vita papper.
+ */
+export function mixHex(hex, base = "#ffffff", amount = 0.12) {
+  const a = hexToRgb(hex);
+  const b = hexToRgb(base);
+  const ch = (x, y) => Math.round(x * amount + y * (1 - amount)).toString(16).padStart(2, "0");
+  return `#${ch(a.r, b.r)}${ch(a.g, b.g)}${ch(a.b, b.b)}`;
+}
+
 /** Slår upp ett ämne och ger { ...subject, textColor } klart att använda. */
 export function subjectStyle(subjectId) {
   const s = SUBJECTS.find((x) => x.id === subjectId) ?? SUBJECTS.at(-1);

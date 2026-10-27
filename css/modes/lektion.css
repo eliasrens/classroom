@@ -214,6 +214,7 @@
 .lesson-panel input[type="text"],
 .lesson-panel input[type="time"],
 .lesson-panel input[type="date"],
+.lesson-panel input[type="number"],
 .lesson-panel select,
 .lesson-panel textarea {
   width: 100%;
@@ -400,6 +401,11 @@
 .field-edit__praise { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); margin-top: var(--space-2); }
 .field-edit__praise[hidden] { display: none; }
 .field-edit .praise-editor__add input[type="text"] { margin-top: 0; }
+/* Efter rasten (issue #132): minuter + text, bara när rutan är ikryssad. */
+.field-edit__break { display: flex; flex-direction: column; gap: var(--space-1); margin-top: var(--space-2); }
+.field-edit__break[hidden] { display: none; }
+.field-edit__break textarea { margin-top: 0; }
+.field-edit__min { max-width: 7rem; }
 
 /* ============================================================
    TAVLAN — 6-fältslayout. Delas av lärarförhandsvisning och elevvy.
@@ -525,7 +531,76 @@
 .lb-col--mid .lb-field__label { font-size: 0.9em; }
 .lb-col--mid .lb-field__body { font-size: 1.08em; }
 
-/* ATT GÖRA — numrerad lista */
+/* ---- EFTER RASTEN (issue #132) — överst i mittenkolumnen ----
+   Tydligt annorlunda än de andra fälten: tjock ram i ämnesfärgen, rundade
+   hörn och en svag ton av ämnesfärgen (--lb-break-bg, mixHex i
+   js/lib/color.js); etikett och timer i --lb-break-ink, som klarar AA mot
+   just den tonen. Pappret är vitt i alla teman, så det gäller ljust, mörkt
+   och elevtemat. Nedräkningen står i rubrikraden uppe till höger — texten
+   börjar under den och täcks aldrig. Lärarens knappar ligger på en egen
+   liten rad nederst till höger. tabular-nums ger fast bredd, så sekundticket aldrig ändrar
+   layouten (och aldrig anpassar om texten).
+   Tavlans storlek och kolumnbredder beror inte på rutan — när den tonas
+   bort (lb-break-out) flyttar bara mittenkolumnens innehåll upp. */
+.lb-break {
+  flex: 0 1 auto;
+  min-height: 0;
+  margin: 0.45em 0.6em 0.15em;
+  padding: 0.3em 0.7em 0.45em;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15em;
+  border: 3px solid var(--subj);
+  border-radius: var(--radius-l);
+  background: var(--lb-break-bg, var(--lb-paper));
+  overflow: hidden;
+}
+/* Rubrikraden: etiketten till vänster, nedräkningen till höger. I en smal
+   mittenkolumn bryts etiketten hellre på två rader än att hela tavlans
+   text krymps för den stora timerns skull. */
+.lb-break__head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 0.6em; overflow: hidden; }
+.lb-break__head > .lb-field__label { flex: 0 1 auto; min-width: 0; color: var(--lb-break-ink, var(--subj-deep)); }
+.lb-break__text { margin: 0; }
+/* Ungefär dubbelt så hög som brödtexten (1.08em i mittenkolumnen). */
+.lb-break__time {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15em;
+  font-size: 2.1em;
+  /* Inte 1: siffrornas glyfer sticker då ut ur raden och fitBoard tror
+     att rubrikraden svämmar över. */
+  line-height: 1.2;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--lb-break-ink, var(--subj-deep));
+}
+.lb-break__time .icon { width: 0.8em; height: 0.8em; }
+/* "+1 min" / "Dölj nu" — små lärarknappar (teacher-only, aldrig i elevvyn). */
+.lb-break__tools { flex: none; align-self: flex-end; display: flex; gap: 0.3em; }
+.lb-break__btn {
+  padding: 0.15em 0.45em;
+  border: 1px solid color-mix(in srgb, var(--lb-break-ink, var(--subj)) 45%, transparent);
+  border-radius: var(--radius-s);
+  background: var(--lb-paper);
+  color: var(--lb-break-ink, var(--lb-ink));
+  font: inherit;
+  font-size: 0.5em;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.lb-break__btn:hover { background: var(--lb-break-bg, var(--lb-paper)); }
+.lb-break__btn:focus-visible { outline: 2px solid var(--lb-break-ink, var(--subj)); outline-offset: 1px; }
+.lb-break--leaving { animation: lb-break-out 0.5s ease forwards; pointer-events: none; }
+@keyframes lb-break-out { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .lb-break--leaving { animation-duration: 1ms; }
+}
+
+/* LEKTIONSORDNING (datanyckel attGora) — numrerad lista */
 ol.lb-steps { margin: 0; padding: 0; list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 0.35em; }
 ol.lb-steps > li {
   counter-increment: step;

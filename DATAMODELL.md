@@ -448,11 +448,30 @@ teachers/{uid}/classes/{classId}/lessonPlans/{planId}
   ownerUid           — lärarens uid (= {uid} i pathen; gör ägaren explicit)
   date: "2026-09-14" — ISO-datum; en planering per dag och klass är normalfallet
   name, subjectId, start, end
-  fields: { … }      — planeringens innehåll (vad/hur/varför/…)
+  fields: { … }      — planeringens innehåll (vad/hur/varför/…).
+                       fields.attGora visas som "Lektionsordning" (issue
+                       #132) — bara etiketten bytte namn, nyckeln är kvar.
+    efterRasten        — "Efter rasten" (issue #132): fritext, en rad per
+                         sak; rader som börjar med "-" eller "•" blir
+                         punkter. Visas överst i mittenkolumnen.
+    efterRastenMin     — nedräkningens längd i minuter, 1–60 (standard 10).
+                         Räknas från lektionens start (date + start) —
+                         ingen starttid eller inte idag: står still på full tid.
+    efterRastenPlusMin — "+1 min"-knappens tillägg i minuter (standard 0).
+                         Nollas när rutan kryssas i, när minuterna ändras
+                         och i kopior.
+    efterRastenFrom    — epoch ms (servertid) då nedräkningen startades om,
+                         null = lektionens start. Sätts när läraren kryssar
+                         i rutan igen efter att tiden gått ut samma dag.
+                         Följer inte med i kopior.
+                       (Logik: js/lib/efter-rasten.js.)
   show: { … }        — vilka fält som visas på tavlan; show.praise = visa
                        "Bra jobbat"-rutan i högerkolumnen (namnen läses ur
                        den LOKALA classes/{id}/praise/board — elevdata,
-                       aldrig i molnet)
+                       aldrig i molnet). show.efterRasten (standard false)
+                       sätts till false av LÄRARVYN när nedräkningen är
+                       slut (en gång; elevskärmen skriver aldrig, den
+                       döljer rutan själv när tiden är ute)
   widgets: [{ id, type, cfg }]
                      — widgetbrickor i rubrikraden (issue #115, högst 3
                        visas). Följer med i Kopiera/Skicka kopia (nya id:n).
