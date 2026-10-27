@@ -406,6 +406,8 @@
 .field-edit__break[hidden] { display: none; }
 .field-edit__break textarea { margin-top: 0; }
 .field-edit__min { max-width: 7rem; }
+/* Issue #139: rubrikvalet ("Efter rasten"/"Efter pausen") bredvid minuterna. */
+.field-edit__break-row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-end; }
 
 /* ============================================================
    TAVLAN — 6-fältslayout. Delas av lärarförhandsvisning och elevvy.

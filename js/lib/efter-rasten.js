@@ -11,6 +11,8 @@
  *   efterRastenFrom    — epoch ms då nedräkningen startades om, eller null
  *                        = lektionens starttid. Sätts när läraren kryssar i
  *                        rutan igen efter att tiden redan gått ut.
+ *   efterRastenOrd     — rubrikens ord, "rasten" | "pausen" (issue #139).
+ *                        Saknat/okänt → "rasten".
  *
  * Nedräkningen byggs på js/lib/timer.js (tidsstämplar — rätt i
  * bakgrundsflikar och på elevskärmen); `now` skickas in (serverNow()).
@@ -41,6 +43,15 @@ export function clampBreakMinutes(v) {
   return Math.min(BREAK_MIN_MAX, Math.max(BREAK_MIN_MIN, n));
 }
 
+/** Rubrikens ord (issue #139): "Efter rasten" eller "Efter pausen". Första = standard. */
+export const BREAK_WORDS = ["rasten", "pausen"];
+
+/** "rasten" | "pausen"; saknat/okänt → "rasten". */
+export const breakWord = (v) => (BREAK_WORDS.includes(v) ? v : BREAK_WORDS[0]);
+
+/** Rubriken, "Efter rasten" / "Efter pausen", ur planeringens `fields`. */
+export const breakLabel = (fields) => `Efter ${breakWord(fields?.efterRastenOrd)}`;
+
 /** Normaliserade fält för rutan (ur planeringens `fields`). */
 export function normalizeBreakFields(f = {}) {
   const plus = Math.round(Number(f.efterRastenPlusMin));
@@ -50,6 +61,7 @@ export function normalizeBreakFields(f = {}) {
     efterRastenMin: clampBreakMinutes(f.efterRastenMin),
     efterRastenPlusMin: Number.isFinite(plus) && plus > 0 ? plus : 0,
     efterRastenFrom: f.efterRastenFrom != null && Number.isFinite(from) && from > 0 ? from : null,
+    efterRastenOrd: breakWord(f.efterRastenOrd),
   };
 }
 

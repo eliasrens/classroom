@@ -464,6 +464,10 @@ teachers/{uid}/classes/{classId}/lessonPlans/{planId}
                          null = lektionens start. Sätts när läraren kryssar
                          i rutan igen efter att tiden gått ut samma dag.
                          Följer inte med i kopior.
+    efterRastenOrd     — rubrikens ord (issue #139): "rasten" | "pausen" →
+                         "Efter rasten" / "Efter pausen" i redigeringen och
+                         på tavlan. Saknat eller okänt värde = "rasten" (äldre
+                         planeringar, ingen migrering). Följer med i kopior.
                        (Logik: js/lib/efter-rasten.js.)
   show: { … }        — vilka fält som visas på tavlan; show.praise = visa
                        "Bra jobbat"-rutan i högerkolumnen (namnen läses ur

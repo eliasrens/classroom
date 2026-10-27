@@ -69,6 +69,19 @@ function ok(cond, msg) {
   ok(R.normalizeBreakFields({ efterRasten: ["a", "b"] }).efterRasten === "a\nb", "text som lista → rader");
 }
 
+// --- rubrikens ord (issue #139) -----------------------------------------------
+{
+  ok(R.normalizeBreakFields({}).efterRastenOrd === "rasten", "saknat ord → rasten");
+  ok(R.normalizeBreakFields({ efterRastenOrd: "pausen" }).efterRastenOrd === "pausen", "pausen behålls");
+  ok(R.normalizeBreakFields({ efterRastenOrd: "lunchen" }).efterRastenOrd === "rasten"
+    && R.normalizeBreakFields({ efterRastenOrd: null }).efterRastenOrd === "rasten"
+    && R.normalizeBreakFields({ efterRastenOrd: "PAUSEN" }).efterRastenOrd === "rasten", "okänt ord → rasten");
+  ok(R.breakLabel({}) === "Efter rasten" && R.breakLabel(undefined) === "Efter rasten", "rubrik utan fält: Efter rasten");
+  ok(R.breakLabel({ efterRastenOrd: "pausen" }) === "Efter pausen", "rubrik: Efter pausen");
+  ok(R.breakLabel({ efterRastenOrd: "x" }) === "Efter rasten", "rubrik med okänt ord: Efter rasten");
+  ok(R.resetBreakRun({ efterRastenOrd: "pausen", efterRastenPlusMin: 2 }).efterRastenOrd === "pausen", "kopians nollställning behåller ordet");
+}
+
 // --- timern --------------------------------------------------------------------
 const at = (h, m, s = 0) => new Date(2026, 9, 27, h, m, s).getTime(); // tis 27 okt 2026
 const PLAN = {
