@@ -601,8 +601,8 @@
   align-items: center;
   gap: 0.15em;
   font-size: 2.1em;
-  /* Inte 1: siffrornas glyfer sticker då ut ur raden och fitBoard tror
-     att rubrikraden svämmar över. */
+  /* Siffrornas glyfer sticker ut ur raden (med Segoe UI på Windows även
+     vid 1.2) — fitBoard mäter därför block, inte scrollHeight (issue #144). */
   line-height: 1.2;
   font-weight: 700;
   font-variant-numeric: tabular-nums;

@@ -215,5 +215,44 @@ function noBottomRow({ steps, frame = 1057, top = 187, box = 520, pad = 24 }) {
   ok(1057 - c.lastStep() < 600 * FIT_PRECISION + 1, "… sista steget slutar vid ramen");
 }
 
+// --- Glyfer som sticker ut ur raden (issue #144) ------------------------------
+// På Windows (Segoe UI) är glyfernas innehållsyta 1.33 em mot line-height
+// 1.2–1.28, så scrollHeight − clientHeight är några px i VARJE skala, fast
+// inget block når förbi kolumnens nederkant. Kontrollen i fitBoard är därför
+// geometrisk (contentBottom mot innerBottom via stepsWithin), inte
+// scrollHeight-baserad. Här modellerat: `glyph` px konstant inre överflöd.
+function glyphColumn({ box, steps, room, glyph }) {
+  const st = { steps: 1, brk: 1 };
+  const bottom = () => box * st.brk + steps * st.steps;
+  return {
+    st, bottom,
+    // Den gamla kontrollen: scrollHeight > clientHeight + 1 — glyferna räknas med.
+    scrollFits: () => Math.max(0, bottom() - room) + glyph <= 1,
+    // Den nya: sista blockets underkant mot rutans inre nederkant.
+    fits: () => stepsWithin(bottom(), room),
+    setSteps: (v) => { st.steps = v; },
+    setBreak: (v) => { st.brk = v; },
+  };
+}
+{
+  const c = glyphColumn({ box: 30, steps: 50, room: 100, glyph: 3 });
+  const old = fitMidColumn({ fits: c.scrollFits, setSteps: c.setSteps, setBreak: c.setBreak });
+  ok(old.steps === FIT_MIN && old.brk === FIT_MIN, `#144: scrollHeight-kontrollen med 3 px glyföverflöd trycker ner båda till golvet (fick ${old.steps}/${old.brk}) — det var felet`);
+  const r = fitMidColumn(c);
+  ok(r.steps === 1 && r.brk === 1, `#144: geometriskt ryms kolumnen → båda 1 trots glyföverflödet (fick ${r.steps}/${r.brk})`);
+}
+{
+  // Glyföverflödet ändrar inte heller hur mycket som krymps när det är trångt.
+  const c = glyphColumn({ box: 30, steps: 100, room: 100, glyph: 3 });
+  const r = fitMidColumn(c);
+  // 1 px tolerans i stepsWithin → sista steget får sluta högst vid 101.
+  ok(r.brk === 1 && r.steps <= 0.71 && r.steps > 0.7 - FIT_PRECISION, `#144: för många steg → bara Lektionsordning, precis så mycket som behövs (fick ${r.steps})`);
+  ok(c.fits() && c.bottom() > 100 - 100 * FIT_PRECISION, "#144: … sista steget slutar vid nederkanten");
+}
+{
+  // Avrundning: ett block som slutar högst 1 px förbi nederkanten ryms (subpixel, zoom 110 %).
+  ok(stepsWithin(672.9, 672.5) && !stepsWithin(674, 672.5), "#144: 1 px tolerans för subpixel, inte mer");
+}
+
 console.log(`\n${passed} OK, ${failed} fel`);
 if (failed > 0) process.exit(1);

@@ -251,16 +251,18 @@ function stepsHTML(items) {
   return `<ol class="lb-steps">${rows.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>`;
 }
 
+/* Ren text ligger i ett eget block (.lb-text) — ser likadant ut, men ger
+   fitBoard() en layoutunderkant att mäta mot (issue #144, contentBottom). */
 function listHTML(value) {
   const rows = String(value ?? "").split("\n").map((s) => s.trim()).filter(Boolean);
   if (rows.length === 0) return `<div class="lb-empty">—</div>`;
-  if (rows.length === 1) return esc(rows[0]);
+  if (rows.length === 1) return `<div class="lb-text">${esc(rows[0])}</div>`;
   return `<ul class="lb-list">${rows.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>`;
 }
 
 function textHTML(value) {
   const v = String(value ?? "").trim();
-  return v ? esc(v).replace(/\n/g, "<br>") : `<div class="lb-empty">—</div>`;
+  return v ? `<div class="lb-text">${esc(v).replace(/\n/g, "<br>")}</div>` : `<div class="lb-empty">—</div>`;
 }
 
 function fieldHTML(part, plan) {
@@ -368,8 +370,11 @@ function boardHTML(rawPlan, subjects, { praise = false, breakBox = "" } = {}) {
    js/lib/board-fit.js. Gränsen är sista stegets underkant mot kolumnens
    nederkant — utan bottenrad tavlans ram (issue #138). Lärarens knapprad
    i rutan mäts bort, så förhandsvisningen får elevskärmens skalor; raden
-   får sedan plats genom rutans egen skala (issue #142). Nedräkningens
-   sekundtick byter bara text med fast bredd och anpassar aldrig om.
+   får sedan plats genom rutans egen skala (issue #142). Höjden mäts
+   geometriskt — blockens underkanter, inte scrollHeight — så glyfer som
+   sticker ut ur sina rader (Segoe UI på Windows) aldrig räknas som
+   överflöd (issue #144, contentBottom). Nedräkningens sekundtick byter
+   bara text med fast bredd och anpassar aldrig om.
    Utan Lektionsordning (issue #136) har rutan en egen smal kolumn
    (.lb-col--break-only). Den tas ut ur tavlan under sökningen, så
    --lb-scale är samma som utan rutan; sedan får kolumnen bredd efter
@@ -389,13 +394,35 @@ const BREAK_COL_FLOOR = 0.16;
 
 const OVERFLOW_NODES = ".lb-top, .lb-break, .lb-break__head, .lb-field__body";
 
+/* Höjden mäts geometriskt (issue #144): innehållets underkant = sista
+   synliga barnets layoutunderkant (contentBottom), mot rutans inre
+   nederkant (innerBottom). scrollHeight duger inte: med typsnitt vars
+   glyfer är högre än raden (Segoe UI på Windows: 1.33 em mot line-height
+   1.2–1.28) räknar Chrome glyferna som överflöd i VARJE skala, så
+   "ryms" blev aldrig sant och allt krympte till golvet. Ett blocks
+   underkant påverkas inte av glyferna — därför ligger all ren text i ett
+   eget block (.lb-text, textHTML/listHTML). Bredden mäts som förut. */
+function contentBottom(el) {
+  for (let n = el.lastElementChild; n; n = n.previousElementSibling) {
+    const r = n.getBoundingClientRect();
+    if (r.height > 0 || r.width > 0) return r.bottom;
+  }
+  return el.getBoundingClientRect().top;
+}
+function innerBottom(el) {
+  const cs = getComputedStyle(el);
+  return el.getBoundingClientRect().bottom - parseFloat(cs.borderBottomWidth) - parseFloat(cs.paddingBottom);
+}
+// Bortmätta noder (display:none, t.ex. rutan under steg 1) har ingen låda och ryms.
+const clipsY = (el) => el.getClientRects().length > 0 && !stepsWithin(contentBottom(el), innerBottom(el));
+
 /**
  * Svämmar något över? `skip` (valfri) = ett delträd som inte räknas;
  * `x: false` = bara på höjden.
  */
 function overflows(el, skip = null, { x = true } = {}) {
   const nodes = [el, ...el.querySelectorAll(OVERFLOW_NODES)].filter((n) => !skip?.contains(n));
-  return nodes.some((n) => n.scrollHeight > n.clientHeight + 1 || (x && n.scrollWidth > n.clientWidth + 1));
+  return nodes.some((n) => clipsY(n) || (x && n.scrollWidth > n.clientWidth + 1));
 }
 
 /** Bredden kolumnen behöver för att rutans rubrikrad (etikett + timer) ska stå på en rad. */
