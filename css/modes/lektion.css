@@ -530,6 +530,11 @@
 }
 .lb-col--mid .lb-field__label { font-size: 0.9em; }
 .lb-col--mid .lb-field__body { font-size: 1.08em; }
+/* Issue #134: "Efter rasten"-rutan krymper aldrig hela tavlan. Ryms inte
+   mittenkolumnen sätter fitBoard() --lb-steps-scale (< 1) på kolumnen, och
+   bara Lektionsordnings text blir mindre; i reservfallet även
+   --lb-break-scale på rutan. Utan rutan är båda 1. */
+.lb-col--mid .lb-field--attGora > .lb-field__body { font-size: calc(1.08em * var(--lb-steps-scale, 1)); }
 
 /* ---- EFTER RASTEN (issue #132) — överst i mittenkolumnen ----
    Tydligt annorlunda än de andra fälten: tjock ram i ämnesfärgen, rundade
@@ -540,8 +545,9 @@
    börjar under den och täcks aldrig. Lärarens knappar ligger på en egen
    liten rad nederst till höger. tabular-nums ger fast bredd, så sekundticket aldrig ändrar
    layouten (och aldrig anpassar om texten).
-   Tavlans storlek och kolumnbredder beror inte på rutan — när den tonas
-   bort (lb-break-out) flyttar bara mittenkolumnens innehåll upp. */
+   Tavlans storlek, kolumnbredder och --lb-scale beror inte på rutan
+   (issue #134) — när den tonas bort (lb-break-out) flyttar bara
+   mittenkolumnens innehåll upp och Lektionsordning växer tillbaka. */
 .lb-break {
   flex: 0 1 auto;
   min-height: 0;
@@ -554,6 +560,7 @@
   border-radius: var(--radius-l);
   background: var(--lb-break-bg, var(--lb-paper));
   overflow: hidden;
+  font-size: calc(1em * var(--lb-break-scale, 1));
 }
 /* Rubrikraden: etiketten till vänster, nedräkningen till höger. I en smal
    mittenkolumn bryts etiketten hellre på två rader än att hela tavlans
