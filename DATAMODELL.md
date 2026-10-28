@@ -474,6 +474,26 @@ teachers/{uid}/classes/{classId}/lessonPlans/{planId}
                          själv — den står kvar tills läraren trycker "Dölj
                          nu" eller bockar ur den. Följer med i kopior.
                        (Logik: js/lib/efter-rasten.js.)
+    ordningAktiv       — Lektionsordning i stunden (issue #146): index
+                         (0-baserat) för det pågående steget, eller null =
+                         inget markerat (tavlan exakt som utan funktionen).
+                         Räknas bland stegen som visas på tavlan (attGora
+                         utan tomma rader). Steg före = avbockade. Ett index
+                         utanför listan (steg borttagna) behandlas som null.
+    ordningDatum       — lektionsdagen (YYYY-MM-DD, lokal tid) då läget
+                         sattes. Läget gäller bara den dagen och tills
+                         planeringens sluttid (end) passerats; utan sluttid
+                         resten av dagen. Annars ignoreras det, och LÄRARVYN
+                         sätter ordningAktiv/ordningDatum/ordningTimer till
+                         null (en gång; elevskärmen skriver aldrig).
+    ordningTimer       — { step, durationMs, startedAt } (startedAt = epoch
+                         ms, servertid) eller null: timern på det pågående
+                         steget, startad i stunden från sidopanelen (1–90
+                         min). step !== ordningAktiv → behandlas som null.
+                         Varje stegbyte sätter den till null. Vid 0 visas
+                         "Klart" — steget går aldrig vidare av sig självt.
+                       Inget av de tre följer med i Kopiera eller Skicka
+                       kopia (null). (Logik: js/lib/lektionsordning.js.)
   show: { … }        — vilka fält som visas på tavlan; show.praise = visa
                        "Bra jobbat"-rutan i högerkolumnen (namnen läses ur
                        den LOKALA classes/{id}/praise/board — elevdata,

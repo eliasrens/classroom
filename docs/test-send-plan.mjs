@@ -17,6 +17,8 @@
  *   - presentedPlanOf (flyttad till js/data/plans.js)
  *   - "Efter rasten" (issue #132): text, minuter och kryssval följer med,
  *     nedräkningens körtillstånd ("+1 min", omstart) gör det inte
+ *   - Lektionsordningens läge (issue #146): stegen följer med, pågående
+ *     steg, datum och stegtimer gör det inte
  */
 
 const {
@@ -259,6 +261,22 @@ const SRC = {
   ok(presentedPlanOf(plans, { value: { presentedPlanId: "c" } }, now)?.id === "c", "valt id vinner");
   ok(presentedPlanOf(plans, { value: { presentedPlanId: "borta" } }, now) === null, "borttagen → tomläge");
   ok(presentedPlanOf(plans, { value: { presentedPlanId: null } }, now) === null, "null → tomläge");
+}
+
+// --- Lektionsordningens läge följer inte med (issue #146) -----------------------
+{
+  const src = {
+    id: "p9", name: "Bråk", subjectId: "ma", date: "2026-10-27", start: "08:00", end: "09:20",
+    fields: { attGora: ["A", "B", "C"], ordningAktiv: 2, ordningDatum: "2026-10-27", ordningTimer: { step: 2, durationMs: 1_200_000, startedAt: 1 } },
+    show: { attGora: true },
+  };
+  const c = buildCopy(src, { date: "2026-11-03" }, "larare-x");
+  ok(c.fields.attGora.join("|") === "A|B|C", "#146: stegen följer med");
+  ok(c.fields.ordningAktiv === null && c.fields.ordningDatum === null && c.fields.ordningTimer === null,
+    "#146: Skicka kopia får inget pågående steg, datum eller stegtimer");
+  ok(src.fields.ordningAktiv === 2 && src.fields.ordningTimer.step === 2, "#146: originalet är orört");
+  const old = buildCopy({ name: "Gammal", fields: { attGora: ["A"] } }, {}, "larare-x");
+  ok(!("ordningAktiv" in old.fields) && !("ordningTimer" in old.fields), "#146: gamla planeringar utan läget får inga nya nycklar");
 }
 
 console.log(`\n${passed} OK, ${failed} fel`);

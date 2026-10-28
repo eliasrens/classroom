@@ -415,6 +415,17 @@
 /* "Visa timer" (issue #139): utan timer döljs Minuter. */
 .field-edit__timer { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 2.25rem; font-size: 0.8rem; cursor: pointer; }
 .lesson-panel label.field-edit__min[hidden] { display: none; }
+/* Lektionsordning i stunden (issue #146): Föregående/Nästa steg, status och
+   timern på det pågående steget — samma knappstil som "+1 min"/"Dölj nu". */
+.field-edit__run { display: flex; flex-direction: column; gap: var(--space-1); margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--color-line); }
+.field-edit__run[hidden] { display: none; }
+.field-edit__run-row { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; }
+.field-edit__run-row .btn { padding-inline: var(--space-2); white-space: nowrap; }
+.field-edit__run-status { margin: 0; font-size: 0.85rem; font-weight: 600; overflow-wrap: anywhere; }
+.field-edit__run-ask { margin: 0; }
+.field-edit__run-min { width: 4.5rem; }
+.field-edit__run-error { margin: 0; font-size: 0.78rem; font-weight: 600; color: var(--color-danger); }
+.field-edit__run-error[hidden] { display: none; }
 
 /* ============================================================
    TAVLAN — 6-fältslayout. Delas av lärarförhandsvisning och elevvy.
@@ -647,6 +658,84 @@ ol.lb-steps > li::before {
   color: var(--subj-ink);
   font-size: 0.72em;
   font-weight: 700;
+}
+/* ---- Lektionsordning i stunden (issue #146) ----
+   Bara när ett steg är markerat (ol.lb-steps--run) — annars är tavlan
+   exakt som förut. Inget här tar plats i layouten, så radhöjder och
+   --lb-scale/--lb-steps-scale blir desamma som utan markering:
+   - avklarat steg: bock i samma bubbla (siffran står kvar osynlig och ger
+     bubblan exakt samma bredd och baslinje), överstruken och dämpad text
+     (text-decoration och opacity tar ingen plats);
+   - pågående steg: ram (outline) + ton (bakgrund och box-shadow-ring) som
+     ritas UTANFÖR radens låda. Ingen halvfet text. Fältets kropp klipper
+     med overflow: clip + overflow-clip-margin i stället för hidden, så att
+     ramen får synas utanför raden — det ändrar ingen layout (kroppen är en
+     flexpost med min-height: 0 och eget formateringssammanhang).
+   Timerbrickan sitter sist på raden (flex: none); texten bryts till
+   vänster om den (min-width: 0) och hamnar aldrig under den. */
+.lb-col--mid .lb-field--attGora > .lb-field__body:has(> ol.lb-steps--run) { overflow: clip; overflow-clip-margin: 0.45em; }
+ol.lb-steps > li.lb-step--done::before { content: none; }
+.lb-step__mark {
+  /* Samma mått som siffrans bubbla (ol.lb-steps > li::before) */
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 1.5em;
+  height: 1.5em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-round);
+  background: var(--subj);
+  color: transparent;
+  font-size: 0.72em;
+  font-weight: 700;
+  opacity: 0.5;
+}
+.lb-step__mark .icon {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 1.05em;
+  height: 1.05em;
+  color: var(--subj-ink);
+}
+.lb-step--done > .lb-step__text { text-decoration: line-through; text-decoration-thickness: 0.08em; opacity: 0.5; }
+ol.lb-steps > li.lb-step--now {
+  border-radius: 0.35em;
+  background: var(--lb-break-bg);
+  box-shadow: 0 0 0 0.2em var(--lb-break-bg);
+  outline: 2px solid var(--subj);
+  outline-offset: 0.2em;
+}
+.lb-step--timer > .lb-step__text { flex: 1 1 auto; min-width: 0; }
+.lb-step__timer {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15em;
+  padding: 0 0.3em;
+  border-radius: 0.3em;
+  /* Ungefär som Efter rastens timer (2.1em i rutan) */
+  font-size: 1.7em;
+  line-height: 1.2;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--lb-break-ink, var(--subj-deep));
+}
+.lb-step__timer .icon { width: 0.8em; height: 0.8em; }
+/* Klart: brickan i ämnets egen färg (som rubrikraden) med en mjuk puls —
+   aldrig rött, inget ljud. Steget går inte vidare av sig självt. */
+.lb-step__timer[data-phase="done"] {
+  background: var(--subj);
+  color: var(--subj-ink);
+  animation: lb-step-pulse 1.8s ease-in-out infinite;
+}
+@keyframes lb-step-pulse { 50% { opacity: 0.5; } }
+@media (prefers-reduced-motion: reduce) {
+  .lb-step__timer[data-phase="done"] { animation: none; }
+  ol.lb-steps > li.lb-step--now:has(> .lb-step__timer[data-phase="done"]) { outline-width: 4px; }
 }
 ul.lb-list { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 0.25em; }
 
