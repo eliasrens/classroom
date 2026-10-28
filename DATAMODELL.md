@@ -426,6 +426,19 @@ teachers/{uid}/settings/classes         — Mina klasser (issue #102,
                        när läraren har gjort ett val. Statistik, Veckor och
                        klassåtgärder filtreras aldrig (de visar bara vald klass).
 
+teachers/{uid}/settings/lektionsvy      — "Avancerat" i Lektionsplaneringens
+                       sidopanel (issue #149, js/lib/lektion-advanced.js). PRIVAT
+                       per lärare, ingen elevdata; följer läraren mellan datorer
+                       (i lokalt läge: uid "local").
+  id: "lektionsvy"
+  advanced: boolean  — true = sidopanelen visar även Efter rasten, Bra jobbat,
+                       stegning och timer i Lektionsordning och Widgets.
+                       Saknas dokumentet eller är värdet inte true är växeln AV
+                       (panelen som från början). Styr BARA lärarens sidopanel:
+                       tavlan, förhandsvisningen och elevskärmen ritas alltid
+                       likadant, och planeringarnas data (show, fields, widgets)
+                       ändras aldrig av växeln.
+
 teachers/{uid}/settings/klassrad        — Klassrådets mall + sekreterarens förval
                        (issue #125, js/lib/klassrad.js). PRIVAT per lärare,
                        ALDRIG elevdata; följer läraren mellan datorer (i lokalt
