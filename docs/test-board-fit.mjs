@@ -19,6 +19,10 @@
  *     (CSS-reglerna rör inga mått), så skalorna blir desamma; timerbrickan
  *     kan göra en rad högre → bara Lektionsordning anpassas, och när timern
  *     försvinner växer texten tillbaka
+ *   - planerade minuter (#153): Min-kolumnen mäts bort under sökningen av
+ *     --lb-scale (samma skala som utan minuter); fyra korta steg får samma
+ *     skalor med och utan kolumnen; långa steg som bryts av den smalare
+ *     kolumnen krymper bara Lektionsordning, aldrig resten av tavlan
  */
 
 const { FIT_MIN, FIT_PRECISION, searchScale, fitMidColumn, fitBreakColumn, stepsWithin } = await import("../js/lib/board-fit.js");
@@ -366,6 +370,50 @@ function glyphColumn({ box, steps, room, glyph }) {
   const gap = +(/gap: ([\d.]+)em;/.exec(bt)?.[1] ?? 9);
   const ic = +(/width: ([\d.]+)em;/.exec(rule(".lb-break__time .icon"))?.[1] ?? 9);
   ok(2 * px + gap + ic <= 0.8 + 0.15 + 1e-9, `#146: Efter rastens bricka tar ingen bredd från rubriken (${2 * px + gap + ic}em ≤ 0.95em)`);
+}
+
+// --- Planerade minuter (issue #153) ---------------------------------------------------
+// Min-kolumnen ligger inne i Lektionsordnings fält. fitBoard tar av klassen
+// lb-field--min under sökningen av --lb-scale (kolumnens delar är då
+// display:none), sätter tillbaka den och krymper sedan bara Lektionsordning
+// om stegen inte ryms i den smalare bredden. Uppmätt i webbläsaren (se
+// docs/screenshots/issue-153/README.md): fyra korta steg 0.966 / 1.00 med
+// och utan kolumnen i 1280 och 1920; en lång rad 0.863 med och utan, bara
+// --lb-steps-scale sjunker.
+{
+  const { readFileSync } = await import("node:fs");
+  const css = readFileSync(new URL("../css/modes/lektion.css", import.meta.url), "utf8");
+  const js = readFileSync(new URL("../js/modes/lektion.js", import.meta.url), "utf8");
+  const fit = js.slice(js.indexOf("function fitBoard("), js.indexOf("function fitBreakLabel("));
+  const off = fit.indexOf('minEl?.classList.remove("lb-field--min")');
+  const search = fit.indexOf("let scale = searchScale(1, () => !overflows(boardEl), setScale);");
+  const on = fit.indexOf('minEl?.classList.add("lb-field--min")');
+  ok(off > 0 && search > off && on > search, "#153 fall 1: Min-kolumnen mäts bort under sökningen av --lb-scale och sätts tillbaka efteråt");
+  ok(/\.lb-min__label, \.lb-min, \.lb-min__rule \{ display: none; \}/.test(css), "#153 fall 1: utan lb-field--min är kolumnens delar display:none (fältet som utan minuter)");
+  ok(/if \(!breakEl && !minEl\) return;/.test(fit), "#153 fall 1: utan minuter (och utan ruta) samma väg som förut — ingen --lb-steps-scale");
+
+  // Fall 2: fyra korta steg ryms i den smalare bredden → --lb-steps-scale 1.
+  // Modell: raden behöver `need` px, kolumnen ger `room` px vid skala s.
+  const shortSteps = (need, room) => {
+    let s = 1;
+    const steps = searchScale(1, () => need * s <= room, (v) => { s = v; });
+    return steps;
+  };
+  ok(shortSteps(438, 439) === 1, "#153 fall 2: fyra korta steg ryms bredvid kolumnen → --lb-steps-scale 1 (samma som utan)");
+  // CSS: kolumnen tar fältets högerluft och rubriken MIN gör den inte bredare.
+  const rule = (sel) => { const i = css.indexOf(`${sel} {`); return i < 0 ? "" : css.slice(i + sel.length + 2, css.indexOf("}", i)); };
+  ok(/padding-right: 0\.2em;/.test(rule(".lb-col--mid .lb-field--attGora.lb-field--min")), "#153 fall 2: Min-kolumnen får fältets högerluft");
+  ok(/grid-column: 1 \/ -1;/.test(rule(".lb-field--min > .lb-min__label")) && /justify-self: end;/.test(rule(".lb-field--min > .lb-min__label")),
+    "#153 fall 2: rubriken MIN spänner över raden (bestämmer inte kolumnens bredd)");
+  ok(/min-width: 2ch;/.test(rule(".lb-field--min .lb-min")), "#153: kolumnen minst \"90\" bred");
+
+  // Fall 3: långa steg — bara Lektionsordning krymps (tavlans skala orörd).
+  ok(/if \(!breakEl\) \{\s*const steps = searchScale\(1, fits, setVar\("--lb-steps-scale"\)\);/.test(fit), "#153 fall 3: utan ruta krymps bara --lb-steps-scale");
+  ok(/minRows\.every\(\(li\) => li\.scrollWidth <= li\.clientWidth \+ 1\)/.test(fit), "#153 fall 3: ett steg som går in under minuterna räknas som att det inte ryms");
+  const board = { scale: 0.863 };
+  const col = column({ box: 0, steps: 110, room: 100 });
+  const r = fitMidColumn(col);
+  ok(board.scale === 0.863 && r.steps < 1 && col.fits(), `#153 fall 3: raden blir högre i den smalare kolumnen → bara stegen krymps (fick ${r.steps})`);
 }
 
 console.log(`\n${passed} OK, ${failed} fel`);
