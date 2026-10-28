@@ -713,39 +713,38 @@ ol.lb-steps > li.lb-step--now {
   outline: 2px solid var(--subj-deep, var(--subj));
   outline-offset: 0.2em;
 }
-/* Texten tar resten av raden och bryts till vänster om brickan. Ryms inte
-   ens textens längsta ord bredvid brickan flyttar brickan ned på en egen
-   rad (högerställd, fortfarande inuti ramen) — hellre det än ett ord
-   som bryts mitt i eller text som hamnar bakom brickan. */
-ol.lb-steps > li.lb-step--timer { flex-wrap: wrap; row-gap: 0.1em; }
-.lb-step--timer > .lb-step__text { flex: 1 1 0; }
+/* Stegtexten tar all ledig plats och bryts först när den inte ryms
+   bredvid brickan (ingen fast bredd eller flex-basis). */
+.lb-step--timer > .lb-step__text { flex: 1 1 auto; min-width: 0; }
+/* Timerbrickan: ifylld i ämnets färg, som rubrikraden (--subj/--subj-ink =
+   subjectStyle().color/textColor), så att den syns på projektorn.
+   align-self: flex-start + höjden = stegtextens radhöjd (1.28 i
+   brödtextens em, brickan är 1.15 gånger större): brickan ligger mitt på
+   textens första rad — med text på en rad centrerad med bubbla och text —
+   och gör aldrig raden högre än de andra stegen. Siffrornas glyfer får
+   plats inom höjden (line-height: 1). */
 .lb-step__timer {
   flex: none;
-  margin-left: auto;
+  align-self: flex-start;
+  height: calc(1.28em / 1.15);
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   gap: 0.15em;
-  padding: 0 0.3em;
-  border-radius: 0.3em;
-  /* Större och fetare än stegtexten, men mindre än Efter rastens timer
-     (2.1em i rutan, som har hela kolumnens bredd): brickan delar raden med
-     stegtexten, och ett vanligt ord ("Mattebok") ska få plats till vänster
-     om den utan att brytas mitt i. */
+  padding: 0.1em 0.5em;
+  border-radius: 0.35em;
   font-size: 1.15em;
-  line-height: 1.2;
+  line-height: 1;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  color: var(--lb-break-ink, var(--subj-deep));
-}
-.lb-step__timer .icon { width: 0.8em; height: 0.8em; }
-/* Klart: brickan i ämnets egen färg (som rubrikraden) med en mjuk puls —
-   aldrig rött, inget ljud. Steget går inte vidare av sig självt. */
-.lb-step__timer[data-phase="done"] {
   background: var(--subj);
   color: var(--subj-ink);
-  animation: lb-step-pulse 1.8s ease-in-out infinite;
 }
+.lb-step__timer .icon { width: 0.8em; height: 0.8em; }
+/* Klart: hela brickan pulserar mjukt — aldrig rött, inget ljud. Steget
+   går inte vidare av sig självt. */
+.lb-step__timer[data-phase="done"] { animation: lb-step-pulse 1.8s ease-in-out infinite; }
 @keyframes lb-step-pulse { 50% { opacity: 0.5; } }
 @media (prefers-reduced-motion: reduce) {
   .lb-step__timer[data-phase="done"] { animation: none; }
