@@ -672,7 +672,7 @@ ol.lb-steps > li::before {
      likaså), så att ramen får synas utanför raden — det ändrar ingen layout (kroppen är en
      flexpost med min-height: 0 och eget formateringssammanhang).
    Timerbrickan sitter sist på raden (flex: none); texten bryts till
-   vänster om den (min-width: 0) och hamnar aldrig under den. */
+   vänster om den och hamnar aldrig under den. */
 .lb-col--mid .lb-field--attGora > .lb-field__body:has(> ol.lb-steps--run) { overflow: clip; overflow-clip-margin: 0.45em; }
 /* Fältet runt omkring likaså: utan luft under sista steget (#138) skulle
    det annars klippa ramens underkant när sista steget pågår. fitBoard
@@ -708,10 +708,17 @@ ol.lb-steps > li.lb-step--now {
   border-radius: 0.35em;
   background: var(--lb-break-bg);
   box-shadow: 0 0 0 0.2em var(--lb-break-bg);
-  outline: 2px solid var(--subj);
+  /* --subj-deep: ämnesfärgen mörknad tills den syns mot det vita pappret
+     (color.js) — med ljusa ämnen (Slöjd, Idrott) syns ramen annars knappt. */
+  outline: 2px solid var(--subj-deep, var(--subj));
   outline-offset: 0.2em;
 }
-.lb-step--timer > .lb-step__text { flex: 1 1 auto; min-width: 0; }
+/* Texten tar resten av raden och bryts till vänster om brickan. Ryms inte
+   ens textens längsta ord bredvid brickan flyttar brickan ned på en egen
+   rad (högerställd, fortfarande inuti ramen) — hellre det än ett ord
+   som bryts mitt i eller text som hamnar bakom brickan. */
+ol.lb-steps > li.lb-step--timer { flex-wrap: wrap; row-gap: 0.1em; }
+.lb-step--timer > .lb-step__text { flex: 1 1 0; }
 .lb-step__timer {
   flex: none;
   margin-left: auto;
