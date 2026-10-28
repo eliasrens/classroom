@@ -32,7 +32,7 @@ globalThis.localStorage = {
 globalThis.sessionStorage ??= { getItem: () => null, setItem() {}, removeItem() {} };
 
 const L = await import("../js/lib/lektionsordning.js");
-const { boardHTML, normalizePlan } = await import("../js/modes/lektion.js");
+const { boardHTML, breakBoxHTML, normalizePlan } = await import("../js/modes/lektion.js");
 const { SUBJECTS } = await import("../js/lib/color.js");
 const { buildCopy } = await import("../js/lib/send-plan.js");
 const { resetBreakRun } = await import("../js/lib/efter-rasten.js");
@@ -144,6 +144,30 @@ const withF = (plan, fields) => ({ ...plan, fields });
   ok(L.ordningState(broken, t0).timer === null, "trasig timer → ingen timer");
 }
 
+// --- stapeln: andelen tid kvar (issue #146) ----------------------------------------------
+{
+  const t0 = at(8, 40);
+  const step3 = withF(PLAN, { attGora: STEPS, ordningAktiv: 2, ordningDatum: "2026-10-27", ordningTimer: { step: 2, durationMs: 20 * 60_000, startedAt: t0 } });
+  ok(L.stepCountdown(step3, t0 - 5_000).fraction === 1, "stegtimern före start: full stapel (1)");
+  ok(L.stepCountdown(step3, t0).fraction === 1, "stegtimern vid start: 1");
+  ok(L.stepCountdown(step3, t0 + 10 * 60_000).fraction === 0.5, "stegtimern halvvägs: 0,5");
+  ok(L.stepCountdown(step3, t0 + 20 * 60_000).fraction === 0, "stegtimern vid Klart: 0");
+  const plus = withF(step3, L.stepPlusOneMinute(step3, t0 + 10 * 60_000));
+  ok(Math.abs(L.stepCountdown(plus, t0 + 10 * 60_000).fraction - 11 / 21) < 1e-9, "+1 min: andelen räknas om mot den nya totalen (11/21)");
+  const late = t0 + 25 * 60_000;
+  ok(L.stepCountdown(withF(step3, L.stepPlusOneMinute(step3, late)), late).fraction === 1, "+1 min efter Klart: full stapel igen");
+  ok(L.ordningView(step3, t0 + 10 * 60_000).fraction === 0.5, "ordningView skickar med andelen");
+
+  const R = await import("../js/lib/efter-rasten.js");
+  const brk = { id: "b", date: "2026-10-27", start: "08:00", end: "09:00", fields: { efterRasten: "- Läs", efterRastenMin: 10 }, show: { efterRasten: true } };
+  ok(R.breakCountdown(brk, at(7, 50)).fraction === 1, "Efter rasten före start: full stapel (1)");
+  ok(R.breakCountdown({ ...brk, start: "" }, at(8, 30)).fraction === 1, "Efter rasten utan starttid: full stapel");
+  ok(R.breakCountdown(brk, at(8, 5)).fraction === 0.5, "Efter rasten halvvägs: 0,5");
+  ok(R.breakCountdown(brk, at(8, 10)).fraction === 0, "Efter rasten vid 0: 0");
+  const brkPlus = { ...brk, fields: R.plusOneMinute(brk.fields) };
+  ok(Math.abs(R.breakCountdown(brkPlus, at(8, 5)).fraction - 6 / 11) < 1e-9, "Efter rasten +1 min: andelen räknas om mot 11 min (6/11)");
+}
+
 // --- minutfältet --------------------------------------------------------------------
 {
   for (const bad of [0, "0", 91, "91", "", "  ", null, undefined, "tio", "5 min", "2.5", -3, "1e1"]) {
@@ -234,8 +258,8 @@ const BEFORE = [
 
   const timed = withF(mid, { ...mid.fields, ordningTimer: { step: 1, durationMs: 20 * 60_000, startedAt: now } });
   const ht = html(timed);
-  ok((ht.match(/class="lb-step__timer"/g) ?? []).length === 1, "timern visas på EN rad");
-  ok(/<li class="lb-step--now lb-step--timer" aria-current="step"><span class="lb-step__text">&lt;b&gt;Två&lt;\/b&gt;<\/span><span class="lb-step__timer" role="timer"[^>]*data-phase="running"><svg[^]*?<\/svg><span data-el="step-time">20:00<\/span><\/span><\/li>/.test(ht),
+  ok((ht.match(/class="lb-step__timer lb-timer"/g) ?? []).length === 1, "timern visas på EN rad");
+  ok(/<li class="lb-step--now lb-step--timer" aria-current="step"><span class="lb-step__text">&lt;b&gt;Två&lt;\/b&gt;<\/span><span class="lb-step__timer lb-timer" role="timer"[^>]*data-phase="running"><svg[^]*?<\/svg><span data-el="step-time">20:00<\/span><span class="wt-bar lb-timer__bar"[^>]*><span class="wt-bar__fill" data-el="step-bar" style="transform:scaleX\(1\.0000\)"><\/span><\/span><\/span><\/li>/.test(ht),
     "timern sitter sist på det pågående stegets rad, inuti raden, och visar 20:00");
   const hd = boardHTML(timed, SUBJECTS, { run: L.ordningView(timed, now + 20 * 60_000) });
   ok(hd.includes(`data-phase="done"`) && hd.includes(">Klart</span>"), "vid 0: Klart");
@@ -255,13 +279,22 @@ const BEFORE = [
   const now = at(8, 30);
   const p = withF(PLAN, { attGora: STEPS, ordningAktiv: 2, ordningDatum: "2026-10-27", ordningTimer: { step: 2, durationMs: 600_000, startedAt: now } });
   const h = boardHTML(p, SUBJECTS, { run: L.ordningView(p, now) });
-  ok(/<span class="lb-step__timer" role="timer"[^>]*>/.test(h), "timern är en bricka (klassen lb-step__timer)");
-  const badge = rule(".lb-step__timer") ?? "";
+  ok(/<span class="lb-step__timer lb-timer" role="timer"[^>]*>/.test(h), "stegtimern har brickklassen lb-timer");
+  // Efter rastens timer har SAMMA brickklass (en gemensam stil, ingen variant).
+  const brkPlan = { ...p, show: { attGora: true, efterRasten: true }, fields: { ...p.fields, efterRasten: "- Läs", efterRastenMin: 10 } };
+  const brkHTML = breakBoxHTML(brkPlan, at(8, 5));
+  ok(/<div class="lb-break__time lb-timer" role="timer"/.test(brkHTML), "Efter rastens timer har samma brickklass lb-timer");
+  ok(/<span class="wt-bar lb-timer__bar"[^>]*><span class="wt-bar__fill" data-el="brk-bar" style="transform:scaleX\(0\.5000\)">/.test(brkHTML), "Efter rasten halvvägs: stapeln halv (widgetens wt-bar/wt-bar__fill)");
+  ok(!/lb-timer/.test(breakBoxHTML({ ...brkPlan, fields: { ...brkPlan.fields, efterRastenTimer: false } }, at(8, 5))), "Efter rasten utan timer: ingen bricka");
+  const badge = rule(".lb-timer") ?? "";
   ok(/background: var\(--subj\);/.test(badge) && /color: var\(--subj-ink\);/.test(badge), "brickan är ifylld: ämnesfärg som bakgrund, ämnets textfärg");
-  ok(/padding: 0\.05em 0\.3em;/.test(badge) && /border-radius:/.test(badge) && /tabular-nums/.test(badge), "rundade hörn, smal padding, tabular-nums");
-  ok(/font-size: 1em;/.test(badge) && /height: 1\.28em;/.test(badge), "brickan har stegtextens storlek och är en textrad hög (raden blir inte högre)");
-  ok(/width: 0\.7em; height: 0\.7em;/.test(rule(".lb-step__timer .icon") ?? ""), "ikonen något mindre (0.7em)");
-  ok(/flex: none;/.test(badge) && !/margin-left/.test(badge), "brickan: flex none, mellanrum via gap (ingen margin-left: auto)");
+  ok(/padding: 0\.05em var\(--lb-timer-px, 0\.4em\) 0\.15em;/.test(badge) && /border-radius: var\(--radius-m\);/.test(badge) && /tabular-nums/.test(badge), "radius-m, padding 0.05em 0.4em (+ luft för stapeln), tabular-nums");
+  const bar = rule(".lb-timer > .lb-timer__bar") ?? "";
+  ok(/height: 0\.12em;/.test(bar) && /position: absolute;/.test(bar) && /currentColor 25%/.test(bar), "stapeln: 0.12em, inuti brickans nederkant, spår i currentColor 25 %");
+  ok(/background: currentColor;/.test(rule(".lb-timer > .lb-timer__bar > .wt-bar__fill") ?? ""), "fyllningen i currentColor");
+  const stepT = rule(".lb-step__timer") ?? "";
+  ok(/font-size: 1em;/.test(stepT) && /height: 1\.28em;/.test(stepT), "stegbrickan: stegtextens storlek, en textrad hög (raden blir inte högre)");
+  ok(/flex: none;/.test(stepT) && !/margin-left/.test(stepT + badge), "brickan: flex none, mellanrum via gap (ingen margin-left: auto)");
   ok(/animation: lb-step-pulse/.test(rule('.lb-step__timer[data-phase="done"]') ?? ""), "Klart: hela brickan pulserar");
   const text = rule(".lb-step--timer > .lb-step__text") ?? "";
   ok(/flex: 1 1 auto;/.test(text) && /min-width: 0;/.test(text), "stegtexten: flex 1 1 auto, min-width 0");

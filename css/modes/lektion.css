@@ -616,26 +616,64 @@
 .lb-col--break-only .lb-break[data-phase="off"] .lb-break__head > .lb-field__label { white-space: nowrap; }
 .lb-break__text { margin: 0; }
 /* Ungefär dubbelt så hög som brödtexten (1.08em i mittenkolumnen). */
+/* Brickan (.lb-timer, issue #146) i samma höjd som förut: 1.2em =
+   luft 0.05em + siffrorna (line-height 1) + 0.15em för stapeln. Siffrornas
+   glyfer sticker ut ur raden (Segoe UI på Windows) — fitBoard mäter därför
+   block, inte scrollHeight (issue #144). */
 .lb-break__time {
   flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.15em;
   font-size: 2.1em;
-  /* Siffrornas glyfer sticker ut ur raden (med Segoe UI på Windows även
-     vid 1.2) — fitBoard mäter därför block, inte scrollHeight (issue #144). */
-  line-height: 1.2;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  color: var(--lb-break-ink, var(--subj-deep));
+  height: 1.2em;
+  --lb-timer-px: calc(0.4em / 2.1);
+  gap: 0.1em;
 }
-.lb-break__time .icon { width: 0.8em; height: 0.8em; }
+/* Ikonen något mindre än förut (0.8em) och tätare mot siffrorna: brickans
+   sidoluft tar då ingen bredd från rubriken "EFTER RASTEN" bredvid. */
+.lb-break__time .icon { width: 0.7em; height: 0.7em; }
 .lb-break--leaving { animation: lb-break-out 0.5s ease forwards; pointer-events: none; }
 @keyframes lb-break-out { to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .lb-break--leaving { animation-duration: 1ms; }
 }
+
+/* ---- TIMERBRICKAN (issue #146) — Efter rastens timer och stegtimern ----
+   EN gemensam stil: ifylld i ämnets färg (--subj/--subj-ink =
+   subjectStyle().color/textColor, som rubrikraden) så att den syns på
+   projektorn. Mindre rundad (--radius-m) än ramarna runt omkring.
+   En tunn stapel i nederkanten visar andelen tid kvar — samma utseende
+   som timerwidgetens (.wt--chip .wt-bar, css/ui/widgets.css): spår i
+   currentColor 25 %, fyllning currentColor, scaleX(kvar/total) från
+   vänster. Storlek och höjd sätts av respektive timer ovan/nedan.
+   tabular-nums: sekundticket ändrar aldrig bredden. */
+.lb-timer {
+  position: relative;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15em;
+  /* Sidoluften i stegtextens em (0.4em där); Efter rastens bricka har 2.1
+     gånger större text och sätter --lb-timer-px så att luften blir lika
+     stor i pixlar — annars trycker den ihop rutans rubrik. */
+  padding: 0.05em var(--lb-timer-px, 0.4em) 0.15em;
+  border-radius: var(--radius-m);
+  background: var(--subj);
+  color: var(--subj-ink);
+  line-height: 1;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.lb-timer > .lb-timer__bar {
+  position: absolute;
+  left: var(--lb-timer-px, 0.4em);
+  right: var(--lb-timer-px, 0.4em);
+  bottom: 0.05em;
+  height: 0.12em;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 25%, transparent);
+}
+.lb-timer > .lb-timer__bar > .wt-bar__fill { background: currentColor; }
 
 /* LEKTIONSORDNING (datanyckel attGora) — numrerad lista */
 ol.lb-steps { margin: 0; padding: 0; list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 0.35em; }
@@ -716,10 +754,7 @@ ol.lb-steps > li.lb-step--now {
 /* Stegtexten tar all ledig plats och bryts först när den inte ryms
    bredvid brickan (ingen fast bredd eller flex-basis). */
 .lb-step--timer > .lb-step__text { flex: 1 1 auto; min-width: 0; }
-/* Timerbrickan: ifylld i ämnets färg, som rubrikraden (--subj/--subj-ink =
-   subjectStyle().color/textColor), så att den syns på projektorn. Samma
-   textstorlek som steget (fetstil gör den tydlig) och smal padding, så att
-   ett kort steg ("Mattebok s.44-45") oftare ryms på raden bredvid.
+/* Stegtimern: samma bricka (.lb-timer) i stegtextens storlek.
    align-self: flex-start + höjden = stegtextens radhöjd (1.28): brickan
    ligger mitt på textens första rad — med text på en rad centrerad med
    bubbla och text — och gör aldrig raden högre än de andra stegen. */
@@ -727,19 +762,7 @@ ol.lb-steps > li.lb-step--now {
   flex: none;
   align-self: flex-start;
   height: 1.28em;
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.12em;
-  padding: 0.05em 0.3em;
-  border-radius: 0.3em;
   font-size: 1em;
-  line-height: 1;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  background: var(--subj);
-  color: var(--subj-ink);
 }
 .lb-step__timer .icon { width: 0.7em; height: 0.7em; }
 /* Klart: hela brickan pulserar mjukt — aldrig rött, inget ljud. Steget

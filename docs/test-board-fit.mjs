@@ -323,5 +323,27 @@ function glyphColumn({ box, steps, room, glyph }) {
   ok(fitMidColumn(fits).steps === 1, "#146: ryms raden med brickan ändå krymps ingenting");
 }
 
+// Fall 3: timerbrickorna (.lb-timer, rättelse i #146) får inte ändra
+// --lb-scale eller --lb-steps-scale. Brickan har exakt samma höjd som
+// timern hade: Efter rasten 1.2em (förut line-height 1.2), stegtimern en
+// textrad (1.28). Luft + siffror (line-height 1) + stapelns luft ryms i den
+// höjden, och stapeln ligger absolut (tar ingen plats). #144:s mätning av
+// blockens underkanter ser alltså samma låda som förut.
+{
+  const { readFileSync } = await import("node:fs");
+  const css = readFileSync(new URL("../css/modes/lektion.css", import.meta.url), "utf8");
+  const rule = (sel) => {
+    const i = css.indexOf(`${sel} {`);
+    return i < 0 ? "" : css.slice(i + sel.length + 2, css.indexOf("}", i));
+  };
+  const badge = rule(".lb-timer");
+  const pad = /padding: ([\d.]+)em .* ([\d.]+)em;/.exec(badge);
+  const inner = pad ? +pad[1] + 1 + +pad[2] : Infinity; // line-height 1
+  ok(/line-height: 1;/.test(badge) && /box-sizing: border-box;/.test(badge), "#146: brickan: line-height 1, border-box");
+  ok(/height: 1\.2em;/.test(rule(".lb-break__time")) && inner <= 1.2 + 1e-9, `#146: Efter rastens bricka är 1.2em hög som förut (innehåll ${inner}em)`);
+  ok(/height: 1\.28em;/.test(rule(".lb-step__timer")) && inner <= 1.28, "#146: stegbrickan är en textrad hög — raden blir inte högre");
+  ok(/position: absolute;/.test(rule(".lb-timer > .lb-timer__bar")), "#146: stapeln tar ingen plats i layouten");
+}
+
 console.log(`\n${passed} OK, ${failed} fel`);
 if (failed > 0) process.exit(1);

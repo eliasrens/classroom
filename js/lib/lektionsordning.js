@@ -93,14 +93,15 @@ export function ordningState(plan, now) {
  *   none    — ingen timer (eller inget pågående steg)
  *   running — räknar ned (före startedAt, t.ex. klockskillnad: full tid)
  *   done    — tiden är ute: texten "Klart"
+ * `fraction` = andelen tid kvar (1 → 0) för timerbrickans stapel.
  */
 export function stepCountdown(plan, now) {
   const { timer } = ordningState(plan, now);
-  if (!timer) return { phase: "none", remainingMs: 0, text: "" };
+  if (!timer) return { phase: "none", remainingMs: 0, text: "", fraction: 0 };
   const left = Math.max(0, Math.min(timer.durationMs, timer.startedAt + timer.durationMs - now));
   return left > 0
-    ? { phase: "running", remainingMs: left, text: formatMs(left) }
-    : { phase: "done", remainingMs: 0, text: STEP_DONE_TEXT };
+    ? { phase: "running", remainingMs: left, text: formatMs(left), fraction: left / timer.durationMs }
+    : { phase: "done", remainingMs: 0, text: STEP_DONE_TEXT, fraction: 0 };
 }
 
 /* ---- Lärarens knappar: de ändrade fälten (sparas via datalagret) ---- */
@@ -192,11 +193,11 @@ export function createOrdningReset({ teacher = true } = {}) {
 
 /**
  * Det tavlan ska visa: null = inget markerat (exakt dagens tavla), annars
- * { active, phase, text } — phase/text från stepCountdown.
+ * { active, phase, text, fraction } — från stepCountdown.
  */
 export function ordningView(plan, now) {
   const { active } = ordningState(plan, now);
   if (active == null) return null;
   const c = stepCountdown(plan, now);
-  return { active, phase: c.phase, text: c.text };
+  return { active, phase: c.phase, text: c.text, fraction: c.fraction };
 }

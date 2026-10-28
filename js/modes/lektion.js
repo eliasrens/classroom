@@ -261,6 +261,19 @@ function normalizePlan(plan) {
    (inga tomma hål). Ämnesfärgen kommer in via inline --subj.
    ============================================================ */
 
+/* Timerbrickornas stapel (issue #146): samma utseende som timerwidgetens
+   (.wt-bar/.wt-bar__fill, css/ui/widgets.css). Fyllningen = andelen tid
+   kvar, räknad ur tidsstämplarna (breakCountdown/stepCountdown). */
+const barScale = (f) => `scaleX(${Math.max(0, Math.min(1, f)).toFixed(4)})`;
+/** Stapelns tick: bara transform (ingen layout, ingen omanpassning). */
+function setBar(fillEl, fraction) {
+  const t = barScale(fraction);
+  if (fillEl && fillEl.style.transform !== t) fillEl.style.transform = t;
+}
+function timerBarHTML(fraction, el) {
+  return `<span class="wt-bar lb-timer__bar" aria-hidden="true"><span class="wt-bar__fill" data-el="${el}" style="transform:${barScale(fraction)}"></span></span>`;
+}
+
 /* Lektionsordning i stunden (issue #146, js/lib/lektionsordning.js).
    `run` = ordningView(): null → exakt samma HTML som före #146. Annars:
    avklarade steg får en bock i stället för siffran (samma bubbla, siffran
@@ -275,7 +288,7 @@ function stepRowHTML(s, i, run) {
   }
   if (i > run.active) return `<li>${esc(s)}</li>`;
   const timer = run.phase === "none" ? "" :
-    `<span class="lb-step__timer" role="timer" aria-label="Tid kvar på steget" data-phase="${run.phase}">${icon("clock")}<span data-el="step-time">${esc(run.text)}</span></span>`;
+    `<span class="lb-step__timer lb-timer" role="timer" aria-label="Tid kvar på steget" data-phase="${run.phase}">${icon("clock")}<span data-el="step-time">${esc(run.text)}</span>${timerBarHTML(run.fraction, "step-bar")}</span>`;
   return `<li class="lb-step--now${timer ? " lb-step--timer" : ""}" aria-current="step"><span class="lb-step__text">${esc(s)}</span>${timer}</li>`;
 }
 
@@ -329,7 +342,7 @@ function breakBoxHTML(plan, now, { leavingMs = null } = {}) {
   return `<div class="lb-break${leaving ? " lb-break--leaving" : ""}" data-phase="${c.phase}"${leaving ? ` style="animation-delay:${-Math.round(leavingMs)}ms"` : ""}>
     <div class="lb-break__head">
       <div class="lb-field__label">${esc(breakLabel(plan.fields).toUpperCase())}</div>
-      ${timer ? `<div class="lb-break__time" role="timer" aria-label="Tid kvar">${icon("clock")}<span data-el="brk-time">${c.text}</span></div>` : ""}
+      ${timer ? `<div class="lb-break__time lb-timer" role="timer" aria-label="Tid kvar">${icon("clock")}<span data-el="brk-time">${c.text}</span>${timerBarHTML(c.fraction, "brk-bar")}</div>` : ""}
     </div>
     <div class="lb-field__body lb-break__body">${body}</div>
   </div>`;
@@ -682,6 +695,7 @@ function tickBreak(container, brk, rawPlan, rerender) {
   const timeEl = box?.querySelector('[data-el="brk-time"]');
   const c = breakCountdown(plan, now);
   if (timeEl && timeEl.textContent !== c.text) timeEl.textContent = c.text;
+  setBar(box?.querySelector('[data-el="brk-bar"]'), c.fraction);
   if (box && box.dataset.phase !== c.phase) box.dataset.phase = c.phase;
 }
 
@@ -712,6 +726,7 @@ function tickSteps(container, rawPlan, rerender) {
   if (runKey(run) !== renderedRunKey(container)) { rerender(); return; }
   const timeEl = run?.phase === "running" ? container.querySelector('[data-el="step-time"]') : null;
   if (timeEl && timeEl.textContent !== run.text) timeEl.textContent = run.text;
+  if (timeEl) setBar(container.querySelector('[data-el="step-bar"]'), run.fraction);
 }
 
 /** Anpassa om efter storleksändring (samma innehåll). */
@@ -807,7 +822,7 @@ function lessonWidgetsSummary(rawPlan) {
 
 /** Exporterade för docs/test-widgets.mjs (widgets följer med planeringen)
     och docs/test-lektionsordning.mjs (tavlans HTML, issue #146). */
-export { normalizePlan, boardHTML };
+export { normalizePlan, boardHTML, breakBoxHTML };
 
 export default {
   id: "lektion",
