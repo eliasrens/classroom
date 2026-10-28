@@ -749,15 +749,11 @@ ol.lb-steps > li.lb-step--now {
   outline: 2px solid var(--subj-deep, var(--subj));
   outline-offset: 0.2em;
 }
-/* Issue #138-fallet: utan bottenrad och med Efter rasten-rutan får sista
-   steget sluta vid tavlans ram, så en ram UTANFÖR raden skulle klippas när
-   sista steget pågår. Där ritas ramen i stället precis innanför raden
-   (outline-offset negativ) — fitBoard räknar aldrig in markeringen, så
-   skalorna blir desamma som utan markering (Testarens fynd). */
-.lesson-board:not(:has(> .lb-bottom)) .lb-col--mid:has(> .lb-break:not(.lb-break--off)) ol.lb-steps > li.lb-step--now:last-child {
-  outline-offset: -2px;
-  box-shadow: none;
-}
+/* Ramen ritas alltid UTANFÖR raden, så att den omsluter bubbla, text och
+   bricka. I #138-fallet (ingen bottenrad, Efter rasten-rutan i kolumnen)
+   kan sista steget sluta vid tavlans ram; då sammanfaller ramens underkant
+   med tavlans egen ram i ämnesfärgen. fitBoard räknar aldrig in
+   markeringen, så skalorna blir desamma som utan markering. */
 /* Stegtexten tar all ledig plats och bryts först när den inte ryms
    bredvid brickan (ingen fast bredd eller flex-basis). */
 .lb-step--timer > .lb-step__text { flex: 1 1 auto; min-width: 0; }
