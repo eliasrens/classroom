@@ -87,6 +87,13 @@
  *   av sig självt. Utan markering är tavlans HTML exakt som förut. Läget
  *   gäller dagen det sattes, till lektionens slut; lärarvyn nollställer
  *   det sedan (en gång), och kopior får aldrig med det.
+ * - "Avancerat" (issue #149, js/lib/lektion-advanced.js): sidopanelen är som
+ *   standard enkel. Efter rasten, Bra jobbat, stegningen i Lektionsordning
+ *   och Widgets visas bara med växeln "Avancerat" längst ner i panelen på
+ *   (lärarens val, teachers/{uid}/settings/lektionsvy). Växeln styr BARA
+ *   panelen — tavlan, förhandsvisningen och elevskärmen ritas likadant och
+ *   planeringen ändras aldrig. Använder planeringen avancerade delar när
+ *   växeln är av visas en rad med "Visa avancerat".
  *
  * Kontrakt: docs/MODULKONTRAKT.md. Data: DATAMODELL.md.
  * Planeringar OCH presentedPlanId är PRIVATA per lärare
@@ -106,6 +113,9 @@ import {
   ordningState, ordningView, parseStepMinutes, resetOrdningRun, stepCountdown, stepNext, stepPlusOneMinute, stepPrev,
   stepStartTimer, stepStopTimer,
 } from "../lib/lektionsordning.js";
+import {
+  ADVANCED_FIELD_KEYS, ADVANCED_SETTINGS_DOC, advancedPartsInUse, advancedSettingsPath, isAdvanced,
+} from "../lib/lektion-advanced.js";
 import {
   MY_SUBJECTS_DOC, mySubjectsPath, myIds, filterSubjects, withMine, saveMine,
 } from "../lib/my-subjects.js";
@@ -829,8 +839,17 @@ function lessonWidgetsSummary(rawPlan) {
 
 /* ---- Sidopanelens fältredigerare (kryssruta + innehåll) ---- */
 
-function fieldsHTML(plan) {
-  const rows = FIELD_KEYS.map((k) => {
+/* Den lilla etiketten vid varje avancerad del (issue #149). */
+const ADV_TAG = `<span class="adv-tag">Avancerat</span>`;
+
+/**
+ * `advanced` = växeln "Avancerat" (issue #149). Av: Efter rasten och Bra
+ * jobbat (ADVANCED_FIELD_KEYS) och stegningens plats under Lektionsordning
+ * renderas inte. På: samma HTML som före #149, plus etiketterna.
+ */
+function fieldsHTML(plan, { advanced = false } = {}) {
+  const keys = advanced ? FIELD_KEYS : FIELD_KEYS.filter((k) => !ADVANCED_FIELD_KEYS.includes(k));
+  const rows = keys.map((k) => {
     const part = PARTS.find((p) => p.key === k);
     const on = plan.show[k];
     if (k === "efterRasten") return breakFieldHTML(plan, on);
@@ -840,7 +859,7 @@ function fieldsHTML(plan) {
       ? `<textarea data-field="${k}" rows="${k === "attGora" ? 4 : 2}" placeholder="En rad per punkt">${esc(val)}</textarea>`
       : `<input type="text" data-field="${k}" value="${esc(val)}" autocomplete="off">`;
     // Lektionsordning: stegningen i stunden under textfältet (issue #146, renderStepRun).
-    const run = k === "attGora" ? `<div class="field-edit__run" data-el="step-run" hidden></div>` : "";
+    const run = k === "attGora" && advanced ? `<div class="field-edit__run" data-el="step-run" hidden></div>` : "";
     return `<div class="field-edit${on ? "" : " field-edit--off"}" data-fieldwrap="${k}">
       <div class="field-edit__head">
         <label><input type="checkbox" data-show="${k}" ${on ? "checked" : ""}> ${esc(part.label.toUpperCase())}</label>
@@ -850,9 +869,10 @@ function fieldsHTML(plan) {
   });
   // Bra jobbat: kryssrutan + (bara när den är ikryssad) samma redigerare
   // som på morgonskärmen — samma LOKALA lista (issue #112).
+  if (!advanced) return rows.join("");
   rows.push(`<div class="field-edit${plan.show.praise ? "" : " field-edit--off"}" data-fieldwrap="praise">
     <div class="field-edit__head">
-      <label><input type="checkbox" data-show="praise" ${plan.show.praise ? "checked" : ""}> Visa Bra jobbat</label>
+      <label><input type="checkbox" data-show="praise" ${plan.show.praise ? "checked" : ""}> Visa Bra jobbat</label>${ADV_TAG}
     </div>
     <p class="field-edit__hint">Visas i högerkolumnen (delar plats med "När du är klar"). Samma lista som på Morgonskärmen — ändringar syns på båda.</p>
     <div class="field-edit__praise" data-el="praise-editor"${plan.show.praise ? "" : " hidden"}>${praiseEditorHTML()}</div>
@@ -869,7 +889,7 @@ function breakFieldHTML(plan, on) {
     `<option value="${w}"${w === plan.fields.efterRastenOrd ? " selected" : ""}>${esc(breakLabel({ efterRastenOrd: w }))}</option>`).join("");
   return `<div class="field-edit${on ? "" : " field-edit--off"}" data-fieldwrap="efterRasten">
     <div class="field-edit__head">
-      <label><input type="checkbox" data-show="efterRasten" ${on ? "checked" : ""}> <span data-el="break-label">${esc(label.toUpperCase())}</span></label>
+      <label><input type="checkbox" data-show="efterRasten" ${on ? "checked" : ""}> <span data-el="break-label">${esc(label.toUpperCase())}</span></label>${ADV_TAG}
     </div>
     <div class="field-edit__break" data-el="break-editor"${on ? "" : " hidden"}>
       <div class="field-edit__break-row">
@@ -893,7 +913,8 @@ function breakFieldHTML(plan, on) {
 
 /** Lektionsordning i stunden (issue #146): Föregående/Nästa steg, status
     och timern på det pågående steget. Bara med steg och när Lektionsordning
-    syns på tavlan. Samma knappstil som Efter rastens "+1 min"/"Dölj nu". */
+    syns på tavlan. Samma knappstil som Efter rastens "+1 min"/"Dölj nu".
+    Bara med Avancerat på (issue #149) — platsen finns annars inte (fieldsHTML). */
 function stepRunHTML(np, now) {
   const steps = ordningSteps(np.fields);
   if (!np.show.attGora || steps.length === 0) return "";
@@ -918,14 +939,24 @@ function stepRunHTML(np, now) {
   }
   return `<div class="field-edit__run-row">
       <button type="button" class="btn" data-act="step-prev" title="Tillbaka ett steg"${active == null ? " disabled" : ""}>Föregående</button>
-      <button type="button" class="btn" data-act="step-next" title="Bocka av steget och gå till nästa"${active === steps.length - 1 ? " disabled" : ""}>Nästa steg</button>
+      <button type="button" class="btn" data-act="step-next" title="Bocka av steget och gå till nästa"${active === steps.length - 1 ? " disabled" : ""}>Nästa steg</button>${ADV_TAG}
     </div>
     <p class="field-edit__run-status">${status}</p>
     ${timerPart}`;
 }
 
-/** Lärarvyns markup: sidopanelen + förhandsvisningens yta. */
-function teacherHTML() {
+/** "Den här planeringen använder Efter rasten. Visa avancerat" — "" utan avancerade delar. */
+function advancedUsedHTML(parts) {
+  if (!parts.length) return "";
+  return `Den här planeringen använder <strong>${esc(parts.join(", "))}</strong>.
+    <button type="button" class="lesson-advanced__show" data-act="show-advanced">Visa avancerat</button>`;
+}
+
+/**
+ * Lärarvyns markup: sidopanelen + förhandsvisningens yta. `advanced` =
+ * växeln (issue #149): Widgets döljs när den är av, och växeln står sist.
+ */
+function teacherHTML({ advanced = false } = {}) {
   return `
   <div class="lesson">
     <aside class="lesson-panel teacher-only">
@@ -992,9 +1023,20 @@ function teacherHTML() {
         <div data-el="fields"></div>
       </div>` })}
 
-      ${collapsibleHTML({ key: "widgets", level: 2, className: "lesson-fold", title: "Widgets", body: `<div class="lesson-panel__group">
+      <div data-el="widgets-fold"${advanced ? "" : " hidden"}>
+      ${collapsibleHTML({ key: "widgets", level: 2, className: "lesson-fold", title: `Widgets${ADV_TAG}`, body: `<div class="lesson-panel__group">
         <div data-el="widgets"></div>
       </div>` })}
+      </div>
+
+      <div class="lesson-advanced">
+        <p class="lesson-advanced__used" data-el="advanced-used" aria-live="polite" hidden></p>
+        <label class="lesson-advanced__toggle">
+          <input type="checkbox" role="switch" data-el="advanced-toggle"${advanced ? " checked" : ""}>
+          ${icon("adjustments")}<span>Avancerat</span>
+        </label>
+        <p class="field-edit__hint">Kommer ihåg ditt val. Ändrar aldrig vad som visas på tavlan.</p>
+      </div>
     </aside>
 
     <div class="lesson__main">
@@ -1007,9 +1049,10 @@ function teacherHTML() {
    MODEN
    ============================================================ */
 
-/** Exporterade för docs/test-widgets.mjs (widgets följer med planeringen)
-    och docs/test-lektionsordning.mjs (tavlans HTML, issue #146). */
-export { normalizePlan, boardHTML, breakBoxHTML, fieldsHTML, stepRunHTML, teacherHTML };
+/** Exporterade för docs/test-widgets.mjs (widgets följer med planeringen),
+    docs/test-lektionsordning.mjs (tavlans HTML, issue #146) och
+    docs/test-lektion-advanced.mjs (sidopanelen med och utan Avancerat, #149). */
+export { normalizePlan, boardHTML, breakBoxHTML, fieldsHTML, stepRunHTML, teacherHTML, advancedUsedHTML };
 
 export default {
   id: "lektion",
@@ -1058,6 +1101,9 @@ export default {
     const mine = () => myIds(myDoc);
     // "Visa alla ämnen…" — visar tillfälligt hela paletten i väljaren.
     let showAllSubjects = false;
+    // "Avancerat" (issue #149): lärarens PRIVATA val (teachers/{uid}/settings/
+    // lektionsvy). Av tills inställningen lästs — styr bara sidopanelen.
+    let advanced = false;
 
     // "Bra jobbat"-namnen: samma LOKALA data som morgonskärmen (issue #32) —
     // listan innehåller elevdata och lagras bara på den här datorn.
@@ -1185,7 +1231,7 @@ export default {
     }
 
     // ---------- LÄRARVY: panel + levande förhandsvisning ----------
-    el.innerHTML = teacherHTML();
+    el.innerHTML = teacherHTML({ advanced });
 
     const listEl = el.querySelector('[data-el="list"]');
     const fieldsEl = el.querySelector('[data-el="fields"]');
@@ -1200,6 +1246,9 @@ export default {
     const tabHitsEl = el.querySelector('[data-el="tab-hits"]');
     const metaInputs = () => [...el.querySelectorAll("[data-meta]")];
     const panel = el.querySelector(".lesson-panel");
+    const widgetsFoldEl = el.querySelector('[data-el="widgets-fold"]');
+    const advancedToggleEl = el.querySelector('[data-el="advanced-toggle"]');
+    const advancedUsedEl = el.querySelector('[data-el="advanced-used"]');
 
     // ⋯-menyn (issue #82) — samma menykomponent som toppmenyns rullgardiner
     // (tangentbord + ARIA, js/ui/menu-button.js). Valen bubblar som vanliga
@@ -1417,6 +1466,35 @@ export default {
       box.innerHTML = html;
       box.hidden = !html;
     }
+    // -- Avancerat (issue #149) --
+    /** Raden "Den här planeringen använder …" — bara med växeln av. */
+    function renderAdvancedUsed() {
+      const p = editingPlan();
+      const html = !advanced && p ? advancedUsedHTML(advancedPartsInUse(normalizePlan(p), serverNow())) : "";
+      if (advancedUsedEl.dataset.html === html) return;
+      advancedUsedEl.dataset.html = html;
+      advancedUsedEl.innerHTML = html;
+      advancedUsedEl.hidden = !html;
+    }
+    /** Visa/dölj de avancerade delarna i panelen. Rör aldrig planeringen. */
+    function applyAdvanced(on) {
+      if (on === advanced) return;
+      advanced = on;
+      advancedToggleEl.checked = on;
+      widgetsFoldEl.hidden = !on;
+      const p = editingPlan();
+      if (p) {
+        fieldsEl.innerHTML = fieldsHTML(normalizePlan(p), { advanced });
+        mountFieldPraise();
+      }
+      renderStepRun();
+      renderAdvancedUsed();
+    }
+    async function setAdvanced(on) {
+      applyAdvanced(on);
+      await data.put(advancedSettingsPath(currentUid()), { id: ADVANCED_SETTINGS_DOC, advanced: on });
+    }
+
     function showStepMinError(on) {
       const err = fieldsEl.querySelector('[data-el="step-min-error"]');
       if (err) err.hidden = !on;
@@ -1643,6 +1721,7 @@ export default {
       renderPresentState();
       renderSummaries();
       renderStepRun();
+      renderAdvancedUsed();
     }
 
     // Förhandsmarkeringen (issue #82 + #88): när den öppna planeringen INTE
@@ -1703,6 +1782,7 @@ export default {
       tickBreak(stageEl, brk, editingPlan(), renderPreview);
       tickSteps(stageEl, editingPlan(), renderPreview);
       renderStepRun();
+      renderAdvancedUsed();
       const p = editingPlan();
       if (p && autoHide(normalizePlan(p), serverNow())) void hideBreak();
       if (p && ordningReset(normalizePlan(p), serverNow())) void patchEditing({ fields: resetOrdningRun(normalizePlan(p).fields) });
@@ -1734,7 +1814,7 @@ export default {
       el.querySelector('[data-meta="end"]').value = np.end;
       fillSubjectSelect(el.querySelector('[data-meta="subjectId"]'), np.subjectId);
       renderSubjectHint();
-      fieldsEl.innerHTML = fieldsHTML(np);
+      fieldsEl.innerHTML = fieldsHTML(np, { advanced });
       mountFieldPraise();
       widgetsUI.render();
     }
@@ -1863,6 +1943,8 @@ export default {
       const act = e.target.closest("[data-act]")?.dataset.act;
       if (!act) return;
       if (act === "new") await createPlan();
+      // "Visa avancerat" i informationsraden (issue #149) slår på växeln.
+      else if (act === "show-advanced") await setAdvanced(true);
       // "+1 min" / "Dölj nu" i Efter rasten-delen (issue #144) — sparas i
       // planeringen och når elevskärmen via datalagret.
       else if (act === "brk-plus") {
@@ -1937,6 +2019,7 @@ export default {
         return;
       }
       if (e.target.dataset.filter === "subject") { filter.subject = e.target.value; renderList(); return; }
+      if (e.target === advancedToggleEl) { await setAdvanced(advancedToggleEl.checked); return; }
 
       const metaKey = e.target.dataset.meta;
       if (metaKey === "subjectId" && e.target.value === ADD_SUBJECT) {
@@ -2081,6 +2164,11 @@ export default {
     this._offs.push(data.watch(mySubjectsPath(), (docs) => {
       myDoc = docs.find((d) => d.id === MY_SUBJECTS_DOC) ?? null;
       refreshSubjectUI();
+    }));
+    // Avancerat (issue #149) — samma privata settings-samling; följer läraren
+    // mellan datorer och fönster.
+    this._offs.push(data.watch(advancedSettingsPath(currentUid()), (docs) => {
+      applyAdvanced(isAdvanced(docs.find((d) => d.id === ADVANCED_SETTINGS_DOC)));
     }));
     // Visas för eleverna — även ändringar från lärarens andra fönster
     // (och elevskärmspanelens "Visa på elevskärm" via onPresent).
