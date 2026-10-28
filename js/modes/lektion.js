@@ -827,13 +827,189 @@ function lessonWidgetsSummary(rawPlan) {
   return rawPlan ? widgetsSummary(normalizePlan(rawPlan).widgets) : "";
 }
 
+/* ---- Sidopanelens fältredigerare (kryssruta + innehåll) ---- */
+
+function fieldsHTML(plan) {
+  const rows = FIELD_KEYS.map((k) => {
+    const part = PARTS.find((p) => p.key === k);
+    const on = plan.show[k];
+    if (k === "efterRasten") return breakFieldHTML(plan, on);
+    const val = k === "attGora" ? (plan.fields.attGora ?? []).join("\n") : plan.fields[k];
+    const multi = part.kind === "steps" || part.kind === "list";
+    const input = multi
+      ? `<textarea data-field="${k}" rows="${k === "attGora" ? 4 : 2}" placeholder="En rad per punkt">${esc(val)}</textarea>`
+      : `<input type="text" data-field="${k}" value="${esc(val)}" autocomplete="off">`;
+    // Lektionsordning: stegningen i stunden under textfältet (issue #146, renderStepRun).
+    const run = k === "attGora" ? `<div class="field-edit__run" data-el="step-run" hidden></div>` : "";
+    return `<div class="field-edit${on ? "" : " field-edit--off"}" data-fieldwrap="${k}">
+      <div class="field-edit__head">
+        <label><input type="checkbox" data-show="${k}" ${on ? "checked" : ""}> ${esc(part.label.toUpperCase())}</label>
+      </div>
+      ${input}${run}
+    </div>`;
+  });
+  // Bra jobbat: kryssrutan + (bara när den är ikryssad) samma redigerare
+  // som på morgonskärmen — samma LOKALA lista (issue #112).
+  rows.push(`<div class="field-edit${plan.show.praise ? "" : " field-edit--off"}" data-fieldwrap="praise">
+    <div class="field-edit__head">
+      <label><input type="checkbox" data-show="praise" ${plan.show.praise ? "checked" : ""}> Visa Bra jobbat</label>
+    </div>
+    <p class="field-edit__hint">Visas i högerkolumnen (delar plats med "När du är klar"). Samma lista som på Morgonskärmen — ändringar syns på båda.</p>
+    <div class="field-edit__praise" data-el="praise-editor"${plan.show.praise ? "" : " hidden"}>${praiseEditorHTML()}</div>
+  </div>`);
+  return rows.join("");
+}
+
+/** "Efter rasten" (issue #132): rubrik (issue #139), minuter + text, bara
+    synliga när rutan är ikryssad. Lärarens "+1 min" (bara med timer) och
+    "Dölj nu" står här sedan issue #144 — inte i rutan på tavlan. */
+function breakFieldHTML(plan, on) {
+  const label = breakLabel(plan.fields);
+  const words = BREAK_WORDS.map((w) =>
+    `<option value="${w}"${w === plan.fields.efterRastenOrd ? " selected" : ""}>${esc(breakLabel({ efterRastenOrd: w }))}</option>`).join("");
+  return `<div class="field-edit${on ? "" : " field-edit--off"}" data-fieldwrap="efterRasten">
+    <div class="field-edit__head">
+      <label><input type="checkbox" data-show="efterRasten" ${on ? "checked" : ""}> <span data-el="break-label">${esc(label.toUpperCase())}</span></label>
+    </div>
+    <div class="field-edit__break" data-el="break-editor"${on ? "" : " hidden"}>
+      <div class="field-edit__break-row">
+        <label class="field-label field-edit__word">Rubrik
+          <select data-field="efterRastenOrd">${words}</select>
+        </label>
+        <label class="field-edit__timer"><input type="checkbox" data-field="efterRastenTimer"${plan.fields.efterRastenTimer ? " checked" : ""}> Visa timer</label>
+        <label class="field-label field-edit__min" data-el="break-min"${plan.fields.efterRastenTimer ? "" : " hidden"}>Minuter
+          <input type="number" data-field="efterRastenMin" min="${BREAK_MIN_MIN}" max="${BREAK_MIN_MAX}" step="1" inputmode="numeric" value="${plan.fields.efterRastenMin}">
+        </label>
+        <span class="field-edit__break-acts">
+          <button type="button" class="btn" data-act="brk-plus" data-el="brk-plus" title="Förläng nedräkningen med en minut"${plan.fields.efterRastenTimer ? "" : " hidden"}>+1 min</button>
+          <button type="button" class="btn" data-act="brk-hide" title="Dölj rutan nu — kryssrutan bockas ur">Dölj nu</button>
+        </span>
+      </div>
+      <textarea data-field="efterRasten" rows="3" aria-label="${esc(label)}">${esc(plan.fields.efterRasten)}</textarea>
+      <p class="field-edit__hint">En rad per sak. Börja raden med - för en punkt.</p>
+    </div>
+  </div>`;
+}
+
+/** Lektionsordning i stunden (issue #146): Föregående/Nästa steg, status
+    och timern på det pågående steget. Bara med steg och när Lektionsordning
+    syns på tavlan. Samma knappstil som Efter rastens "+1 min"/"Dölj nu". */
+function stepRunHTML(np, now) {
+  const steps = ordningSteps(np.fields);
+  if (!np.show.attGora || steps.length === 0) return "";
+  const { active, timer } = ordningState(np, now);
+  const status = active == null
+    ? "Inget steg markerat"
+    : `Pågår: ${active + 1}. ${esc(steps[active])}`;
+  let timerPart = "";
+  if (active != null && timer) {
+    timerPart = `<div class="field-edit__run-row">
+        <button type="button" class="btn" data-act="step-plus" title="Förläng stegets timer med en minut">+1 min</button>
+        <button type="button" class="btn" data-act="step-stop" title="Ta bort timern — steget förblir markerat">Stoppa timer</button>
+      </div>`;
+  } else if (active != null) {
+    timerPart = `<p class="field-edit__hint field-edit__run-ask">Timer på det här steget?</p>
+      <div class="field-edit__run-row">
+        ${STEP_QUICK_MIN.map((m) => `<button type="button" class="btn" data-act="step-timer" data-min="${m}">${m} min</button>`).join("")}
+        <input type="number" class="field-edit__run-min" data-el="step-min" min="${STEP_MIN_MIN}" max="${STEP_MIN_MAX}" step="1" inputmode="numeric" placeholder="min" aria-label="Egna minuter (${STEP_MIN_MIN}–${STEP_MIN_MAX})" aria-describedby="step-min-error">
+        <button type="button" class="btn" data-act="step-timer">Starta</button>
+      </div>
+      <p class="field-edit__run-error" id="step-min-error" data-el="step-min-error" role="alert" hidden>${esc(STEP_MIN_ERROR)}</p>`;
+  }
+  return `<div class="field-edit__run-row">
+      <button type="button" class="btn" data-act="step-prev" title="Tillbaka ett steg"${active == null ? " disabled" : ""}>Föregående</button>
+      <button type="button" class="btn" data-act="step-next" title="Bocka av steget och gå till nästa"${active === steps.length - 1 ? " disabled" : ""}>Nästa steg</button>
+    </div>
+    <p class="field-edit__run-status">${status}</p>
+    ${timerPart}`;
+}
+
+/** Lärarvyns markup: sidopanelen + förhandsvisningens yta. */
+function teacherHTML() {
+  return `
+  <div class="lesson">
+    <aside class="lesson-panel teacher-only">
+      <section class="lesson-panel__group">
+        <h2>Planeringar</h2>
+        <div class="plan-toolbar">
+          <button class="btn btn--primary" data-act="new">${icon("plus")} Ny planering</button>
+          <div class="plan-more" data-el="more">
+            <button type="button" class="btn btn--icon plan-more__btn" data-el="more-btn" title="Fler åtgärder" aria-label="Fler åtgärder">${icon("more")}</button>
+            <div class="plan-more__menu" data-el="more-menu" aria-label="Fler åtgärder">
+              <button type="button" role="menuitem" class="plan-more__item" data-act="dup" title="Kopiera den valda planeringen till samma veckodag, idag eller framåt">${icon("copy")} Kopiera</button>
+              <button type="button" role="menuitem" class="plan-more__item" data-act="send" title="Skicka en kopia av den valda planeringen till en annan klass — du ställer in datum och tid direkt">${icon("copy")} Skicka kopia till klass…</button>
+              <button type="button" role="menuitem" class="plan-more__item" data-act="del" title="Ta bort den valda planeringen">${icon("trash")} Ta bort</button>
+              <button type="button" role="menuitem" class="plan-more__item" data-act="select" aria-pressed="false" title="Markera flera planeringar och ta bort dem på en gång">${icon("check")} Välj flera</button>
+            </div>
+          </div>
+        </div>
+        <div class="plan-filter">
+          <label class="plan-filter__search">${icon("search", { size: 16 })}
+            <input type="search" data-filter="q" placeholder="Sök namn eller innehåll" aria-label="Sök planering" autocomplete="off">
+          </label>
+          <select data-filter="subject" aria-label="Filtrera på ämne"></select>
+        </div>
+        <div class="plan-tabs" role="tablist" aria-label="Visa planeringar för" data-el="tabs">
+          <button type="button" class="plan-tab" role="tab" data-tab="week" aria-selected="false" tabindex="-1">Denna vecka</button>
+          <button type="button" class="plan-tab" role="tab" data-tab="upcoming" aria-selected="false" tabindex="-1">Kommande</button>
+          <button type="button" class="plan-tab" role="tab" data-tab="archive" aria-selected="false" tabindex="-1">Arkiv</button>
+        </div>
+        <div class="plan-tab-hits" data-el="tab-hits" hidden></div>
+        <div class="plan-bulk" data-el="bulk" hidden></div>
+        <div class="plan-confirm" data-el="confirm" role="alertdialog" aria-live="assertive" hidden></div>
+        <p class="plan-status" data-el="status" aria-live="polite" hidden></p>
+        <div class="plan-list" data-el="list"></div>
+      </section>
+
+      ${collapsibleHTML({ key: "about", level: 2, className: "lesson-fold", title: "Om lektionen",
+        trail: `<button class="btn ca-add" data-act="class-action"
+            title="Testade ni något nytt arbetssätt på lektionen? Dela hur det gick med de andra lärarna">${icon("plus")}<span>Klassåtgärd</span></button>`,
+        body: `<div class="lesson-panel__group">
+        <label class="field-label">Namn
+          <input type="text" data-meta="name" autocomplete="off">
+        </label>
+        <div class="row-2">
+          <label class="field-label">Datum
+            <input type="date" data-meta="date">
+          </label>
+          <label class="field-label">Ämne
+            <select data-meta="subjectId"></select>
+          </label>
+        </div>
+        <div class="subject-mine-hint" data-el="subject-hint" hidden></div>
+        <div class="row-2">
+          <label class="field-label">Start
+            <input type="time" data-meta="start">
+          </label>
+          <label class="field-label">Slut
+            <input type="time" data-meta="end">
+          </label>
+        </div>
+      </div>` })}
+
+      ${collapsibleHTML({ key: "fields", level: 2, className: "lesson-fold", title: "Fält", body: `<div class="lesson-panel__group">
+        <p class="field-edit__hint">Kryssrutan slår av/på fältet på tavlan — layouten omfördelar sig automatiskt. Valen sparas med planeringen.</p>
+        <div data-el="fields"></div>
+      </div>` })}
+
+      ${collapsibleHTML({ key: "widgets", level: 2, className: "lesson-fold", title: "Widgets", body: `<div class="lesson-panel__group">
+        <div data-el="widgets"></div>
+      </div>` })}
+    </aside>
+
+    <div class="lesson__main">
+      <div class="lesson__stage" data-el="stage"></div>
+    </div>
+  </div>`;
+}
+
 /* ============================================================
    MODEN
    ============================================================ */
 
 /** Exporterade för docs/test-widgets.mjs (widgets följer med planeringen)
     och docs/test-lektionsordning.mjs (tavlans HTML, issue #146). */
-export { normalizePlan, boardHTML, breakBoxHTML };
+export { normalizePlan, boardHTML, breakBoxHTML, fieldsHTML, stepRunHTML, teacherHTML };
 
 export default {
   id: "lektion",
@@ -1009,81 +1185,7 @@ export default {
     }
 
     // ---------- LÄRARVY: panel + levande förhandsvisning ----------
-    el.innerHTML = `
-      <div class="lesson">
-        <aside class="lesson-panel teacher-only">
-          <section class="lesson-panel__group">
-            <h2>Planeringar</h2>
-            <div class="plan-toolbar">
-              <button class="btn btn--primary" data-act="new">${icon("plus")} Ny planering</button>
-              <div class="plan-more" data-el="more">
-                <button type="button" class="btn btn--icon plan-more__btn" data-el="more-btn" title="Fler åtgärder" aria-label="Fler åtgärder">${icon("more")}</button>
-                <div class="plan-more__menu" data-el="more-menu" aria-label="Fler åtgärder">
-                  <button type="button" role="menuitem" class="plan-more__item" data-act="dup" title="Kopiera den valda planeringen till samma veckodag, idag eller framåt">${icon("copy")} Kopiera</button>
-                  <button type="button" role="menuitem" class="plan-more__item" data-act="send" title="Skicka en kopia av den valda planeringen till en annan klass — du ställer in datum och tid direkt">${icon("copy")} Skicka kopia till klass…</button>
-                  <button type="button" role="menuitem" class="plan-more__item" data-act="del" title="Ta bort den valda planeringen">${icon("trash")} Ta bort</button>
-                  <button type="button" role="menuitem" class="plan-more__item" data-act="select" aria-pressed="false" title="Markera flera planeringar och ta bort dem på en gång">${icon("check")} Välj flera</button>
-                </div>
-              </div>
-            </div>
-            <div class="plan-filter">
-              <label class="plan-filter__search">${icon("search", { size: 16 })}
-                <input type="search" data-filter="q" placeholder="Sök namn eller innehåll" aria-label="Sök planering" autocomplete="off">
-              </label>
-              <select data-filter="subject" aria-label="Filtrera på ämne"></select>
-            </div>
-            <div class="plan-tabs" role="tablist" aria-label="Visa planeringar för" data-el="tabs">
-              <button type="button" class="plan-tab" role="tab" data-tab="week" aria-selected="false" tabindex="-1">Denna vecka</button>
-              <button type="button" class="plan-tab" role="tab" data-tab="upcoming" aria-selected="false" tabindex="-1">Kommande</button>
-              <button type="button" class="plan-tab" role="tab" data-tab="archive" aria-selected="false" tabindex="-1">Arkiv</button>
-            </div>
-            <div class="plan-tab-hits" data-el="tab-hits" hidden></div>
-            <div class="plan-bulk" data-el="bulk" hidden></div>
-            <div class="plan-confirm" data-el="confirm" role="alertdialog" aria-live="assertive" hidden></div>
-            <p class="plan-status" data-el="status" aria-live="polite" hidden></p>
-            <div class="plan-list" data-el="list"></div>
-          </section>
-
-          ${collapsibleHTML({ key: "about", level: 2, className: "lesson-fold", title: "Om lektionen",
-            trail: `<button class="btn ca-add" data-act="class-action"
-                title="Testade ni något nytt arbetssätt på lektionen? Dela hur det gick med de andra lärarna">${icon("plus")}<span>Klassåtgärd</span></button>`,
-            body: `<div class="lesson-panel__group">
-            <label class="field-label">Namn
-              <input type="text" data-meta="name" autocomplete="off">
-            </label>
-            <div class="row-2">
-              <label class="field-label">Datum
-                <input type="date" data-meta="date">
-              </label>
-              <label class="field-label">Ämne
-                <select data-meta="subjectId"></select>
-              </label>
-            </div>
-            <div class="subject-mine-hint" data-el="subject-hint" hidden></div>
-            <div class="row-2">
-              <label class="field-label">Start
-                <input type="time" data-meta="start">
-              </label>
-              <label class="field-label">Slut
-                <input type="time" data-meta="end">
-              </label>
-            </div>
-          </div>` })}
-
-          ${collapsibleHTML({ key: "fields", level: 2, className: "lesson-fold", title: "Fält", body: `<div class="lesson-panel__group">
-            <p class="field-edit__hint">Kryssrutan slår av/på fältet på tavlan — layouten omfördelar sig automatiskt. Valen sparas med planeringen.</p>
-            <div data-el="fields"></div>
-          </div>` })}
-
-          ${collapsibleHTML({ key: "widgets", level: 2, className: "lesson-fold", title: "Widgets", body: `<div class="lesson-panel__group">
-            <div data-el="widgets"></div>
-          </div>` })}
-        </aside>
-
-        <div class="lesson__main">
-          <div class="lesson__stage" data-el="stage"></div>
-        </div>
-      </div>`;
+    el.innerHTML = teacherHTML();
 
     const listEl = el.querySelector('[data-el="list"]');
     const fieldsEl = el.querySelector('[data-el="fields"]');
@@ -1302,101 +1404,7 @@ export default {
       return id;
     }
 
-    // -- Fältredigerare (kryssruta + innehåll) --
-    function fieldsHTML(plan) {
-      const rows = FIELD_KEYS.map((k) => {
-        const part = PARTS.find((p) => p.key === k);
-        const on = plan.show[k];
-        if (k === "efterRasten") return breakFieldHTML(plan, on);
-        const val = k === "attGora" ? (plan.fields.attGora ?? []).join("\n") : plan.fields[k];
-        const multi = part.kind === "steps" || part.kind === "list";
-        const input = multi
-          ? `<textarea data-field="${k}" rows="${k === "attGora" ? 4 : 2}" placeholder="En rad per punkt">${esc(val)}</textarea>`
-          : `<input type="text" data-field="${k}" value="${esc(val)}" autocomplete="off">`;
-        // Lektionsordning: stegningen i stunden under textfältet (issue #146, renderStepRun).
-        const run = k === "attGora" ? `<div class="field-edit__run" data-el="step-run" hidden></div>` : "";
-        return `<div class="field-edit${on ? "" : " field-edit--off"}" data-fieldwrap="${k}">
-          <div class="field-edit__head">
-            <label><input type="checkbox" data-show="${k}" ${on ? "checked" : ""}> ${esc(part.label.toUpperCase())}</label>
-          </div>
-          ${input}${run}
-        </div>`;
-      });
-      // Bra jobbat: kryssrutan + (bara när den är ikryssad) samma redigerare
-      // som på morgonskärmen — samma LOKALA lista (issue #112).
-      rows.push(`<div class="field-edit${plan.show.praise ? "" : " field-edit--off"}" data-fieldwrap="praise">
-        <div class="field-edit__head">
-          <label><input type="checkbox" data-show="praise" ${plan.show.praise ? "checked" : ""}> Visa Bra jobbat</label>
-        </div>
-        <p class="field-edit__hint">Visas i högerkolumnen (delar plats med "När du är klar"). Samma lista som på Morgonskärmen — ändringar syns på båda.</p>
-        <div class="field-edit__praise" data-el="praise-editor"${plan.show.praise ? "" : " hidden"}>${praiseEditorHTML()}</div>
-      </div>`);
-      return rows.join("");
-    }
-
-    /** "Efter rasten" (issue #132): rubrik (issue #139), minuter + text, bara
-        synliga när rutan är ikryssad. Lärarens "+1 min" (bara med timer) och
-        "Dölj nu" står här sedan issue #144 — inte i rutan på tavlan. */
-    function breakFieldHTML(plan, on) {
-      const label = breakLabel(plan.fields);
-      const words = BREAK_WORDS.map((w) =>
-        `<option value="${w}"${w === plan.fields.efterRastenOrd ? " selected" : ""}>${esc(breakLabel({ efterRastenOrd: w }))}</option>`).join("");
-      return `<div class="field-edit${on ? "" : " field-edit--off"}" data-fieldwrap="efterRasten">
-        <div class="field-edit__head">
-          <label><input type="checkbox" data-show="efterRasten" ${on ? "checked" : ""}> <span data-el="break-label">${esc(label.toUpperCase())}</span></label>
-        </div>
-        <div class="field-edit__break" data-el="break-editor"${on ? "" : " hidden"}>
-          <div class="field-edit__break-row">
-            <label class="field-label field-edit__word">Rubrik
-              <select data-field="efterRastenOrd">${words}</select>
-            </label>
-            <label class="field-edit__timer"><input type="checkbox" data-field="efterRastenTimer"${plan.fields.efterRastenTimer ? " checked" : ""}> Visa timer</label>
-            <label class="field-label field-edit__min" data-el="break-min"${plan.fields.efterRastenTimer ? "" : " hidden"}>Minuter
-              <input type="number" data-field="efterRastenMin" min="${BREAK_MIN_MIN}" max="${BREAK_MIN_MAX}" step="1" inputmode="numeric" value="${plan.fields.efterRastenMin}">
-            </label>
-            <span class="field-edit__break-acts">
-              <button type="button" class="btn" data-act="brk-plus" data-el="brk-plus" title="Förläng nedräkningen med en minut"${plan.fields.efterRastenTimer ? "" : " hidden"}>+1 min</button>
-              <button type="button" class="btn" data-act="brk-hide" title="Dölj rutan nu — kryssrutan bockas ur">Dölj nu</button>
-            </span>
-          </div>
-          <textarea data-field="efterRasten" rows="3" aria-label="${esc(label)}">${esc(plan.fields.efterRasten)}</textarea>
-          <p class="field-edit__hint">En rad per sak. Börja raden med - för en punkt.</p>
-        </div>
-      </div>`;
-    }
-
-    /** Lektionsordning i stunden (issue #146): Föregående/Nästa steg, status
-        och timern på det pågående steget. Bara med steg och när Lektionsordning
-        syns på tavlan. Samma knappstil som Efter rastens "+1 min"/"Dölj nu". */
-    function stepRunHTML(np, now) {
-      const steps = ordningSteps(np.fields);
-      if (!np.show.attGora || steps.length === 0) return "";
-      const { active, timer } = ordningState(np, now);
-      const status = active == null
-        ? "Inget steg markerat"
-        : `Pågår: ${active + 1}. ${esc(steps[active])}`;
-      let timerPart = "";
-      if (active != null && timer) {
-        timerPart = `<div class="field-edit__run-row">
-            <button type="button" class="btn" data-act="step-plus" title="Förläng stegets timer med en minut">+1 min</button>
-            <button type="button" class="btn" data-act="step-stop" title="Ta bort timern — steget förblir markerat">Stoppa timer</button>
-          </div>`;
-      } else if (active != null) {
-        timerPart = `<p class="field-edit__hint field-edit__run-ask">Timer på det här steget?</p>
-          <div class="field-edit__run-row">
-            ${STEP_QUICK_MIN.map((m) => `<button type="button" class="btn" data-act="step-timer" data-min="${m}">${m} min</button>`).join("")}
-            <input type="number" class="field-edit__run-min" data-el="step-min" min="${STEP_MIN_MIN}" max="${STEP_MIN_MAX}" step="1" inputmode="numeric" placeholder="min" aria-label="Egna minuter (${STEP_MIN_MIN}–${STEP_MIN_MAX})" aria-describedby="step-min-error">
-            <button type="button" class="btn" data-act="step-timer">Starta</button>
-          </div>
-          <p class="field-edit__run-error" id="step-min-error" data-el="step-min-error" role="alert" hidden>${esc(STEP_MIN_ERROR)}</p>`;
-      }
-      return `<div class="field-edit__run-row">
-          <button type="button" class="btn" data-act="step-prev" title="Tillbaka ett steg"${active == null ? " disabled" : ""}>Föregående</button>
-          <button type="button" class="btn" data-act="step-next" title="Bocka av steget och gå till nästa"${active === steps.length - 1 ? " disabled" : ""}>Nästa steg</button>
-        </div>
-        <p class="field-edit__run-status">${status}</p>
-        ${timerPart}`;
-    }
+    // Lektionsordning i stunden (issue #146): stepRunHTML ovan.
     // Ritas bara om när innehållet ändras — annars tappar minutfältet det läraren skriver.
     let stepRunShown = { box: null, html: null };
     function renderStepRun() {
