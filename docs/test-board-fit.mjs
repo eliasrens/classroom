@@ -15,6 +15,10 @@
  *     överflöd i rutan krymper inte Lektionsordning
  *   - ingen bottenrad (#138): sista steget får sluta vid tavlans ram; få steg
  *     krymps inte, många steg bara så att sista steget slutar vid ramen
+ *   - Lektionsordning i stunden (#146): markering och bockar tar ingen plats
+ *     (CSS-reglerna rör inga mått), så skalorna blir desamma; timerbrickan
+ *     kan göra en rad högre → bara Lektionsordning anpassas, och när timern
+ *     försvinner växer texten tillbaka
  */
 
 const { FIT_MIN, FIT_PRECISION, searchScale, fitMidColumn, fitBreakColumn, stepsWithin } = await import("../js/lib/board-fit.js");
@@ -269,6 +273,99 @@ function glyphColumn({ box, steps, room, glyph }) {
   ok(/\.lb-break\.lb-break--off \{ display: none; \}/.test(css), "#144: lb-break--off döljer rutan");
   ok(/breakEl\.classList\.add\("lb-break--off"\)/.test(js) && /breakEl\.classList\.remove\("lb-break--off"\)/.test(js), "#144: fitBoard mäter bort rutan med klassen under steg 1 och tar bort den efteråt");
   ok(!/breakEl\.style\.display/.test(js), "#144: … inte med display:none (som #138-regeln fortfarande matchar)");
+}
+
+// --- Lektionsordning i stunden (issue #146) ------------------------------------------
+// Fall 1: markering och bockar. Ramen/tonen på det pågående steget och
+// bocken på avklarade steg ritas utan att ta plats, så samma tavla får
+// samma mått — och därmed samma --lb-scale och --lb-steps-scale — med och
+// utan markering. Kontrollen läser CSS:en: reglerna för markeringen får
+// inte innehålla något som ändrar en låda (padding, marginal, ram, typsnitt,
+// höjd). Bockens bubbla har exakt siffrans mått.
+{
+  const { readFileSync } = await import("node:fs");
+  const css = readFileSync(new URL("../css/modes/lektion.css", import.meta.url), "utf8");
+  const rule = (sel) => {
+    const i = css.indexOf(`${sel} {`);
+    return i < 0 ? null : css.slice(i + sel.length + 2, css.indexOf("}", i));
+  };
+  const LAYOUT = /(^|[\s;])(padding|margin|border(-width)?|font-weight|font-size|line-height|height|width|min-height|letter-spacing|display|position)\s*:/;
+  for (const sel of ["ol.lb-steps > li.lb-step--now", ".lb-step--done > .lb-step__text"]) {
+    const r = rule(sel);
+    ok(r != null && !LAYOUT.test(r), `#146: "${sel}" ändrar inga mått (fick ${r})`);
+  }
+  const now = rule("ol.lb-steps > li.lb-step--now");
+  ok(/outline:/.test(now) && /outline-offset:/.test(now) && /box-shadow:/.test(now) && !/border:/.test(now), "#146: ramen är outline + box-shadow (tar ingen plats), ingen border");
+  ok(!/font-weight/.test(now), "#146: ingen halvfet text på det pågående steget");
+  const before = rule("ol.lb-steps > li::before");
+  const mark = rule(".lb-step__mark");
+  for (const prop of ["min-width: 1.5em", "height: 1.5em", "font-size: 0.72em", "font-weight: 700", "display: inline-flex", "flex: 0 0 auto"]) {
+    ok(before.includes(prop) && mark.includes(prop), `#146: bockens bubbla har siffrans mått (${prop})`);
+  }
+  ok(/overflow: clip; overflow-clip-margin:/.test(rule(".lb-col--mid .lb-field--attGora > .lb-field__body:has(> ol.lb-steps--run)") ?? ""),
+    "#146: stegfältet klipper med marginal (ramen syns), bara när ett steg är markerat");
+  // Samma mätningar → samma skalor: markeringen är bara färg.
+  const a = fitMidColumn(column({ box: 30, steps: 100, room: 100 }));
+  const b = fitMidColumn(column({ box: 30, steps: 100, room: 100 }));
+  ok(a.steps === b.steps && a.brk === b.brk, "#146: samma mått med och utan markering → samma skalor");
+}
+// Fall 1b (Testarens fynd): markering av SISTA steget i #138-fallet gav en
+// annan --lb-steps-scale (0.794 → 0.777) eftersom fitBoard räknade in ramens
+// outline. fitBoard läser aldrig markeringen. Ramen ritas alltid utanför
+// raden (runda 3: en ram innanför raden täcktes av bubbla och bricka); i
+// #138-fallet sammanfaller dess underkant med tavlans ram.
+{
+  const { readFileSync } = await import("node:fs");
+  const css = readFileSync(new URL("../css/modes/lektion.css", import.meta.url), "utf8");
+  const js = readFileSync(new URL("../js/modes/lektion.js", import.meta.url), "utf8");
+  const fit = js.slice(js.indexOf("function fitBoard("), js.indexOf("function fitBreakOnly("));
+  ok(fit.length > 0 && !/outline|lb-step--now|lb-steps--run/.test(fit), "#146: fitBoard läser aldrig markeringen (ingen outline, inga stegklasser)");
+  ok(/lastStep\.getBoundingClientRect\(\)\.bottom, midEl/.test(fit), "#146: sista steget mäts med sin egen underkant, utan tillägg");
+  ok(!/li\.lb-step--now:last-child/.test(css) && !/outline-offset: -/.test(css),
+    "#146: ramen ritas aldrig innanför raden (bubbla och bricka ligger alltid innanför ramen)");
+  const nowRule = css.slice(css.indexOf("ol.lb-steps > li.lb-step--now {"), css.indexOf("}", css.indexOf("ol.lb-steps > li.lb-step--now {")));
+  ok(/outline-offset: 0\.2em;/.test(nowRule), "#146: ramen ligger 0.2em utanför raden");
+}
+// Fall 2: timerbrickan gör en lång rad högre. Då anpassas Lektionsordning
+// som vanligt (bara --lb-steps-scale), och när timern försvinner (stegbyte
+// eller Stoppa timer) körs anpassningen igen och texten växer tillbaka.
+{
+  const withTimer = column({ box: 30, steps: 64 + 12, room: 100 }); // brickan: +12 på en rad
+  const r1 = fitMidColumn(withTimer);
+  ok(r1.brk === 1 && r1.steps < 1 && withTimer.fits(), `#146: med timer krymps bara Lektionsordning, precis så att den ryms (fick ${r1.steps})`);
+  const without = column({ box: 30, steps: 64, room: 100 });
+  const r2 = fitMidColumn(without);
+  ok(r2.steps === 1 && r2.brk === 1, "#146: timern borta → anpassningen körs igen och texten växer tillbaka till 1");
+  const fits = column({ box: 30, steps: 50 + 12, room: 100 });
+  ok(fitMidColumn(fits).steps === 1, "#146: ryms raden med brickan ändå krymps ingenting");
+}
+
+// Fall 3: timerbrickorna (.lb-timer, rättelse i #146) får inte ändra
+// --lb-scale eller --lb-steps-scale. Brickan har exakt samma höjd som
+// timern hade: Efter rasten 1.2em (förut line-height 1.2), stegtimern en
+// textrad (1.28). Luft + siffror (line-height 1) + stapelns luft ryms i den
+// höjden, och stapeln ligger absolut (tar ingen plats). #144:s mätning av
+// blockens underkanter ser alltså samma låda som förut.
+{
+  const { readFileSync } = await import("node:fs");
+  const css = readFileSync(new URL("../css/modes/lektion.css", import.meta.url), "utf8");
+  const rule = (sel) => {
+    const i = css.indexOf(`${sel} {`);
+    return i < 0 ? "" : css.slice(i + sel.length + 2, css.indexOf("}", i));
+  };
+  const badge = rule(".lb-timer");
+  const pad = /padding: ([\d.]+)em .* ([\d.]+)em;/.exec(badge);
+  const inner = pad ? +pad[1] + 1 + +pad[2] : Infinity; // line-height 1
+  ok(/line-height: 1;/.test(badge) && /box-sizing: border-box;/.test(badge), "#146: brickan: line-height 1, border-box");
+  ok(/height: 1\.2em;/.test(rule(".lb-break__time")) && inner <= 1.2 + 1e-9, `#146: Efter rastens bricka är 1.2em hög som förut (innehåll ${inner}em)`);
+  ok(/height: 1\.28em;/.test(rule(".lb-step__timer")) && inner <= 1.28, "#146: stegbrickan är en textrad hög — raden blir inte högre");
+  ok(/position: absolute;/.test(rule(".lb-timer > .lb-timer__bar")), "#146: stapeln tar ingen plats i layouten");
+  // Efter rastens bricka är inte bredare än timern var (0.8 + 0.15 em utöver siffrorna).
+  const bt = rule(".lb-break__time");
+  const px = +(/--lb-timer-px: ([\d.]+)em;/.exec(bt)?.[1] ?? 9);
+  const gap = +(/gap: ([\d.]+)em;/.exec(bt)?.[1] ?? 9);
+  const ic = +(/width: ([\d.]+)em;/.exec(rule(".lb-break__time .icon"))?.[1] ?? 9);
+  ok(2 * px + gap + ic <= 0.8 + 0.15 + 1e-9, `#146: Efter rastens bricka tar ingen bredd från rubriken (${2 * px + gap + ic}em ≤ 0.95em)`);
 }
 
 console.log(`\n${passed} OK, ${failed} fel`);

@@ -128,15 +128,19 @@ export function breakTimer(plan, now) {
   return createTimerState(breakDurationMs(f), startedAt);
 }
 
-/** { phase, remainingMs, endMs, text } — se huvudkommentaren. */
+/**
+ * { phase, remainingMs, endMs, text, fraction } — se huvudkommentaren.
+ * `fraction` = andelen tid kvar (1 före start, 0 när tiden är ute) för
+ * timerbrickans stapel (issue #146); totalen är minuterna + "+1 min".
+ */
 export function breakCountdown(plan, now) {
   const full = breakDurationMs(plan?.fields);
   const t = breakTimer(plan, now);
-  if (!t) return { phase: "idle", remainingMs: full, endMs: null, text: formatMs(full) };
+  if (!t) return { phase: "idle", remainingMs: full, endMs: null, text: formatMs(full), fraction: 1 };
   const endMs = t.startedAt + t.durationMs;
-  if (now < t.startedAt) return { phase: "waiting", remainingMs: full, endMs, text: formatMs(full) };
+  if (now < t.startedAt) return { phase: "waiting", remainingMs: full, endMs, text: formatMs(full), fraction: 1 };
   const left = remainingMs(t, now);
-  return { phase: left > 0 ? "running" : "done", remainingMs: left, endMs, text: formatMs(left) };
+  return { phase: left > 0 ? "running" : "done", remainingMs: left, endMs, text: formatMs(left), fraction: t.durationMs > 0 ? left / t.durationMs : 0 };
 }
 
 /** Visas nedräkningen? (issue #139; saknat = ja) */

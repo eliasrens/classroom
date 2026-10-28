@@ -415,6 +415,17 @@
 /* "Visa timer" (issue #139): utan timer döljs Minuter. */
 .field-edit__timer { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 2.25rem; font-size: 0.8rem; cursor: pointer; }
 .lesson-panel label.field-edit__min[hidden] { display: none; }
+/* Lektionsordning i stunden (issue #146): Föregående/Nästa steg, status och
+   timern på det pågående steget — samma knappstil som "+1 min"/"Dölj nu". */
+.field-edit__run { display: flex; flex-direction: column; gap: var(--space-1); margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--color-line); }
+.field-edit__run[hidden] { display: none; }
+.field-edit__run-row { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; }
+.field-edit__run-row .btn { padding-inline: var(--space-2); white-space: nowrap; }
+.field-edit__run-status { margin: 0; font-size: 0.85rem; font-weight: 600; overflow-wrap: anywhere; }
+.field-edit__run-ask { margin: 0; }
+.field-edit .field-edit__run-min { width: 4.5rem; flex: none; }
+.field-edit__run-error { margin: 0; font-size: 0.78rem; font-weight: 600; color: var(--color-danger); }
+.field-edit__run-error[hidden] { display: none; }
 
 /* ============================================================
    TAVLAN — 6-fältslayout. Delas av lärarförhandsvisning och elevvy.
@@ -605,26 +616,64 @@
 .lb-col--break-only .lb-break[data-phase="off"] .lb-break__head > .lb-field__label { white-space: nowrap; }
 .lb-break__text { margin: 0; }
 /* Ungefär dubbelt så hög som brödtexten (1.08em i mittenkolumnen). */
+/* Brickan (.lb-timer, issue #146) i samma höjd som förut: 1.2em =
+   luft 0.05em + siffrorna (line-height 1) + 0.15em för stapeln. Siffrornas
+   glyfer sticker ut ur raden (Segoe UI på Windows) — fitBoard mäter därför
+   block, inte scrollHeight (issue #144). */
 .lb-break__time {
   flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.15em;
   font-size: 2.1em;
-  /* Siffrornas glyfer sticker ut ur raden (med Segoe UI på Windows även
-     vid 1.2) — fitBoard mäter därför block, inte scrollHeight (issue #144). */
-  line-height: 1.2;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  color: var(--lb-break-ink, var(--subj-deep));
+  height: 1.2em;
+  --lb-timer-px: 0.12em;
+  gap: 0.08em;
 }
-.lb-break__time .icon { width: 0.8em; height: 0.8em; }
+/* Brickan får inte bli bredare än timern var (ikon 0.8em + mellanrum
+   0.15em + siffror): rutans rubrik "EFTER RASTEN" bredvid har ofta precis
+   plats. Sidoluft 2 × 0.12em + ikon 0.6em + mellanrum 0.08em = 0.92em. */
+.lb-break__time .icon { width: 0.6em; height: 0.6em; }
 .lb-break--leaving { animation: lb-break-out 0.5s ease forwards; pointer-events: none; }
 @keyframes lb-break-out { to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .lb-break--leaving { animation-duration: 1ms; }
 }
+
+/* ---- TIMERBRICKAN (issue #146) — Efter rastens timer och stegtimern ----
+   EN gemensam stil: ifylld i ämnets färg (--subj/--subj-ink =
+   subjectStyle().color/textColor, som rubrikraden) så att den syns på
+   projektorn. Mindre rundad (--radius-m) än ramarna runt omkring.
+   En tunn stapel i nederkanten visar andelen tid kvar — samma utseende
+   som timerwidgetens (.wt--chip .wt-bar, css/ui/widgets.css): spår i
+   currentColor 25 %, fyllning currentColor, scaleX(kvar/total) från
+   vänster. Storlek och höjd sätts av respektive timer ovan/nedan.
+   tabular-nums: sekundticket ändrar aldrig bredden. */
+.lb-timer {
+  position: relative;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15em;
+  /* Sidoluften (0.4em i stegtimern); Efter rastens bricka har 2.1 gånger
+     större text och sätter en mindre --lb-timer-px, se .lb-break__time. */
+  padding: 0.05em var(--lb-timer-px, 0.4em) 0.15em;
+  border-radius: var(--radius-m);
+  background: var(--subj);
+  color: var(--subj-ink);
+  line-height: 1;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.lb-timer > .lb-timer__bar {
+  position: absolute;
+  left: var(--lb-timer-px, 0.4em);
+  right: var(--lb-timer-px, 0.4em);
+  bottom: 0.05em;
+  height: 0.12em;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 25%, transparent);
+}
+.lb-timer > .lb-timer__bar > .wt-bar__fill { background: currentColor; }
 
 /* LEKTIONSORDNING (datanyckel attGora) — numrerad lista */
 ol.lb-steps { margin: 0; padding: 0; list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 0.35em; }
@@ -647,6 +696,85 @@ ol.lb-steps > li::before {
   color: var(--subj-ink);
   font-size: 0.72em;
   font-weight: 700;
+}
+/* ---- Lektionsordning i stunden (issue #146) ----
+   Bara när ett steg är markerat (ol.lb-steps--run) — annars är tavlan
+   exakt som förut. Inget här tar plats i layouten, så radhöjder och
+   --lb-scale/--lb-steps-scale blir desamma som utan markering:
+   - avklarat steg: bock i samma bubbla (siffran står kvar osynlig och ger
+     bubblan exakt samma bredd och baslinje), överstruken och dämpad text
+     (text-decoration och opacity tar ingen plats);
+   - pågående steg: ram (outline) + ton (bakgrund och box-shadow-ring) som
+     ritas UTANFÖR radens låda. Ingen halvfet text. Fältets kropp klipper
+     med overflow: clip + overflow-clip-margin i stället för hidden (fältet
+     likaså), så att ramen får synas utanför raden — det ändrar ingen layout (kroppen är en
+     flexpost med min-height: 0 och eget formateringssammanhang).
+   Timerbrickan sitter sist på raden (flex: none); texten bryts till
+   vänster om den och hamnar aldrig under den. */
+.lb-col--mid .lb-field--attGora > .lb-field__body:has(> ol.lb-steps--run) { overflow: clip; overflow-clip-margin: 0.45em; }
+/* Fältet runt omkring likaså, så att ramen inte klipps i kanterna. */
+.lb-col--mid .lb-field--attGora:has(> .lb-field__body > ol.lb-steps--run) { overflow: clip; overflow-clip-margin: 0.45em; }
+ol.lb-steps > li.lb-step--done::before { content: none; }
+.lb-step__mark {
+  /* Samma mått som siffrans bubbla (ol.lb-steps > li::before) */
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 1.5em;
+  height: 1.5em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-round);
+  background: var(--subj);
+  color: transparent;
+  font-size: 0.72em;
+  font-weight: 700;
+  opacity: 0.5;
+}
+.lb-step__mark .icon {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 1.05em;
+  height: 1.05em;
+  color: var(--subj-ink);
+}
+.lb-step--done > .lb-step__text { text-decoration: line-through; text-decoration-thickness: 0.08em; opacity: 0.5; }
+ol.lb-steps > li.lb-step--now {
+  border-radius: 0.35em;
+  background: var(--lb-break-bg);
+  box-shadow: 0 0 0 0.2em var(--lb-break-bg);
+  /* --subj-deep: ämnesfärgen mörknad tills den syns mot det vita pappret
+     (color.js) — med ljusa ämnen (Slöjd, Idrott) syns ramen annars knappt. */
+  outline: 2px solid var(--subj-deep, var(--subj));
+  outline-offset: 0.2em;
+}
+/* Ramen ritas alltid UTANFÖR raden, så att den omsluter bubbla, text och
+   bricka. I #138-fallet (ingen bottenrad, Efter rasten-rutan i kolumnen)
+   kan sista steget sluta vid tavlans ram; då sammanfaller ramens underkant
+   med tavlans egen ram i ämnesfärgen. fitBoard räknar aldrig in
+   markeringen, så skalorna blir desamma som utan markering. */
+/* Stegtexten tar all ledig plats och bryts först när den inte ryms
+   bredvid brickan (ingen fast bredd eller flex-basis). */
+.lb-step--timer > .lb-step__text { flex: 1 1 auto; min-width: 0; }
+/* Stegtimern: samma bricka (.lb-timer) i stegtextens storlek.
+   align-self: flex-start + höjden = stegtextens radhöjd (1.28): brickan
+   ligger mitt på textens första rad — med text på en rad centrerad med
+   bubbla och text — och gör aldrig raden högre än de andra stegen. */
+.lb-step__timer {
+  flex: none;
+  align-self: flex-start;
+  height: 1.28em;
+  font-size: 1em;
+}
+.lb-step__timer .icon { width: 0.7em; height: 0.7em; }
+/* Klart: hela brickan pulserar mjukt — aldrig rött, inget ljud. Steget
+   går inte vidare av sig självt. */
+.lb-step__timer[data-phase="done"] { animation: lb-step-pulse 1.8s ease-in-out infinite; }
+@keyframes lb-step-pulse { 50% { opacity: 0.5; } }
+@media (prefers-reduced-motion: reduce) {
+  .lb-step__timer[data-phase="done"] { animation: none; }
+  ol.lb-steps > li.lb-step--now:has(> .lb-step__timer[data-phase="done"]) { outline-width: 4px; }
 }
 ul.lb-list { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 0.25em; }
 

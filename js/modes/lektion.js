@@ -79,6 +79,14 @@
  *   Lärarvyn bockar då ur delen (en gång); elevvyn skriver
  *   aldrig. "+1 min" och "Dölj nu" sitter i sidopanelens "Efter rasten"-
  *   del (issue #144), så rutan på tavlan är densamma i båda vyerna.
+ * - Lektionsordning i stunden (issue #146, logik i js/lib/lektionsordning.js):
+ *   läraren stegar med Föregående/Nästa steg i sidopanelens Lektionsordning-
+ *   del; avklarade steg får en bock, det pågående en ram, och en valfri
+ *   timer (5/10/15/20 eller egna 1–90 min) visas högerställd på det
+ *   pågående stegets rad. Vid 0 "Klart" med en mjuk puls — inget går vidare
+ *   av sig självt. Utan markering är tavlans HTML exakt som förut. Läget
+ *   gäller dagen det sattes, till lektionens slut; lärarvyn nollställer
+ *   det sedan (en gång), och kopior får aldrig med det.
  *
  * Kontrakt: docs/MODULKONTRAKT.md. Data: DATAMODELL.md.
  * Planeringar OCH presentedPlanId är PRIVATA per lärare
@@ -93,6 +101,11 @@ import {
   BREAK_MIN_MIN, BREAK_MIN_MAX, BREAK_WORDS, breakBodyHTML, breakCountdown, breakHasTimer, breakLabel, breakVisible, clampBreakMinutes,
   createAutoHide, enableBreakFields, normalizeBreakFields, plusOneMinute, resetBreakRun,
 } from "../lib/efter-rasten.js";
+import {
+  STEP_MIN_MIN, STEP_MIN_MAX, STEP_QUICK_MIN, STEP_MIN_ERROR, createOrdningReset, normalizeOrdningFields, ordningSteps,
+  ordningState, ordningView, parseStepMinutes, resetOrdningRun, stepCountdown, stepNext, stepPlusOneMinute, stepPrev,
+  stepStartTimer, stepStopTimer,
+} from "../lib/lektionsordning.js";
 import {
   MY_SUBJECTS_DOC, mySubjectsPath, myIds, filterSubjects, withMine, saveMine,
 } from "../lib/my-subjects.js";
@@ -216,6 +229,8 @@ function normalizePlan(plan) {
       // och rubrikens ord ("rasten"/"pausen", issue #139).
       ...normalizeBreakFields(f),
       attGora: Array.isArray(f.attGora) ? f.attGora : (f.attGora ? String(f.attGora).split("\n") : []),
+      // Lektionsordningens läge i stunden (issue #146): pågående steg + timer.
+      ...normalizeOrdningFields(f),
       narKlar: f.narKlar ?? "",
       duBehover: f.duBehover ?? "",
       mal: f.mal ?? "",
@@ -246,10 +261,42 @@ function normalizePlan(plan) {
    (inga tomma hål). Ämnesfärgen kommer in via inline --subj.
    ============================================================ */
 
-function stepsHTML(items) {
+/* Timerbrickornas stapel (issue #146): samma utseende som timerwidgetens
+   (.wt-bar/.wt-bar__fill, css/ui/widgets.css). Fyllningen = andelen tid
+   kvar, räknad ur tidsstämplarna (breakCountdown/stepCountdown). */
+const barScale = (f) => `scaleX(${Math.max(0, Math.min(1, f)).toFixed(4)})`;
+/** Stapelns tick: bara transform (ingen layout, ingen omanpassning). */
+function setBar(fillEl, fraction) {
+  const t = barScale(fraction);
+  if (fillEl && fillEl.style.transform !== t) fillEl.style.transform = t;
+}
+function timerBarHTML(fraction, el) {
+  return `<span class="wt-bar lb-timer__bar" aria-hidden="true"><span class="wt-bar__fill" data-el="${el}" style="transform:${barScale(fraction)}"></span></span>`;
+}
+
+/* Lektionsordning i stunden (issue #146, js/lib/lektionsordning.js).
+   `run` = ordningView(): null → exakt samma HTML som före #146. Annars:
+   avklarade steg får en bock i stället för siffran (samma bubbla, siffran
+   står kvar osynlig så att bredd och baslinje är oförändrade), det
+   pågående får ram + ton (ritas utan att ta plats, se CSS) och ev.
+   timerbrickan högerställd på raden. Kommande steg ser ut som i dag.
+   Raderna är flexrader utan fast höjd — en senare kolumn med planerade
+   minuter kan följa radhöjden. */
+function stepRowHTML(s, i, run) {
+  if (i < run.active) {
+    return `<li class="lb-step--done"><span class="lb-step__mark" aria-hidden="true">${i + 1}${icon("check", { strokeWidth: 3 })}</span><span class="lb-step__text">${esc(s)}</span></li>`;
+  }
+  if (i > run.active) return `<li>${esc(s)}</li>`;
+  const timer = run.phase === "none" ? "" :
+    `<span class="lb-step__timer lb-timer" role="timer" aria-label="Tid kvar på steget" data-phase="${run.phase}">${icon("clock")}<span data-el="step-time">${esc(run.text)}</span>${timerBarHTML(run.fraction, "step-bar")}</span>`;
+  return `<li class="lb-step--now${timer ? " lb-step--timer" : ""}" aria-current="step"><span class="lb-step__text">${esc(s)}</span>${timer}</li>`;
+}
+
+function stepsHTML(items, run = null) {
   const rows = items.map((s) => String(s).trim()).filter(Boolean);
   if (rows.length === 0) return `<div class="lb-empty">—</div>`;
-  return `<ol class="lb-steps">${rows.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>`;
+  if (!run || run.active >= rows.length) return `<ol class="lb-steps">${rows.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>`;
+  return `<ol class="lb-steps lb-steps--run">${rows.map((s, i) => stepRowHTML(s, i, run)).join("")}</ol>`;
 }
 
 /* Ren text ligger i ett eget block (.lb-text) — ser likadant ut, men ger
@@ -266,10 +313,10 @@ function textHTML(value) {
   return v ? `<div class="lb-text">${esc(v).replace(/\n/g, "<br>")}</div>` : `<div class="lb-empty">—</div>`;
 }
 
-function fieldHTML(part, plan) {
+function fieldHTML(part, plan, run = null) {
   const val = plan.fields[part.key];
   let body;
-  if (part.kind === "steps") body = stepsHTML(val);
+  if (part.kind === "steps") body = stepsHTML(val, run);
   else if (part.kind === "list") body = listHTML(val);
   else body = textHTML(val);
   return `<div class="lb-field lb-field--${part.key}">
@@ -295,7 +342,7 @@ function breakBoxHTML(plan, now, { leavingMs = null } = {}) {
   return `<div class="lb-break${leaving ? " lb-break--leaving" : ""}" data-phase="${c.phase}"${leaving ? ` style="animation-delay:${-Math.round(leavingMs)}ms"` : ""}>
     <div class="lb-break__head">
       <div class="lb-field__label">${esc(breakLabel(plan.fields).toUpperCase())}</div>
-      ${timer ? `<div class="lb-break__time" role="timer" aria-label="Tid kvar">${icon("clock")}<span data-el="brk-time">${c.text}</span></div>` : ""}
+      ${timer ? `<div class="lb-break__time lb-timer" role="timer" aria-label="Tid kvar">${icon("clock")}<span data-el="brk-time">${c.text}</span>${timerBarHTML(c.fraction, "brk-bar")}</div>` : ""}
     </div>
     <div class="lb-field__body lb-break__body">${body}</div>
   </div>`;
@@ -304,8 +351,10 @@ function breakBoxHTML(plan, now, { leavingMs = null } = {}) {
 /**
  * `opts.praise` = rendera en plats för Bra jobbat-rutan (fylls i efteråt, se renderBoard).
  * `opts.breakBox` = färdig HTML för "Efter rasten"-rutan ("" = ingen), se renderBoard.
+ * `opts.run` = Lektionsordningens läge i stunden (ordningView, issue #146);
+ *   null = inget markerat → samma HTML som före #146.
  */
-function boardHTML(rawPlan, subjects, { praise = false, breakBox = "" } = {}) {
+function boardHTML(rawPlan, subjects, { praise = false, breakBox = "", run = null } = {}) {
   const plan = normalizePlan(rawPlan);
   const st = styleFor(plan.subjectId, subjects);
   const show = plan.show;
@@ -331,7 +380,7 @@ function boardHTML(rawPlan, subjects, { praise = false, breakBox = "" } = {}) {
   // "Efter rasten" ligger överst i samma kolumn som Lektionsordning. Utan
   // Lektionsordning får rutan en egen smal kolumn (issue #136, fitBoard).
   const midCol = show.attGora || breakBox
-    ? `<div class="lb-col lb-col--mid${show.attGora ? "" : " lb-col--break-only"}">${breakBox}${show.attGora ? fieldHTML(part("attGora"), plan) : ""}</div>`
+    ? `<div class="lb-col lb-col--mid${show.attGora ? "" : " lb-col--break-only"}">${breakBox}${show.attGora ? fieldHTML(part("attGora"), plan, run) : ""}</div>`
     : "";
   const rightCol = show.narKlar || praise
     ? `<div class="lb-col lb-col--right${praise ? " lb-col--has-praise" : ""}">${show.narKlar ? fieldHTML(part("narKlar"), plan) : ""}${praise ? `<div class="lb-praise-slot"></div>` : ""}</div>`
@@ -460,6 +509,7 @@ function fitBoard(fitEl, praiseBoard = null) {
   midEl?.style.removeProperty("--lb-steps-scale");
   midEl?.style.removeProperty("--lb-break-scale");
   midEl?.style.removeProperty("--lb-break-col");
+  breakEl?.querySelector(".lb-break__head > .lb-field__label")?.style.removeProperty("font-size");
   if (midEl) { delete midEl.dataset.stepsScale; delete midEl.dataset.breakScale; delete midEl.dataset.breakCol; }
 
   // 1. Tavlans skala — utan rutan. Med Lektionsordning står kolumnen kvar,
@@ -499,6 +549,7 @@ function fitBoard(fitEl, praiseBoard = null) {
   // Lektionsordning krymps bara när kolumnens innehåll når förbi dess
   // nederkant — ett horisontellt överflöd i rutan (t.ex. den stora
   // timern) är rutans sak, inte stegens.
+  // Markeringen (issue #146) räknas aldrig in: samma skalor med och utan.
   const fits = () => !overflows(midEl, null, { x: false })
     && (!lastStep || stepsWithin(lastStep.getBoundingClientRect().bottom, midEl.getBoundingClientRect().bottom));
   const breakFits = () => !overflows(breakEl);
@@ -511,6 +562,25 @@ function fitBoard(fitEl, praiseBoard = null) {
   });
   midEl.dataset.stepsScale = steps.toFixed(2);
   if (brk < 1) midEl.dataset.breakScale = brk.toFixed(2);
+  fitBreakLabel(breakEl);
+}
+
+/**
+ * Issue #146: rubriken "EFTER RASTEN" bredvid timerbrickan. I en trång
+ * kolumn är rubrikens längsta ord bredare än platsen bredvid brickan och
+ * texten hamnade under den (syntes inte förut, när timern var genomskinlig
+ * text). Bara rubrikens egen text krymps då tills den ryms. Rubrikraden är
+ * lika hög som brickan, så det ändrar ingen höjd och ingen skala.
+ */
+function fitBreakLabel(breakEl) {
+  const label = breakEl?.querySelector(".lb-break__head > .lb-field__label");
+  if (!label || !breakEl.querySelector(".lb-break__time")) return;
+  const base = parseFloat(getComputedStyle(label).fontSize);
+  const range = document.createRange();
+  range.selectNodeContents(label);
+  const fits = () => Math.max(...[...range.getClientRects()].map((r) => r.right)) <= label.getBoundingClientRect().right + 1;
+  if (fits()) return;
+  searchScale(1, fits, (s) => { label.style.fontSize = `${(base * s).toFixed(2)}px`; });
 }
 
 /**
@@ -607,8 +677,10 @@ function watchBreakFade(brk, fitEl) {
 function renderBoard(container, rawPlan, subjects, praise, chips, brk) {
   const plan = normalizePlan(rawPlan);
   const withPraise = plan.show.praise && (praise.names.length > 0 || !!praise.emptyText);
-  const breakBox = breakForRender(brk, plan, serverNow());
-  container.innerHTML = `<div class="lb-fit">${boardHTML(plan, subjects, { praise: withPraise, breakBox })}</div>`;
+  const now = serverNow();
+  const breakBox = breakForRender(brk, plan, now);
+  const run = boardRun(plan, now);
+  container.innerHTML = `<div class="lb-fit">${boardHTML(plan, subjects, { praise: withPraise, breakBox, run })}</div>`;
   const fitEl = container.firstElementChild;
   const slot = fitEl.querySelector(".lb-praise-slot");
   if (slot) {
@@ -634,7 +706,38 @@ function tickBreak(container, brk, rawPlan, rerender) {
   const timeEl = box?.querySelector('[data-el="brk-time"]');
   const c = breakCountdown(plan, now);
   if (timeEl && timeEl.textContent !== c.text) timeEl.textContent = c.text;
+  setBar(box?.querySelector('[data-el="brk-bar"]'), c.fraction);
   if (box && box.dataset.phase !== c.phase) box.dataset.phase = c.phase;
+}
+
+/* ---- Lektionsordning i stunden (issue #146) ---- */
+
+/** Stegläget som tavlan visar (null = inget markerat), bara när Lektionsordning syns. */
+function boardRun(plan, now) {
+  return plan.show.attGora ? ordningView(plan, now) : null;
+}
+/** Nyckel för vad tavlan visar — byts den ritas tavlan om (och anpassas). */
+const runKey = (run) => (run ? `${run.active}|${run.phase}` : "");
+function renderedRunKey(container) {
+  const ol = container.querySelector("ol.lb-steps--run");
+  if (!ol) return "";
+  const active = [...ol.children].findIndex((li) => li.classList.contains("lb-step--now"));
+  return `${active}|${ol.querySelector(".lb-step__timer")?.dataset.phase ?? "none"}`;
+}
+
+/**
+ * Stegtimerns tick (ritsignal): byter bara siffrorna — sekundticket
+ * anpassar aldrig om. Byts något annat (Klart, läget gick ut efter
+ * lektionen, ändring via sync) ritas tavlan om.
+ */
+function tickSteps(container, rawPlan, rerender) {
+  if (!rawPlan || !container.querySelector(".lesson-board")) return;
+  const plan = normalizePlan(rawPlan);
+  const run = boardRun(plan, serverNow());
+  if (runKey(run) !== renderedRunKey(container)) { rerender(); return; }
+  const timeEl = run?.phase === "running" ? container.querySelector('[data-el="step-time"]') : null;
+  if (timeEl && timeEl.textContent !== run.text) timeEl.textContent = run.text;
+  if (timeEl) setBar(container.querySelector('[data-el="step-bar"]'), run.fraction);
 }
 
 /** Anpassa om efter storleksändring (samma innehåll). */
@@ -728,8 +831,9 @@ function lessonWidgetsSummary(rawPlan) {
    MODEN
    ============================================================ */
 
-/** Exporterad för docs/test-widgets.mjs (widgets följer med planeringen). */
-export { normalizePlan };
+/** Exporterade för docs/test-widgets.mjs (widgets följer med planeringen)
+    och docs/test-lektionsordning.mjs (tavlans HTML, issue #146). */
+export { normalizePlan, boardHTML, breakBoxHTML };
 
 export default {
   id: "lektion",
@@ -886,7 +990,11 @@ export default {
         if (p) renderBoard(stage, p, subjects, praise(), chipHost, brk);
         else { chipHost.destroy(); stage.innerHTML = `<div class="lesson-empty"><h1>Ingen planering visas</h1><p>Läraren väljer en lektion att visa.</p></div>`; }
       };
-      this._offs.push(createTicker(() => tickBreak(stage, brk, presentedPlan(), renderStudent), { intervalMs: 250 }));
+      // Stegtimern (issue #146) likaså: elevvyn ritar, skriver aldrig.
+      this._offs.push(createTicker(() => {
+        tickBreak(stage, brk, presentedPlan(), renderStudent);
+        tickSteps(stage, presentedPlan(), renderStudent);
+      }, { intervalMs: 250 }));
       observeStage(stage);
       this._offs.push(data.watch(plansPath, (docs) => { plans = docs; renderStudent(); }));
       watchPresented(renderStudent);
@@ -1205,11 +1313,13 @@ export default {
         const input = multi
           ? `<textarea data-field="${k}" rows="${k === "attGora" ? 4 : 2}" placeholder="En rad per punkt">${esc(val)}</textarea>`
           : `<input type="text" data-field="${k}" value="${esc(val)}" autocomplete="off">`;
+        // Lektionsordning: stegningen i stunden under textfältet (issue #146, renderStepRun).
+        const run = k === "attGora" ? `<div class="field-edit__run" data-el="step-run" hidden></div>` : "";
         return `<div class="field-edit${on ? "" : " field-edit--off"}" data-fieldwrap="${k}">
           <div class="field-edit__head">
             <label><input type="checkbox" data-show="${k}" ${on ? "checked" : ""}> ${esc(part.label.toUpperCase())}</label>
           </div>
-          ${input}
+          ${input}${run}
         </div>`;
       });
       // Bra jobbat: kryssrutan + (bara när den är ikryssad) samma redigerare
@@ -1253,6 +1363,77 @@ export default {
           <p class="field-edit__hint">En rad per sak. Börja raden med - för en punkt.</p>
         </div>
       </div>`;
+    }
+
+    /** Lektionsordning i stunden (issue #146): Föregående/Nästa steg, status
+        och timern på det pågående steget. Bara med steg och när Lektionsordning
+        syns på tavlan. Samma knappstil som Efter rastens "+1 min"/"Dölj nu". */
+    function stepRunHTML(np, now) {
+      const steps = ordningSteps(np.fields);
+      if (!np.show.attGora || steps.length === 0) return "";
+      const { active, timer } = ordningState(np, now);
+      const status = active == null
+        ? "Inget steg markerat"
+        : `Pågår: ${active + 1}. ${esc(steps[active])}`;
+      let timerPart = "";
+      if (active != null && timer) {
+        timerPart = `<div class="field-edit__run-row">
+            <button type="button" class="btn" data-act="step-plus" title="Förläng stegets timer med en minut">+1 min</button>
+            <button type="button" class="btn" data-act="step-stop" title="Ta bort timern — steget förblir markerat">Stoppa timer</button>
+          </div>`;
+      } else if (active != null) {
+        timerPart = `<p class="field-edit__hint field-edit__run-ask">Timer på det här steget?</p>
+          <div class="field-edit__run-row">
+            ${STEP_QUICK_MIN.map((m) => `<button type="button" class="btn" data-act="step-timer" data-min="${m}">${m} min</button>`).join("")}
+            <input type="number" class="field-edit__run-min" data-el="step-min" min="${STEP_MIN_MIN}" max="${STEP_MIN_MAX}" step="1" inputmode="numeric" placeholder="min" aria-label="Egna minuter (${STEP_MIN_MIN}–${STEP_MIN_MAX})" aria-describedby="step-min-error">
+            <button type="button" class="btn" data-act="step-timer">Starta</button>
+          </div>
+          <p class="field-edit__run-error" id="step-min-error" data-el="step-min-error" role="alert" hidden>${esc(STEP_MIN_ERROR)}</p>`;
+      }
+      return `<div class="field-edit__run-row">
+          <button type="button" class="btn" data-act="step-prev" title="Tillbaka ett steg"${active == null ? " disabled" : ""}>Föregående</button>
+          <button type="button" class="btn" data-act="step-next" title="Bocka av steget och gå till nästa"${active === steps.length - 1 ? " disabled" : ""}>Nästa steg</button>
+        </div>
+        <p class="field-edit__run-status">${status}</p>
+        ${timerPart}`;
+    }
+    // Ritas bara om när innehållet ändras — annars tappar minutfältet det läraren skriver.
+    let stepRunShown = { box: null, html: null };
+    function renderStepRun() {
+      const box = fieldsEl.querySelector('[data-el="step-run"]');
+      if (!box) return;
+      const p = editingPlan();
+      const html = p ? stepRunHTML(normalizePlan(p), serverNow()) : "";
+      if (stepRunShown.box === box && stepRunShown.html === html) return;
+      stepRunShown = { box, html };
+      box.innerHTML = html;
+      box.hidden = !html;
+    }
+    function showStepMinError(on) {
+      const err = fieldsEl.querySelector('[data-el="step-min-error"]');
+      if (err) err.hidden = !on;
+      fieldsEl.querySelector('[data-el="step-min"]')?.setAttribute("aria-invalid", String(on));
+    }
+    /** Sidopanelens stegknappar → de ändrade fälten sparas och når elevskärmen via datalagret. */
+    async function stepAction(act, btn) {
+      const p = editingPlan();
+      if (!p) return;
+      const np = normalizePlan(p);
+      const now = serverNow();
+      let fields = null;
+      if (act === "step-next") fields = stepNext(np, now);
+      else if (act === "step-prev") fields = stepPrev(np, now);
+      else if (act === "step-plus") fields = stepPlusOneMinute(np, now);
+      else if (act === "step-stop") fields = stepStopTimer(np);
+      else if (act === "step-timer") {
+        const input = fieldsEl.querySelector('[data-el="step-min"]');
+        const own = btn.dataset.min == null;
+        if (own && parseStepMinutes(input?.value) == null) { showStepMinError(true); input?.focus(); return; }
+        fields = stepStartTimer(np, own ? input.value : btn.dataset.min, now);
+      }
+      if (!fields) return;
+      await patchEditing({ fields });
+      renderPreview();
     }
 
     // -- Widgets (issue #115, kompakt i #123): en rad per widget, sparas i planeringen --
@@ -1453,6 +1634,7 @@ export default {
       else { chipHost.destroy(); stageEl.innerHTML = `<div class="lesson-empty"><h1>Ingen planering</h1><p>Skapa en ny planering för att börja.</p></div>`; }
       renderPresentState();
       renderSummaries();
+      renderStepRun();
     }
 
     // Förhandsmarkeringen (issue #82 + #88): när den öppna planeringen INTE
@@ -1506,10 +1688,16 @@ export default {
       await patchEditing({ show: { ...normalizePlan(p).show, efterRasten: false } });
       renderPreview();
     }
+    // Lektionsordningens läge (issue #146) nollställs efter lektionen — bara
+    // härifrån (lärarvyn), en gång; även när planeringen öppnas efteråt.
+    const ordningReset = createOrdningReset({ teacher: true });
     this._offs.push(createTicker(() => {
       tickBreak(stageEl, brk, editingPlan(), renderPreview);
+      tickSteps(stageEl, editingPlan(), renderPreview);
+      renderStepRun();
       const p = editingPlan();
       if (p && autoHide(normalizePlan(p), serverNow())) void hideBreak();
+      if (p && ordningReset(normalizePlan(p), serverNow())) void patchEditing({ fields: resetOrdningRun(normalizePlan(p).fields) });
     }, { intervalMs: 250 }));
 
     stageEl.addEventListener("click", async (e) => {
@@ -1578,7 +1766,8 @@ export default {
       const copy = normalizePlan(src);
       delete copy.id;
       copy.widgets = copyLessonWidgets(copy.widgets);
-      copy.fields = resetBreakRun(copy.fields);
+      // Inget körtillstånd följer med: Efter rasten (#132), Lektionsordningens läge (#146).
+      copy.fields = resetOrdningRun(resetBreakRun(copy.fields));
       copy.ownerUid = currentUid();
       copy.date = nextSameWeekday(copy.date);
       if (copy.date === src.date) copy.name = `${copy.name} (kopia)`;
@@ -1674,6 +1863,8 @@ export default {
         await patchEditing({ fields: plusOneMinute(normalizePlan(p).fields) });
         renderPreview();
       } else if (act === "brk-hide") await hideBreak();
+      // Lektionsordning i stunden (issue #146): Föregående/Nästa steg och stegets timer.
+      else if (act.startsWith("step-")) await stepAction(act, e.target.closest("[data-act]"));
       else if (act === "class-action") {
         // Den öppna planeringen förväljs som lektion (issue #34); utan
         // datum → den pågående lektionen enligt schemat.
@@ -1803,6 +1994,9 @@ export default {
     panel.addEventListener("input", async (e) => {
       if (e.target.dataset.filter === "q") { filter.q = e.target.value; renderList(); return; }
 
+      // Stegtimerns minutfält (issue #146) sparas inte — felet försvinner när läraren ändrar.
+      if (e.target.dataset.el === "step-min") { showStepMinError(false); return; }
+
       const metaKey = e.target.dataset.meta;
       if (metaKey === "name") { await patchEditing({ name: e.target.value }); renderList(); renderSummaries(); return; }
 
@@ -1852,6 +2046,11 @@ export default {
 
     panel.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && pendingDelete) { pendingDelete = null; renderConfirm(); }
+      // Enter i stegtimerns minutfält = Starta.
+      if (e.key === "Enter" && e.target.dataset.el === "step-min") {
+        e.preventDefault();
+        fieldsEl.querySelector('[data-act="step-timer"]:not([data-min])')?.click();
+      }
     });
 
     // ---- Watchers: håll listan/förhandsvisningen live ----
