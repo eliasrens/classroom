@@ -1484,8 +1484,20 @@ export default {
       widgetsFoldEl.hidden = !on;
       const p = editingPlan();
       if (p) {
+        // Växeln kan ändras i ett annat fönster medan läraren skriver här
+        // (issue #152): fältet med fokus får tillbaka fokus och markör.
+        const a = document.activeElement;
+        const key = a && fieldsEl.contains(a)
+          ? (a.dataset.field ? `[data-field="${a.dataset.field}"]` : a.dataset.show ? `[data-show="${a.dataset.show}"]` : null)
+          : null;
+        const caret = key && typeof a.selectionStart === "number" ? [a.selectionStart, a.selectionEnd, a.selectionDirection] : null;
         fieldsEl.innerHTML = fieldsHTML(normalizePlan(p), { advanced });
         mountFieldPraise();
+        const back = key && fieldsEl.querySelector(key);
+        if (back) {
+          back.focus();
+          if (caret) back.setSelectionRange(...caret);
+        }
       }
       renderStepRun();
       renderAdvancedUsed();
@@ -1806,7 +1818,10 @@ export default {
       const disabled = !p;
       for (const inp of metaInputs()) inp.disabled = disabled;
       editorFor = p?.id ?? null;
-      if (!p) { fieldsEl.innerHTML = ""; widgetsEl.innerHTML = ""; mountFieldPraise(); return; }
+      // Widgets töms via widgetsUI — innerHTML = "" rev ut dess behållare,
+      // så sektionen förblev tom efter Ny planering (issue #152).
+      widgetsEl.hidden = disabled;
+      if (!p) { fieldsEl.innerHTML = ""; widgetsUI.render(); mountFieldPraise(); return; }
       const np = normalizePlan(p);
       el.querySelector('[data-meta="name"]').value = np.name;
       el.querySelector('[data-meta="date"]').value = np.date;
@@ -1944,7 +1959,8 @@ export default {
       if (!act) return;
       if (act === "new") await createPlan();
       // "Visa avancerat" i informationsraden (issue #149) slår på växeln.
-      else if (act === "show-advanced") await setAdvanced(true);
+      // Raden (och länken) försvinner — fokus flyttas till växeln (issue #152).
+      else if (act === "show-advanced") { advancedToggleEl.focus(); await setAdvanced(true); }
       // "+1 min" / "Dölj nu" i Efter rasten-delen (issue #144) — sparas i
       // planeringen och når elevskärmen via datalagret.
       else if (act === "brk-plus") {
