@@ -423,7 +423,7 @@
 .field-edit__run-row .btn { padding-inline: var(--space-2); white-space: nowrap; }
 .field-edit__run-status { margin: 0; font-size: 0.85rem; font-weight: 600; overflow-wrap: anywhere; }
 .field-edit__run-ask { margin: 0; }
-.field-edit__run-min { width: 4.5rem; }
+.field-edit .field-edit__run-min { width: 4.5rem; flex: none; }
 .field-edit__run-error { margin: 0; font-size: 0.78rem; font-weight: 600; color: var(--color-danger); }
 .field-edit__run-error[hidden] { display: none; }
 
@@ -668,12 +668,16 @@ ol.lb-steps > li::before {
      (text-decoration och opacity tar ingen plats);
    - pågående steg: ram (outline) + ton (bakgrund och box-shadow-ring) som
      ritas UTANFÖR radens låda. Ingen halvfet text. Fältets kropp klipper
-     med overflow: clip + overflow-clip-margin i stället för hidden, så att
-     ramen får synas utanför raden — det ändrar ingen layout (kroppen är en
+     med overflow: clip + overflow-clip-margin i stället för hidden (fältet
+     likaså), så att ramen får synas utanför raden — det ändrar ingen layout (kroppen är en
      flexpost med min-height: 0 och eget formateringssammanhang).
    Timerbrickan sitter sist på raden (flex: none); texten bryts till
    vänster om den (min-width: 0) och hamnar aldrig under den. */
 .lb-col--mid .lb-field--attGora > .lb-field__body:has(> ol.lb-steps--run) { overflow: clip; overflow-clip-margin: 0.45em; }
+/* Fältet runt omkring likaså: utan luft under sista steget (#138) skulle
+   det annars klippa ramens underkant när sista steget pågår. fitBoard
+   räknar då in ramen mot kolumnens nederkant (outlineReach). */
+.lb-col--mid .lb-field--attGora:has(> .lb-field__body > ol.lb-steps--run) { overflow: clip; overflow-clip-margin: 0.45em; }
 ol.lb-steps > li.lb-step--done::before { content: none; }
 .lb-step__mark {
   /* Samma mått som siffrans bubbla (ol.lb-steps > li::before) */
@@ -716,8 +720,11 @@ ol.lb-steps > li.lb-step--now {
   gap: 0.15em;
   padding: 0 0.3em;
   border-radius: 0.3em;
-  /* Ungefär som Efter rastens timer (2.1em i rutan) */
-  font-size: 1.7em;
+  /* Större och fetare än stegtexten, men mindre än Efter rastens timer
+     (2.1em i rutan, som har hela kolumnens bredd): brickan delar raden med
+     stegtexten, och ett vanligt ord ("Mattebok") ska få plats till vänster
+     om den utan att brytas mitt i. */
+  font-size: 1.15em;
   line-height: 1.2;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
