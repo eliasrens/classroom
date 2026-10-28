@@ -343,6 +343,12 @@ function glyphColumn({ box, steps, room, glyph }) {
   ok(/height: 1\.2em;/.test(rule(".lb-break__time")) && inner <= 1.2 + 1e-9, `#146: Efter rastens bricka är 1.2em hög som förut (innehåll ${inner}em)`);
   ok(/height: 1\.28em;/.test(rule(".lb-step__timer")) && inner <= 1.28, "#146: stegbrickan är en textrad hög — raden blir inte högre");
   ok(/position: absolute;/.test(rule(".lb-timer > .lb-timer__bar")), "#146: stapeln tar ingen plats i layouten");
+  // Efter rastens bricka är inte bredare än timern var (0.8 + 0.15 em utöver siffrorna).
+  const bt = rule(".lb-break__time");
+  const px = +(/--lb-timer-px: ([\d.]+)em;/.exec(bt)?.[1] ?? 9);
+  const gap = +(/gap: ([\d.]+)em;/.exec(bt)?.[1] ?? 9);
+  const ic = +(/width: ([\d.]+)em;/.exec(rule(".lb-break__time .icon"))?.[1] ?? 9);
+  ok(2 * px + gap + ic <= 0.8 + 0.15 + 1e-9, `#146: Efter rastens bricka tar ingen bredd från rubriken (${2 * px + gap + ic}em ≤ 0.95em)`);
 }
 
 console.log(`\n${passed} OK, ${failed} fel`);

@@ -624,12 +624,13 @@
   flex: none;
   font-size: 2.1em;
   height: 1.2em;
-  --lb-timer-px: calc(0.4em / 2.1);
-  gap: 0.1em;
+  --lb-timer-px: 0.12em;
+  gap: 0.08em;
 }
-/* Ikonen något mindre än förut (0.8em) och tätare mot siffrorna: brickans
-   sidoluft tar då ingen bredd från rubriken "EFTER RASTEN" bredvid. */
-.lb-break__time .icon { width: 0.7em; height: 0.7em; }
+/* Brickan får inte bli bredare än timern var (ikon 0.8em + mellanrum
+   0.15em + siffror): rutans rubrik "EFTER RASTEN" bredvid har ofta precis
+   plats. Sidoluft 2 × 0.12em + ikon 0.6em + mellanrum 0.08em = 0.92em. */
+.lb-break__time .icon { width: 0.6em; height: 0.6em; }
 .lb-break--leaving { animation: lb-break-out 0.5s ease forwards; pointer-events: none; }
 @keyframes lb-break-out { to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
@@ -651,9 +652,8 @@
   display: inline-flex;
   align-items: center;
   gap: 0.15em;
-  /* Sidoluften i stegtextens em (0.4em där); Efter rastens bricka har 2.1
-     gånger större text och sätter --lb-timer-px så att luften blir lika
-     stor i pixlar — annars trycker den ihop rutans rubrik. */
+  /* Sidoluften (0.4em i stegtimern); Efter rastens bricka har 2.1 gånger
+     större text och sätter en mindre --lb-timer-px, se .lb-break__time. */
   padding: 0.05em var(--lb-timer-px, 0.4em) 0.15em;
   border-radius: var(--radius-m);
   background: var(--subj);

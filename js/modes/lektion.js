@@ -515,6 +515,7 @@ function fitBoard(fitEl, praiseBoard = null) {
   midEl?.style.removeProperty("--lb-steps-scale");
   midEl?.style.removeProperty("--lb-break-scale");
   midEl?.style.removeProperty("--lb-break-col");
+  breakEl?.querySelector(".lb-break__head > .lb-field__label")?.style.removeProperty("font-size");
   if (midEl) { delete midEl.dataset.stepsScale; delete midEl.dataset.breakScale; delete midEl.dataset.breakCol; }
 
   // 1. Tavlans skala — utan rutan. Med Lektionsordning står kolumnen kvar,
@@ -570,6 +571,25 @@ function fitBoard(fitEl, praiseBoard = null) {
   });
   midEl.dataset.stepsScale = steps.toFixed(2);
   if (brk < 1) midEl.dataset.breakScale = brk.toFixed(2);
+  fitBreakLabel(breakEl);
+}
+
+/**
+ * Issue #146: rubriken "EFTER RASTEN" bredvid timerbrickan. I en trång
+ * kolumn är rubrikens längsta ord bredare än platsen bredvid brickan och
+ * texten hamnade under den (syntes inte förut, när timern var genomskinlig
+ * text). Bara rubrikens egen text krymps då tills den ryms. Rubrikraden är
+ * lika hög som brickan, så det ändrar ingen höjd och ingen skala.
+ */
+function fitBreakLabel(breakEl) {
+  const label = breakEl?.querySelector(".lb-break__head > .lb-field__label");
+  if (!label || !breakEl.querySelector(".lb-break__time")) return;
+  const base = parseFloat(getComputedStyle(label).fontSize);
+  const range = document.createRange();
+  range.selectNodeContents(label);
+  const fits = () => Math.max(...[...range.getClientRects()].map((r) => r.right)) <= label.getBoundingClientRect().right + 1;
+  if (fits()) return;
+  searchScale(1, fits, (s) => { label.style.fontSize = `${(base * s).toFixed(2)}px`; });
 }
 
 /**
