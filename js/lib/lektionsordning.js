@@ -122,6 +122,18 @@ export function realignMinutes(oldSteps, oldMins, newSteps) {
   });
 }
 
+/**
+ * Ett minutfält i panelen: tomt → { ok: true, min: null }, 1–90 →
+ * { ok: true, min }, annars { ok: false } (felet visas, inget sparas).
+ * `badInput` = fältets validity.badInput (t.ex. "e" i ett sifferfält).
+ */
+export function readStepMinutes(value, badInput = false) {
+  const v = String(value ?? "").trim();
+  if (v === "" && !badInput) return { ok: true, min: null };
+  const min = parseStepMinutes(v);
+  return min == null ? { ok: false } : { ok: true, min };
+}
+
 /** attGoraMin med steg `step` (index bland stegen på tavlan) satt till `min` (tal eller null). */
 export function setStepMinutes(fields, step, min) {
   const mins = normalizeMinutes(fields);

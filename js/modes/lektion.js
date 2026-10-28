@@ -114,7 +114,7 @@ import {
 } from "../lib/efter-rasten.js";
 import {
   STEP_MIN_MIN, STEP_MIN_MAX, STEP_QUICK_MIN, STEP_MIN_ERROR, createOrdningReset, normalizeOrdningFields, ordningSteps,
-  ordningState, ordningView, parseStepMinutes, plannedText, realignMinutes, resetOrdningRun, setStepMinutes, stepCountdown,
+  ordningState, ordningView, parseStepMinutes, plannedText, readStepMinutes, realignMinutes, resetOrdningRun, setStepMinutes, stepCountdown,
   stepMinutes, stepNext, stepPlusOneMinute, stepPrev, stepStartTimer, stepStopTimer,
 } from "../lib/lektionsordning.js";
 import {
@@ -1560,17 +1560,19 @@ export default {
       const text = np ? plannedText(np) : "";
       if (sum && sum.textContent !== text) sum.textContent = text;
     }
-    /** Ett minutfält ändrades: tomt → null, 1–90 → sparas, annars felet vid fältet. */
-    async function setPlanMinute(input) {
+    /** Ett minutfält: tomt → null, 1–90 → giltigt, annars felet vid fältet.
+     *  Under skrivandet (input) visas bara felet; värdet sparas först när
+     *  fältet ändrats klart (change: lämnas eller Enter). Annars sparades
+     *  "9" på vägen till "95" och låg kvar när 95 visade felet. */
+    async function setPlanMinute(input, { save }) {
       const p = editingPlan();
       if (!p) return;
-      const v = input.value.trim();
-      const min = v === "" && !input.validity?.badInput ? null : parseStepMinutes(v);
-      const bad = min == null && (v !== "" || input.validity?.badInput);
+      const r = readStepMinutes(input.value, input.validity?.badInput);
       const err = input.parentElement.querySelector('[data-el="plan-min-error"]');
-      if (err) err.hidden = !bad;
-      input.setAttribute("aria-invalid", String(bad));
-      if (bad) return;
+      if (err) err.hidden = r.ok;
+      input.setAttribute("aria-invalid", String(!r.ok));
+      if (!r.ok || !save) return;
+      const min = r.min;
       const np = normalizePlan(p);
       await patchEditing({ fields: { ...np.fields, attGoraMin: setStepMinutes(np.fields, Number(input.dataset.step), min) } });
       renderPreview();
@@ -2131,6 +2133,8 @@ export default {
       }
       if (e.target.dataset.filter === "subject") { filter.subject = e.target.value; renderList(); return; }
       if (e.target === advancedToggleEl) { await setAdvanced(advancedToggleEl.checked); return; }
+      // Minuter per steg (issue #153): sparas när fältet ändrats klart.
+      if (e.target.dataset.el === "plan-min") { await setPlanMinute(e.target, { save: true }); return; }
 
       const metaKey = e.target.dataset.meta;
       if (metaKey === "subjectId" && e.target.value === ADD_SUBJECT) {
@@ -2199,7 +2203,7 @@ export default {
       // Stegtimerns minutfält (issue #146) sparas inte — felet försvinner när läraren ändrar.
       if (e.target.dataset.el === "step-min") { showStepMinError(false); return; }
       // Minuter per steg (issue #153).
-      if (e.target.dataset.el === "plan-min") { await setPlanMinute(e.target); return; }
+      if (e.target.dataset.el === "plan-min") { await setPlanMinute(e.target, { save: false }); return; }
 
       const metaKey = e.target.dataset.meta;
       if (metaKey === "name") { await patchEditing({ name: e.target.value }); renderList(); renderSummaries(); return; }

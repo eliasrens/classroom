@@ -245,6 +245,30 @@ ok(A.ADVANCED_FIELD_KEYS.join(",") === "efterRasten,praise", "ADVANCED_FIELD_KEY
   const js = readFileSync(new URL("../js/modes/lektion.js", import.meta.url), "utf8");
   ok(/fields = stepStartTimer\(np, own \? input\.value : btn\.dataset\.min, now\);/.test(js), "knappen går genom stepStartTimer med data-min");
 
+  // Minutfältet: "95" skrivs som "9" → "95". Inget får sparas på vägen
+  // (Testarens fynd: 9 sparades och låg kvar när 95 gav felet).
+  const R = (v, bad) => JSON.stringify(L.readStepMinutes(v, bad));
+  ok(R("9") === '{"ok":true,"min":9}' && R("95") === '{"ok":false}', "readStepMinutes: 9 giltigt, 95 ogiltigt");
+  ok(R("") === '{"ok":true,"min":null}' && R(" 20 ") === '{"ok":true,"min":20}', "tomt → null, 20 → 20");
+  for (const bad of ["0", "91", "2.5", "tio"]) ok(R(bad) === '{"ok":false}', `readStepMinutes(${bad}) → fel`);
+  ok(R("", true) === '{"ok":false}', "badInput (t.ex. \"e\") räknas som fel, inte som tomt");
+  const fn = js.slice(js.indexOf("async function setPlanMinute("), js.indexOf("// -- Avancerat (issue #149) --"));
+  ok(/if \(!r\.ok \|\| !save\) return;/.test(fn) && fn.indexOf("if (!r.ok || !save) return;") < fn.indexOf("patchEditing"),
+    "setPlanMinute sparar bara när save är satt och värdet är giltigt");
+  const inputSrc = js.slice(js.indexOf('panel.addEventListener("input"'), js.indexOf('panel.addEventListener("keydown"'));
+  const changeSrc = js.slice(js.indexOf('panel.addEventListener("change"'), js.indexOf('panel.addEventListener("input"'));
+  ok(/setPlanMinute\(e\.target, \{ save: false \}\)/.test(inputSrc) && !/save: true/.test(inputSrc), "under skrivandet (input): bara felet, inget sparas");
+  ok(/setPlanMinute\(e\.target, \{ save: true \}\)/.test(changeSrc), "när fältet ändrats klart (change): sparas");
+  // Simulerat: input 9, input 95, change → ingenting sparat; input 20, change → 20.
+  {
+    const saved = [];
+    const step = (v, save) => { const r = L.readStepMinutes(v); if (r.ok && save) saved.push(r.min); return r.ok; };
+    step("9", false); step("95", false); step("95", true);
+    ok(saved.length === 0, "9 → 95 → lämna fältet: ingenting sparat (inte 9)");
+    step("2", false); step("20", false); step("20", true);
+    ok(saved.join(",") === "20", "2 → 20 → lämna fältet: 20 sparas");
+  }
+
   // advancedPartsInUse
   const parts = (p) => A.advancedPartsInUse(p, now).join(", ");
   ok(parts(plan) === "planerade minuter", "planerade minuter räknas som avancerad del");
