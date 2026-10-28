@@ -643,7 +643,7 @@
    projektorn. Mindre rundad (--radius-m) än ramarna runt omkring.
    En tunn stapel i nederkanten visar andelen tid kvar, scaleX(kvar/total)
    från vänster. Lugnare än timerwidgetens (.wt--chip .wt-bar,
-   css/ui/widgets.css), issue #148: halva tjockleken, spår i currentColor
+   css/ui/widgets.css), issue #148: halva tjockleken (minst 2px, syns på projektorn), spår i currentColor
    18 % och fyllning 60 %, så att den inte blir en tung svart massa på
    ljusa ämnen (SO, gul). Siffrorna har kvar textColor som rubrikraden;
    klockikonen är något dämpad. Storlek och höjd sätts av respektive
@@ -671,7 +671,7 @@
   left: var(--lb-timer-px, 0.4em);
   right: var(--lb-timer-px, 0.4em);
   bottom: 0.05em;
-  height: 0.06em;
+  height: max(0.06em, 2px);
   border-radius: 999px;
   overflow: hidden;
   background: color-mix(in srgb, currentColor 18%, transparent);

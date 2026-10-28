@@ -290,7 +290,7 @@ const BEFORE = [
   ok(/background: var\(--subj\);/.test(badge) && /color: var\(--subj-ink\);/.test(badge), "brickan är ifylld: ämnesfärg som bakgrund, ämnets textfärg");
   ok(/padding: 0\.05em var\(--lb-timer-px, 0\.4em\) 0\.15em;/.test(badge) && /border-radius: var\(--radius-m\);/.test(badge) && /tabular-nums/.test(badge), "radius-m, padding 0.05em 0.4em (+ luft för stapeln), tabular-nums");
   const bar = rule(".lb-timer > .lb-timer__bar") ?? "";
-  ok(/height: 0\.06em;/.test(bar) && /position: absolute;/.test(bar) && /currentColor 18%/.test(bar), "stapeln (issue #148): 0.06em, inuti brickans nederkant, spår i currentColor 18 %");
+  ok(/height: max\(0\.06em, 2px\);/.test(bar) && /position: absolute;/.test(bar) && /currentColor 18%/.test(bar), "stapeln (issue #148): max(0.06em, 2px), inuti brickans nederkant, spår i currentColor 18 %");
   ok(/background: color-mix\(in srgb, currentColor 60%, transparent\);/.test(rule(".lb-timer > .lb-timer__bar > .wt-bar__fill") ?? ""), "fyllningen i currentColor 60 % (issue #148)");
   ok(/opacity: 0\.75;/.test(rule(".lb-timer > .icon") ?? ""), "klockikonen något dämpad (issue #148)");
   const stepT = rule(".lb-step__timer") ?? "";

@@ -7,7 +7,7 @@ densamma. Elevskärmen i 1920×1080. Samma planering i tre ämnen: Historia
 (SO, gul), Matematik (blå) och Idrott & hälsa (mellanljus).
 
 Ändring (bara inom `.lb-timer`, `css/modes/lektion.css`): stapeln är hälften
-så tjock (0.12em → 0.06em), spåret currentColor 25 % → 18 %, fyllningen
+så tjock (0.12em → max(0.06em, 2px)), spåret currentColor 25 % → 18 %, fyllningen
 currentColor → 60 %. Klockikonen har opacitet 0.75. Siffrorna har kvar
 `textColor` som rubrikraden. Timerwidgetens stapel (`css/ui/widgets.css`) är
 orörd.
@@ -22,3 +22,8 @@ orörd.
 
 Uppmätt (bild 4, före och efter): `--lb-scale` 1.000 och `--lb-steps-scale`
 0.673 i båda; brickornas höjd 132.78 px och 49.02 px i båda.
+
+`6-efter-elev-1280-historia-halvvags-min-2px`: stegtimerns stapel har en
+golvhöjd på 2px (`max(0.06em, 2px)`). I 1280 blir den 2px, mot 1.5px utan
+golvet. Efter rastens stapel är 4.3px och påverkas inte. Brickornas höjd är
+86.81 px och 31.23 px, `--lb-scale` 1.000 och `--lb-steps-scale` 0.656.
