@@ -15,17 +15,17 @@ tema — tavlans papper är vitt i alla teman, bara panelen skiljer).
 |---|---|
 | `1-fore-elev-{1280,1920}-inget-markerat` / `1-efter-…` | Inget steg markerat. **Pixelidentiska** (råa PNG-pixlar jämförda, båda storlekarna). |
 | `2-elev-…-steg3-utan-timer` | Steg 1–2 bockade, steg 3 med ram + ton, ingen timer. |
-| `3-elev-{1280,1920}-matte-nedrakning`, `3-larare-{ljust,morkt}-1280-nedrakning` | Steg 3 med timern som ifylld bricka i ämnesfärgen (rättelse från läraren: syns på projektorn), på stegtextens första rad. Sidopanelen: Pågår, +1 min, Stoppa timer. |
-| `4-elev-1280-matte-klart-puls-{ljus,mork}`, `4-elev-1920-matte-klart` | Klart: hela brickan pulserar, pulsens två lägen (opacitet 1 och 0,5, fångade med animationen stoppad). |
-| `5-elev-1280-slojd-nedrakning`, `5-elev-1920-slojd-klart` | Ett ljust ämne (Slöjd): brickan i ämnets färg med mörk text, ramen i `--subj-deep`. |
-| `6-elev-{1280,1920}-lang-text-nedrakning` | Lång stegtext + timer: texten bryts till vänster om brickan, ramen omsluter allt, inget överlapp (mätt). |
+| `3-elev-{1280,1920}-matte-nedrakning`, `3-larare-{ljust,morkt}-1280-nedrakning` | Steg 3 med timern som ifylld bricka i ämnesfärgen, i stegtextens storlek (fetstil, smal padding, ikon 0.7em), på textens första rad. Sidopanelen: Pågår, +1 min, Stoppa timer. |
+| `4-elev-1920-matte-klart-puls-{ljus,mork}`, `4-elev-1280-matte-klart` | Klart: hela brickan pulserar; pulsens två lägen (opacitet 1 och 0,5, fångade med animationen stoppad). |
+| `5-elev-1280-slojd-{nedrakning,klart}` | Ett ljust ämne (Slöjd): brickan i ämnets färg med mörk text. |
+| `6-elev-1280-lang-text-nedrakning` | Lång stegtext + timer: texten bryts till vänster om brickan, ramen omsluter allt, inget överlapp (mätt). |
 
-**Känd begränsning (finding 1):** "Mattebok s.44-45" får inte plats på en
-rad bredvid brickan i 1280 eller 1920. Mätt på elevskärmen 1280×720: raden
-484 px; texten behöver 326 px, brickan 220 px, bubbla + två mellanrum 84 px
-= 630 px. Proportionerna är desamma i 1920 (allt skalar med tavlans
-bredd). Texten tar ändå all ledig plats och bryts bara för att den inte
-ryms; i en bredare mittenkolumn (t.ex. utan Vad/Hur/Varför) står den på en rad.
+**Finding 1 (kvarstår):** även med den mindre brickan (stegtextens storlek,
+171 px i stället för 220 px på elevskärmen 1280×720) ryms inte
+"Mattebok s.44-45" på en rad: raden är 484 px, texten 326 px, bubbla +
+två mellanrum 84 px — brickan skulle behöva vara högst ~74 px. Samma
+proportioner i 1920. Texten bryts ändå bara för att den inte ryms; kortare
+steg ("Avslut", "Mini-whiteboards") och bredare mittenkolumner står på en rad.
 
 ## Uppmätt i webbläsaren (elevskärmen 1280×720)
 

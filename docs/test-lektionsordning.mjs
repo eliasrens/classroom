@@ -258,7 +258,9 @@ const BEFORE = [
   ok(/<span class="lb-step__timer" role="timer"[^>]*>/.test(h), "timern är en bricka (klassen lb-step__timer)");
   const badge = rule(".lb-step__timer") ?? "";
   ok(/background: var\(--subj\);/.test(badge) && /color: var\(--subj-ink\);/.test(badge), "brickan är ifylld: ämnesfärg som bakgrund, ämnets textfärg");
-  ok(/padding: 0\.1em 0\.5em;/.test(badge) && /border-radius:/.test(badge) && /tabular-nums/.test(badge), "rundade hörn, padding 0.1em 0.5em, tabular-nums");
+  ok(/padding: 0\.05em 0\.3em;/.test(badge) && /border-radius:/.test(badge) && /tabular-nums/.test(badge), "rundade hörn, smal padding, tabular-nums");
+  ok(/font-size: 1em;/.test(badge) && /height: 1\.28em;/.test(badge), "brickan har stegtextens storlek och är en textrad hög (raden blir inte högre)");
+  ok(/width: 0\.7em; height: 0\.7em;/.test(rule(".lb-step__timer .icon") ?? ""), "ikonen något mindre (0.7em)");
   ok(/flex: none;/.test(badge) && !/margin-left/.test(badge), "brickan: flex none, mellanrum via gap (ingen margin-left: auto)");
   ok(/animation: lb-step-pulse/.test(rule('.lb-step__timer[data-phase="done"]') ?? ""), "Klart: hela brickan pulserar");
   const text = rule(".lb-step--timer > .lb-step__text") ?? "";

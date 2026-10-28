@@ -717,23 +717,23 @@ ol.lb-steps > li.lb-step--now {
    bredvid brickan (ingen fast bredd eller flex-basis). */
 .lb-step--timer > .lb-step__text { flex: 1 1 auto; min-width: 0; }
 /* Timerbrickan: ifylld i ämnets färg, som rubrikraden (--subj/--subj-ink =
-   subjectStyle().color/textColor), så att den syns på projektorn.
-   align-self: flex-start + höjden = stegtextens radhöjd (1.28 i
-   brödtextens em, brickan är 1.15 gånger större): brickan ligger mitt på
-   textens första rad — med text på en rad centrerad med bubbla och text —
-   och gör aldrig raden högre än de andra stegen. Siffrornas glyfer får
-   plats inom höjden (line-height: 1). */
+   subjectStyle().color/textColor), så att den syns på projektorn. Samma
+   textstorlek som steget (fetstil gör den tydlig) och smal padding, så att
+   ett kort steg ("Mattebok s.44-45") oftare ryms på raden bredvid.
+   align-self: flex-start + höjden = stegtextens radhöjd (1.28): brickan
+   ligger mitt på textens första rad — med text på en rad centrerad med
+   bubbla och text — och gör aldrig raden högre än de andra stegen. */
 .lb-step__timer {
   flex: none;
   align-self: flex-start;
-  height: calc(1.28em / 1.15);
+  height: 1.28em;
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
-  gap: 0.15em;
-  padding: 0.1em 0.5em;
-  border-radius: 0.35em;
-  font-size: 1.15em;
+  gap: 0.12em;
+  padding: 0.05em 0.3em;
+  border-radius: 0.3em;
+  font-size: 1em;
   line-height: 1;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -741,7 +741,7 @@ ol.lb-steps > li.lb-step--now {
   background: var(--subj);
   color: var(--subj-ink);
 }
-.lb-step__timer .icon { width: 0.8em; height: 0.8em; }
+.lb-step__timer .icon { width: 0.7em; height: 0.7em; }
 /* Klart: hela brickan pulserar mjukt — aldrig rött, inget ljud. Steget
    går inte vidare av sig självt. */
 .lb-step__timer[data-phase="done"] { animation: lb-step-pulse 1.8s ease-in-out infinite; }
