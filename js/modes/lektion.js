@@ -470,12 +470,6 @@ function overflows(el, skip = null, { x = true } = {}) {
   return nodes.some((n) => clipsY(n) || (x && n.scrollWidth > n.clientWidth + 1));
 }
 
-/** Hur långt en outline når utanför lådan (px) — det pågående stegets ram, issue #146. */
-function outlineReach(el) {
-  const cs = getComputedStyle(el);
-  return (parseFloat(cs.outlineOffset) || 0) + (parseFloat(cs.outlineWidth) || 0);
-}
-
 /** Bredden kolumnen behöver för att rutans rubrikrad (etikett + timer) ska stå på en rad. */
 function breakHeadWidth(colEl, breakEl) {
   const head = breakEl.querySelector(".lb-break__head");
@@ -555,12 +549,9 @@ function fitBoard(fitEl, praiseBoard = null) {
   // Lektionsordning krymps bara när kolumnens innehåll når förbi dess
   // nederkant — ett horisontellt överflöd i rutan (t.ex. den stora
   // timern) är rutans sak, inte stegens.
-  // Är sista steget det pågående (issue #146) ritas dess ram utanför raden
-  // (outline) — den ska synas hela vägen, så den räknas in här. Bara då:
-  // annars, och för alla andra steg, tar markeringen ingen plats.
-  const ring = lastStep?.classList.contains("lb-step--now") ? outlineReach(lastStep) : 0;
+  // Markeringen (issue #146) räknas aldrig in: samma skalor med och utan.
   const fits = () => !overflows(midEl, null, { x: false })
-    && (!lastStep || stepsWithin(lastStep.getBoundingClientRect().bottom + ring, midEl.getBoundingClientRect().bottom));
+    && (!lastStep || stepsWithin(lastStep.getBoundingClientRect().bottom, midEl.getBoundingClientRect().bottom));
   const breakFits = () => !overflows(breakEl);
   // Rutan är densamma i förhandsvisningen och på elevskärmen (lärarens
   // knappar sitter i sidopanelen sedan issue #144), så skalorna blir lika.

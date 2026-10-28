@@ -23,6 +23,10 @@ tema — tavlans papper är vitt i alla teman, bara panelen skiljer).
 | `9-efter-elev-1280-efter-rasten-fore-start` | Efter rasten före start: "10:00", full stapel. Rubriken "EFTER RASTEN" krymps hellre än hamnar under brickan (fitBreakLabel). |
 | `10-elev-1280-efter-rasten-utan-timer` | Efter rasten med timern avstängd: ingen bricka. |
 
+| `5-elev-1920-slojd-steg-halvvags` | Slöjd, stegtimer halvvägs, 1920. |
+| `11-elev-1280-efter-rasten-och-sista-steget-markerat-winsim` | Efter rasten + markerat steg (bild 7 i issuen): 9 steg, sista steget pågår, simulerade Segoe UI-mått. Testarens fynd: `--lb-steps-scale` ändrades förut när sista steget markerades (fitBoard räknade in ramen). Nu räknas markeringen aldrig in — uppmätt 0.79/0.67 och identiska radhöjder utan markering och med sista steget markerat — och i just det här fallet (#138, ingen bottenrad) ritas ramen innanför raden så att den inte klipps. |
+| `12-larare-{ljust,morkt}-1920-slojd-steg` | Lärarvyn i 1920, ljust och mörkt tema. |
+
 **Efter rasten vid Klart:** rutan tonas bort när tiden är ute (oförändrat
 beteende), så Klart-läget för den brickan syns bara under bortoningen och
 fångades inte på bild; stapeln är då tom (testat i Node).

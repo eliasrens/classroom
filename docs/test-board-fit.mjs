@@ -309,6 +309,20 @@ function glyphColumn({ box, steps, room, glyph }) {
   const b = fitMidColumn(column({ box: 30, steps: 100, room: 100 }));
   ok(a.steps === b.steps && a.brk === b.brk, "#146: samma mått med och utan markering → samma skalor");
 }
+// Fall 1b (Testarens fynd): markering av SISTA steget i #138-fallet gav en
+// annan --lb-steps-scale (0.794 → 0.777) eftersom fitBoard räknade in ramens
+// outline. fitBoard läser aldrig markeringen; ramen ritas i stället innanför
+// raden just där (outline-offset negativ), så den inte klipps.
+{
+  const { readFileSync } = await import("node:fs");
+  const css = readFileSync(new URL("../css/modes/lektion.css", import.meta.url), "utf8");
+  const js = readFileSync(new URL("../js/modes/lektion.js", import.meta.url), "utf8");
+  const fit = js.slice(js.indexOf("function fitBoard("), js.indexOf("function fitBreakOnly("));
+  ok(fit.length > 0 && !/outline|lb-step--now|lb-steps--run/.test(fit), "#146: fitBoard läser aldrig markeringen (ingen outline, inga stegklasser)");
+  ok(/lastStep\.getBoundingClientRect\(\)\.bottom, midEl/.test(fit), "#146: sista steget mäts med sin egen underkant, utan tillägg");
+  ok(/\.lb-col--mid:has\(> \.lb-break:not\(\.lb-break--off\)\) ol\.lb-steps > li\.lb-step--now:last-child \{\s*outline-offset: -2px;/.test(css),
+    "#146: i #138-fallet ritas sista stegets ram innanför raden");
+}
 // Fall 2: timerbrickan gör en lång rad högre. Då anpassas Lektionsordning
 // som vanligt (bara --lb-steps-scale), och när timern försvinner (stegbyte
 // eller Stoppa timer) körs anpassningen igen och texten växer tillbaka.

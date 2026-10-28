@@ -712,9 +712,7 @@ ol.lb-steps > li::before {
    Timerbrickan sitter sist på raden (flex: none); texten bryts till
    vänster om den och hamnar aldrig under den. */
 .lb-col--mid .lb-field--attGora > .lb-field__body:has(> ol.lb-steps--run) { overflow: clip; overflow-clip-margin: 0.45em; }
-/* Fältet runt omkring likaså: utan luft under sista steget (#138) skulle
-   det annars klippa ramens underkant när sista steget pågår. fitBoard
-   räknar då in ramen mot kolumnens nederkant (outlineReach). */
+/* Fältet runt omkring likaså, så att ramen inte klipps i kanterna. */
 .lb-col--mid .lb-field--attGora:has(> .lb-field__body > ol.lb-steps--run) { overflow: clip; overflow-clip-margin: 0.45em; }
 ol.lb-steps > li.lb-step--done::before { content: none; }
 .lb-step__mark {
@@ -750,6 +748,15 @@ ol.lb-steps > li.lb-step--now {
      (color.js) — med ljusa ämnen (Slöjd, Idrott) syns ramen annars knappt. */
   outline: 2px solid var(--subj-deep, var(--subj));
   outline-offset: 0.2em;
+}
+/* Issue #138-fallet: utan bottenrad och med Efter rasten-rutan får sista
+   steget sluta vid tavlans ram, så en ram UTANFÖR raden skulle klippas när
+   sista steget pågår. Där ritas ramen i stället precis innanför raden
+   (outline-offset negativ) — fitBoard räknar aldrig in markeringen, så
+   skalorna blir desamma som utan markering (Testarens fynd). */
+.lesson-board:not(:has(> .lb-bottom)) .lb-col--mid:has(> .lb-break:not(.lb-break--off)) ol.lb-steps > li.lb-step--now:last-child {
+  outline-offset: -2px;
+  box-shadow: none;
 }
 /* Stegtexten tar all ledig plats och bryts först när den inte ryms
    bredvid brickan (ingen fast bredd eller flex-basis). */
