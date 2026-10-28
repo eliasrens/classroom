@@ -245,6 +245,28 @@ const BEFORE = [
   ok(!boardHTML({ ...timed, show: { attGora: false } }, SUBJECTS, { run: null }).includes("lb-steps"), "Lektionsordning urkryssad: inga steg");
 }
 
+// --- timerbrickan: ifylld bricka, stegtexten utan begränsande bredd ---------------------
+{
+  const css = readFileSync(new URL("../css/modes/lektion.css", import.meta.url), "utf8");
+  const rule = (sel) => {
+    const i = css.indexOf(`${sel} {`);
+    return i < 0 ? null : css.slice(i + sel.length + 2, css.indexOf("}", i));
+  };
+  const now = at(8, 30);
+  const p = withF(PLAN, { attGora: STEPS, ordningAktiv: 2, ordningDatum: "2026-10-27", ordningTimer: { step: 2, durationMs: 600_000, startedAt: now } });
+  const h = boardHTML(p, SUBJECTS, { run: L.ordningView(p, now) });
+  ok(/<span class="lb-step__timer" role="timer"[^>]*>/.test(h), "timern är en bricka (klassen lb-step__timer)");
+  const badge = rule(".lb-step__timer") ?? "";
+  ok(/background: var\(--subj\);/.test(badge) && /color: var\(--subj-ink\);/.test(badge), "brickan är ifylld: ämnesfärg som bakgrund, ämnets textfärg");
+  ok(/padding: 0\.1em 0\.5em;/.test(badge) && /border-radius:/.test(badge) && /tabular-nums/.test(badge), "rundade hörn, padding 0.1em 0.5em, tabular-nums");
+  ok(/flex: none;/.test(badge) && !/margin-left/.test(badge), "brickan: flex none, mellanrum via gap (ingen margin-left: auto)");
+  ok(/animation: lb-step-pulse/.test(rule('.lb-step__timer[data-phase="done"]') ?? ""), "Klart: hela brickan pulserar");
+  const text = rule(".lb-step--timer > .lb-step__text") ?? "";
+  ok(/flex: 1 1 auto;/.test(text) && /min-width: 0;/.test(text), "stegtexten: flex 1 1 auto, min-width 0");
+  ok(!/(max-width|[^-]width|flex-basis)\s*:/.test(text), `stegtexten har ingen begränsande bredd (fick ${text})`);
+  ok(!/li\.lb-step--timer \{[^}]*flex-wrap/.test(css), "brickan hamnar aldrig på en egen rad (ingen flex-wrap)");
+}
+
 // --- kopiering ---------------------------------------------------------------------------
 {
   const src = withF(PLAN, { attGora: STEPS, ordningAktiv: 2, ordningDatum: "2026-10-27", ordningTimer: { step: 2, durationMs: 600_000, startedAt: at(8, 40) } });
