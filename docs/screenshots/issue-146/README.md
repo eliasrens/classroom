@@ -24,8 +24,8 @@ tema — tavlans papper är vitt i alla teman, bara panelen skiljer).
 | `10-elev-1280-efter-rasten-utan-timer` | Efter rasten med timern avstängd: ingen bricka. |
 
 | `5-elev-1920-slojd-steg-halvvags` | Slöjd, stegtimer halvvägs, 1920. |
-| `13-elev-1280-avslut-timer-efter-rasten` | Matematik, 4 steg, Efter rasten på, steg 4 "Avslut" pågår med timer (Testarens runda 3). Ramen ligger utanför raden och omsluter bubbla, text och bricka; sista steget slutar vid tavlans ram (#138), så ramens underkant sammanfaller med tavlans ram i ämnesfärgen. |
-| `14-elev-1280-138-fallet-sista-steget` | 9 steg + Efter rasten, sista steget markerat: `--lb-steps-scale` 0.68 och identiska radhöjder utan och med markering (fitBoard räknar aldrig in markeringen). Ramen som i bild 13. |
+| `13-elev-1280-avslut-timer-efter-rasten` | Matematik, 4 steg, Efter rasten på, steg 4 "Avslut" pågår med timer (#138-fallet: sista steget slutar vid tavlans ram). Ramen omsluter bubbla, text och bricka: sidor och överkant utanför raden, underkanten innanför (3 px inset box-shadow), och bubbla/bricka krymps visuellt med transform så att de ligger ovanför den. `--lb-steps-scale` 0.94 och radhöjder 45.00 px med och utan markering. |
+| `14-elev-1280-138-fallet-sista-steget` | 9 steg + Efter rasten, sista steget med timer: `--lb-steps-scale` 0.68 och identiska radhöjder utan och med markering. |
 | `12-larare-{ljust,morkt}-1920-slojd-steg` | Lärarvyn i 1920, ljust och mörkt tema. |
 
 **Efter rasten vid Klart:** rutan tonas bort när tiden är ute (oförändrat
