@@ -286,8 +286,8 @@ function glyphColumn({ box, steps, room, glyph }) {
   const { readFileSync } = await import("node:fs");
   const css = readFileSync(new URL("../css/modes/lektion.css", import.meta.url), "utf8");
   const rule = (sel) => {
-    const i = css.indexOf(`\n${sel} {`) + 1;
-    return i < 1 ? null : css.slice(i + sel.length + 2, css.indexOf("}", i));
+    const i = css.indexOf(`${sel} {`);
+    return i < 0 ? null : css.slice(i + sel.length + 2, css.indexOf("}", i));
   };
   const LAYOUT = /(^|[\s;])(padding|margin|border(-width)?|font-weight|font-size|line-height|height|width|min-height|letter-spacing|display|position)\s*:/;
   for (const sel of ["ol.lb-steps > li.lb-step--now", ".lb-step--done > .lb-step__text"]) {
@@ -311,9 +311,9 @@ function glyphColumn({ box, steps, room, glyph }) {
 }
 // Fall 1b (Testarens fynd): markering av SISTA steget i #138-fallet gav en
 // annan --lb-steps-scale (0.794 → 0.777) eftersom fitBoard räknade in ramens
-// outline. fitBoard läser aldrig markeringen. I #138-fallet ritas ramen
-// innanför raden och bubbla/bricka flyttas in med transform (runda 3:
-// annars täckte de ramlinjerna).
+// outline. fitBoard läser aldrig markeringen. Ramen ritas alltid utanför
+// raden (runda 3: en ram innanför raden täcktes av bubbla och bricka); i
+// #138-fallet sammanfaller dess underkant med tavlans ram.
 {
   const { readFileSync } = await import("node:fs");
   const css = readFileSync(new URL("../css/modes/lektion.css", import.meta.url), "utf8");
@@ -321,18 +321,10 @@ function glyphColumn({ box, steps, room, glyph }) {
   const fit = js.slice(js.indexOf("function fitBoard("), js.indexOf("function fitBreakOnly("));
   ok(fit.length > 0 && !/outline|lb-step--now|lb-steps--run/.test(fit), "#146: fitBoard läser aldrig markeringen (ingen outline, inga stegklasser)");
   ok(/lastStep\.getBoundingClientRect\(\)\.bottom, midEl/.test(fit), "#146: sista steget mäts med sin egen underkant, utan tillägg");
+  ok(!/li\.lb-step--now:last-child/.test(css) && !/outline-offset: -/.test(css),
+    "#146: ramen ritas aldrig innanför raden (bubbla och bricka ligger alltid innanför ramen)");
   const nowRule = css.slice(css.indexOf("ol.lb-steps > li.lb-step--now {"), css.indexOf("}", css.indexOf("ol.lb-steps > li.lb-step--now {")));
-  ok(/outline-offset: 0\.2em;/.test(nowRule), "#146: ramen ligger normalt 0.2em utanför raden");
-  const edge = ".lesson-board:not(:has(> .lb-bottom)) .lb-col--mid:has(> .lb-break:not(.lb-break--off)) ol.lb-steps > li.lb-step--now:last-child";
-  const er = (suffix) => { const i = css.indexOf(`${edge}${suffix} {`); return i < 0 ? null : css.slice(i, css.indexOf("}", i)); };
-  ok(!/outline-offset: -/.test(er("") ?? "x") && /inset 0 -3px 0 0 var\(--subj-deep/.test(er("") ?? ""),
-    "#146: i #138-fallet ritas bara ramens underkant innanför raden (klipps inte); sidor och överkant utanför");
-  ok(/transform: translateY\(-0\.15em\) scale\(0\.85\);/.test(er("::before") ?? "") && /transform: scale\(0\.75\);/.test(er(" > .lb-step__timer") ?? ""),
-    "#146: … och bubbla och bricka krymps visuellt (transform) så att de ryms ovanför den");
-  for (const sfx of ["", "::before", " > .lb-step__timer"]) {
-    const r = (er(sfx) ?? "").replace(/^[^{]*\{/, "");
-    ok(!/(^|[\s;])(padding|margin|border(-width)?|width|height|font-size|line-height|display|position|flex)\s*:/.test(r), `#146: #138-regeln${sfx} ändrar ingen layout`);
-  }
+  ok(/outline-offset: 0\.2em;/.test(nowRule), "#146: ramen ligger 0.2em utanför raden");
 }
 // Fall 2: timerbrickan gör en lång rad högre. Då anpassas Lektionsordning
 // som vanligt (bara --lb-steps-scale), och när timern försvinner (stegbyte
@@ -358,8 +350,8 @@ function glyphColumn({ box, steps, room, glyph }) {
   const { readFileSync } = await import("node:fs");
   const css = readFileSync(new URL("../css/modes/lektion.css", import.meta.url), "utf8");
   const rule = (sel) => {
-    const i = css.indexOf(`\n${sel} {`) + 1;
-    return i < 1 ? "" : css.slice(i + sel.length + 2, css.indexOf("}", i));
+    const i = css.indexOf(`${sel} {`);
+    return i < 0 ? "" : css.slice(i + sel.length + 2, css.indexOf("}", i));
   };
   const badge = rule(".lb-timer");
   const pad = /padding: ([\d.]+)em .* ([\d.]+)em;/.exec(badge);

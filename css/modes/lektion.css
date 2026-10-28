@@ -749,24 +749,11 @@ ol.lb-steps > li.lb-step--now {
   outline: 2px solid var(--subj-deep, var(--subj));
   outline-offset: 0.2em;
 }
-/* Issue #138-fallet: utan bottenrad och med Efter rasten-rutan får sista
-   steget sluta vid tavlans ram (upp till 1 px under, stepsWithin), så
-   ramens underkant utanför raden skulle klippas. Där ritas ramen som
-   vanligt utanför raden upptill och på sidorna, men underkanten ritas
-   innanför raden (inset box-shadow, 3 px). Bubbla och bricka krymps
-   visuellt (transform — påverkar ingen layout) så att de ryms ovanför den
-   linjen. fitBoard räknar aldrig in markeringen: skalor och radhöjder är
-   desamma med och utan markering. */
-.lesson-board:not(:has(> .lb-bottom)) .lb-col--mid:has(> .lb-break:not(.lb-break--off)) ol.lb-steps > li.lb-step--now:last-child {
-  box-shadow: 0 0 0 0.2em var(--lb-break-bg), inset 0 -3px 0 0 var(--subj-deep, var(--subj));
-}
-.lesson-board:not(:has(> .lb-bottom)) .lb-col--mid:has(> .lb-break:not(.lb-break--off)) ol.lb-steps > li.lb-step--now:last-child::before {
-  transform: translateY(-0.15em) scale(0.85);
-}
-.lesson-board:not(:has(> .lb-bottom)) .lb-col--mid:has(> .lb-break:not(.lb-break--off)) ol.lb-steps > li.lb-step--now:last-child > .lb-step__timer {
-  transform: scale(0.75);
-  transform-origin: right center;
-}
+/* Ramen ritas alltid UTANFÖR raden, så att den omsluter bubbla, text och
+   bricka. I #138-fallet (ingen bottenrad, Efter rasten-rutan i kolumnen)
+   kan sista steget sluta vid tavlans ram; då sammanfaller ramens underkant
+   med tavlans egen ram i ämnesfärgen. fitBoard räknar aldrig in
+   markeringen, så skalorna blir desamma som utan markering. */
 /* Stegtexten tar all ledig plats och bryts först när den inte ryms
    bredvid brickan (ingen fast bredd eller flex-basis). */
 .lb-step--timer > .lb-step__text { flex: 1 1 auto; min-width: 0; }

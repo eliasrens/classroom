@@ -273,8 +273,8 @@ const BEFORE = [
 {
   const css = readFileSync(new URL("../css/modes/lektion.css", import.meta.url), "utf8");
   const rule = (sel) => {
-    const i = css.indexOf(`\n${sel} {`) + 1;
-    return i < 1 ? null : css.slice(i + sel.length + 2, css.indexOf("}", i));
+    const i = css.indexOf(`${sel} {`);
+    return i < 0 ? null : css.slice(i + sel.length + 2, css.indexOf("}", i));
   };
   const now = at(8, 30);
   const p = withF(PLAN, { attGora: STEPS, ordningAktiv: 2, ordningDatum: "2026-10-27", ordningTimer: { step: 2, durationMs: 600_000, startedAt: now } });
