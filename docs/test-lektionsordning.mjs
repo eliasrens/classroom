@@ -17,6 +17,10 @@
  *   - oförändrad tavla: utan markering exakt samma HTML som före #146
  *   - HTML-säkerhet: stegtext med <b> escapas i alla tre tillstånden
  *   - kopiering: Kopiera och Skicka kopia får inte med läget
+ *   - planerade minuter (issue #153): normalisering av attGoraMin,
+ *     realignMinutes (infoga, ta bort, byta ordning, redigera, dubbletter),
+ *     tavlans Min-kolumn (ingen utan minuter, tomma celler, escaping,
+ *     avklarade steg), summan, kopiering
  */
 
 // ---- Attrapper för webbläsar-API:er som lektion.js rör vid import ----
@@ -319,6 +323,127 @@ const BEFORE = [
   const np = normalizePlan(src);
   ok(np.fields.ordningAktiv === 2 && np.fields.ordningTimer.durationMs === 600_000, "normalizePlan behåller läget");
   ok(normalizePlan({}).fields.ordningAktiv === null && normalizePlan({}).fields.ordningTimer === null, "normalizePlan utan läge: null");
+}
+
+// --- planerade minuter: normalisering (issue #153) ---------------------------------------
+{
+  const norm = (f) => L.normalizeOrdningFields(f).attGoraMin;
+  ok(JSON.stringify(norm({ attGora: STEPS })) === "[null,null,null,null]", "fältet saknas → null per steg");
+  ok(JSON.stringify(norm({ attGora: STEPS, attGoraMin: [10] })) === "[10,null,null,null]", "för kort → fylls på med null");
+  ok(JSON.stringify(norm({ attGora: STEPS, attGoraMin: [10, 15, 20, 5, 30, 40] })) === "[10,15,20,5]", "för lång → kapas");
+  ok(JSON.stringify(norm({ attGora: STEPS, attGoraMin: [0, 91, "tio", 2.5] })) === "[null,null,null,null]", "0, 91, text, decimaltal → null");
+  ok(JSON.stringify(norm({ attGora: STEPS, attGoraMin: ["10", -5, null, 90] })) === "[null,null,null,90]", "tal som text, negativt, null → null; 90 går igenom");
+  ok(JSON.stringify(norm({ attGora: STEPS, attGoraMin: "10,15" })) === "[null,null,null,null]", "inte en lista → null");
+  ok(JSON.stringify(norm({ attGora: ["A", "  ", "B"], attGoraMin: [1, 2, 3] })) === "[1,null,3]", "tom rad har aldrig minuter");
+  ok(JSON.stringify(norm({ attGora: "A\nB", attGoraMin: [5, 6] })) === "[5,6]", "attGora som text (äldre planering)");
+  ok(JSON.stringify(norm({})) === "[]", "inga steg → tom lista");
+  ok(JSON.stringify(normalizePlan({ fields: { attGora: STEPS, attGoraMin: [10, 15] } }).fields.attGoraMin) === "[10,15,null,null]",
+    "normalizePlan normaliserar attGoraMin");
+  ok(JSON.stringify(L.stepMinutes({ attGora: ["A", "", "B"], attGoraMin: [1, null, 3] })) === "[1,3]", "stepMinutes: samma index som stegen på tavlan");
+  ok(JSON.stringify(L.setStepMinutes({ attGora: ["A", "", "B"], attGoraMin: [1, null, null] }, 1, 20)) === "[1,null,20]",
+    "setStepMinutes: steg 2 på tavlan = rad 3 i textfältet");
+  ok(!L.hasStepMinutes({ attGora: STEPS, attGoraMin: [null, null] }) && L.hasStepMinutes({ attGora: STEPS, attGoraMin: [null, 5] }), "hasStepMinutes");
+}
+
+// --- planerade minuter: realignMinutes (issue #153) -------------------------------------
+{
+  const R = (o, m, n) => JSON.stringify(L.realignMinutes(o, m, n));
+  const MINS = [10, 15, 20, 5];
+  ok(R(STEPS, MINS, ["Genomgång/Samling", "Para ihop", "Mini-whiteboards", "Mattebok s.44-45", "Avslut"]) === "[10,null,15,20,5]",
+    "infoga i mitten (punkt 6): minuterna följer sina steg, det nya får null");
+  ok(R(STEPS, MINS, ["Start", ...STEPS]) === "[null,10,15,20,5]", "infoga först");
+  ok(R(STEPS, MINS, [...STEPS, "Läxa"]) === "[10,15,20,5,null]", "infoga sist");
+  ok(R(STEPS, MINS, ["Genomgång/Samling", "Mattebok s.44-45", "Avslut"]) === "[10,20,5]", "ta bort ett steg: dess minuter försvinner");
+  ok(R(STEPS, MINS, ["Mini-whiteboards", "Genomgång/Samling", "Mattebok s.44-45", "Avslut"]) === "[15,10,20,5]", "byt ordning på två steg");
+  ok(R(STEPS, MINS, ["Genomgång/Samling", "Mini-whiteboards!", "Mattebok s.44-45", "Avslut"]) === "[10,15,20,5]",
+    "ändra texten på en rad: platsens minuter står kvar");
+  ok(R(STEPS, MINS, ["  Genomgång/Samling ", "Mini-whiteboards", "Mattebok s.44-45", "Avslut"]) === "[10,15,20,5]", "samma text efter trim");
+  ok(R(["Läs", "Skriv", "Läs"], [5, 10, 15], ["Skriv", "Läs", "Läs"]) === "[10,5,15]", "dubbletter matchas i ordning");
+  ok(R(["Läs", "Skriv", "Läs"], [5, 10, 15], ["Läs", "Skriv"]) === "[5,10]", "dubbletter: den sista borttagen");
+  ok(R(["A", "B"], [5, 10], ["A", "", "B"]) === "[5,null,10]", "Enter mitt i listan: tom rad får null");
+  ok(R(["A", "", "B"], [5, null, 10], ["A", "C", "B"]) === "[5,null,10]", "skriver i den nya raden: den har fortfarande null");
+  ok(R(["A", "B"], [5, 10], ["B", "X"]) === "[10,null]", "redigerad rad behåller inte minuter som redan följt sitt steg");
+  const o = ["A"]; const m = [5]; const n = ["A", "B"];
+  L.realignMinutes(o, m, n);
+  ok(o.length === 1 && m.length === 1 && n.length === 2, "ren funktion: listorna rörs inte");
+}
+
+// --- planerade minuter: tavlan (issue #153) ---------------------------------------------
+{
+  const plan = { id: "p1", name: "M", date: "2026-10-27", subjectId: "ma", start: "08:00", end: "09:20",
+    fields: { attGora: ["Genomgång/Samling", "Mini-whiteboards", "  ", "Mattebok s.44-45", "Avslut <b>x</b>"], narKlar: "Läs" },
+    show: { attGora: true, narKlar: true } };
+  const mins = (m) => withF(plan, { ...plan.fields, attGoraMin: m });
+  ok(boardHTML(mins([null, null, null, null, null]), SUBJECTS) === BEFORE[0], "inga minuter (bara null) → exakt samma HTML som före");
+  ok(boardHTML(mins([0, 91, null, "x", 2.5]), SUBJECTS) === BEFORE[0], "bara ogiltiga minuter → exakt samma HTML som före");
+  ok(boardHTML(mins([null, null, 20, null, null]), SUBJECTS) === BEFORE[0], "minuter bara på en tom rad → exakt samma HTML");
+
+  const h = boardHTML(mins([10, 15, null, 20, null]), SUBJECTS);
+  ok(h.includes(`<div class="lb-field lb-field--attGora lb-field--min">`), "minst en minut → Min-kolumnen finns");
+  ok(/<div class="lb-field__label">LEKTIONSORDNING<\/div>\s*<div class="lb-field__label lb-min__label">MIN<\/div>/.test(h), "rubriken MIN står på samma rad som LEKTIONSORDNING");
+  const cells = [...h.matchAll(/<span class="lb-min[^"]*" style="grid-row:(\d+)">([^<]*)<\/span>/g)].map((x) => `${x[1]}:${x[2]}`);
+  ok(cells.join(",") === "1:10,2:15,3:20,4:", `en cell per steg på stegets rad, tomt steg → tom cell (fick ${cells.join(",")})`);
+  ok(!/\d+ ?min/i.test(h.replace(/>MIN</, "")), "bara siffran — inga \"min\"-etiketter");
+  ok(h.includes(`<ol class="lb-steps"><li>Genomgång/Samling</li><li>Mini-whiteboards</li><li>Mattebok s.44-45</li><li>Avslut &lt;b&gt;x&lt;/b&gt;</li></ol>`),
+    "stegen har samma HTML som utan minuter (minuterna aldrig i stegtexten)");
+  ok(!h.includes("<b>x</b>") && h.includes("&lt;b&gt;x&lt;/b&gt;"), "stegtext med <b> escapas");
+  ok(/<span class="lb-min__rule" aria-hidden="true" style="grid-row:1 \/ span 4"><\/span><\/div>/.test(h), "skiljelinjen sist, över alla fyra rader");
+  ok(h.includes(`<div class="lb-col lb-col--right">`) && h.indexOf("lb-field--min") < h.indexOf("lb-col--right"),
+    "Min-kolumnen ligger i Lektionsordnings kolumn, före När du är klar");
+
+  // Under stegning: steg 3 pågår → steg 1–2 dämpas även i Min-kolumnen.
+  const now = at(8, 30);
+  const run = withF(plan, { ...plan.fields, attGoraMin: [10, 15, null, 20, 5], ordningAktiv: 2, ordningDatum: "2026-10-27",
+    ordningTimer: { step: 2, durationMs: 20 * 60_000, startedAt: now } });
+  const hr = boardHTML(run, SUBJECTS, { run: L.ordningView(run, now) });
+  const rc = [...hr.matchAll(/<span class="(lb-min[^"]*)" style="grid-row:(\d+)">/g)].map((x) => x[1]);
+  ok(rc.join(",") === "lb-min lb-min--done,lb-min lb-min--done,lb-min,lb-min", `avklarade steg dämpas i Min-kolumnen (fick ${rc.join(",")})`);
+  ok(/<li class="lb-step--now lb-step--timer" aria-current="step">[^]*?<\/li>/.test(hr) && !/lb-step--now[^]*lb-min[^]*<\/li>/.test(hr.slice(0, hr.indexOf("</ol>") + 5)),
+    "ramen och timerbrickan sitter kvar i stegets rad, minutcellen utanför");
+  ok(!/lb-min--now|lb-min[^"]*now/.test(hr), "minutcellen påverkas inte av markeringen");
+
+  // Efter rasten spänner över både stegen och Min-kolumnen (rutan står över fältet i samma kolumn).
+  const hb = boardHTML({ ...mins([10, 15, null, 20, 5]), show: { attGora: true, efterRasten: true } }, SUBJECTS, { breakBox: `<div class="lb-break"></div>` });
+  ok(/<div class="lb-col lb-col--mid"><div class="lb-break"><\/div><div class="lb-field lb-field--attGora lb-field--min">/.test(hb), "Efter rasten ovanför både stegen och Min-kolumnen");
+  ok(!boardHTML({ ...mins([10, 15, null, 20, 5]), show: { narKlar: true } }, SUBJECTS).includes("lb-min"), "Lektionsordning urkryssad: ingen Min-kolumn");
+
+  // CSS: kolumnen i samma rutnät, smal, högerställd, tabular-nums; dämpning utan överstrykning.
+  const css = readFileSync(new URL("../css/modes/lektion.css", import.meta.url), "utf8");
+  const rule = (sel) => { const i = css.indexOf(`${sel} {`); return i < 0 ? "" : css.slice(i + sel.length + 2, css.indexOf("}", i)); };
+  ok(/grid-template-columns: minmax\(0, 1fr\) auto;/.test(rule(".lb-col--mid .lb-field--attGora.lb-field--min")), "rutnätet: minmax(0, 1fr) auto");
+  ok(/grid-template-columns: subgrid;/.test(rule(".lb-field--min > .lb-field__body")), "stegen och minuterna i samma rutnät (subgrid)");
+  const cell = rule(".lb-field--min .lb-min");
+  ok(/text-align: right;/.test(cell) && /tabular-nums/.test(cell) && /color: var\(--subj-deep/.test(cell), "minuten: högerställd, tabular-nums, rubrikernas färg");
+  ok(/opacity: 0\.5;/.test(rule(".lb-field--min .lb-min--done")) && !/line-through/.test(rule(".lb-field--min .lb-min--done")), "avklarad minut: dämpad, ingen överstrykning");
+  ok(/border-left: 1px dashed/.test(rule(".lb-field--min .lb-min__rule")), "tunn streckad skiljelinje");
+  ok(/display: none;/.test(rule(".lb-min__label, .lb-min, .lb-min__rule")), "utan lb-field--min syns ingen del av kolumnen (fitBoards mätning)");
+}
+
+// --- planerade minuter: summan (issue #153) ---------------------------------------------
+{
+  const p = (m, start = "08:00", end = "09:20") => ({ start, end, fields: { attGora: STEPS, attGoraMin: m } });
+  ok(L.plannedText(p([10, 15, 20, 5])) === "Planerat: 50 min av lektionens 80", "under lektionslängden");
+  ok(L.plannedText(p([20, 20, 20, 20])) === "Planerat: 80 min av lektionens 80", "lika med lektionslängden");
+  ok(L.plannedText(p([30, 30, 30, 5])) === "Planerat: 95 min — 15 min mer än lektionen", "över lektionslängden");
+  ok(L.plannedText(p([10, 15, 20, 5], "", "")) === "Planerat: 50 min", "utan start och slut");
+  ok(L.plannedText(p([10, 15, 20, 5], "08:00", "")) === "Planerat: 50 min", "utan slut");
+  ok(L.plannedText(p([10, 15, 20, 5], "09:00", "08:00")) === "Planerat: 50 min", "slut före start → som utan");
+  ok(L.plannedText(p([10, null, null, 5])) === "Planerat: 15 min av lektionens 80", "tomma steg räknas inte");
+  ok(L.plannedText(p([null, null, null, null])) === "", "inga minuter → ingen rad");
+  ok(L.lessonMinutes("08:00", "09:20") === 80 && L.lessonMinutes("8:05", "8:50") === 45, "lessonMinutes");
+}
+
+// --- planerade minuter: kopiering (issue #153) ------------------------------------------
+{
+  const src = withF(PLAN, { attGora: STEPS, attGoraMin: [10, 15, 20, 5], ordningAktiv: 2, ordningDatum: "2026-10-27" });
+  const c = buildCopy(normalizePlan(src), { date: "2026-11-03" }, "larare-x");
+  ok(JSON.stringify(c.fields.attGoraMin) === "[10,15,20,5]", "Skicka planering: minuterna följer med");
+  ok(c.fields.ordningAktiv === null, "… men inte läget");
+  const copied = L.resetOrdningRun(resetBreakRun(normalizePlan(src).fields));
+  ok(JSON.stringify(copied.attGoraMin) === "[10,15,20,5]", "Kopiera (resetOrdningRun): minuterna följer med");
+  ok(JSON.stringify(L.resetOrdningRun({ attGoraMin: [5] }).attGoraMin) === "[5]", "resetOrdningRun rensar inte minuterna");
+  const fields = withF(src, L.stepNext(src, at(8, 30)));
+  ok(JSON.stringify(fields.fields.attGoraMin) === "[10,15,20,5]", "stegningen rör inte minuterna");
 }
 
 console.log(`\n${passed} OK, ${failed} fel`);

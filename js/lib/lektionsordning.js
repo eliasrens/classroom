@@ -19,6 +19,15 @@
  *
  * Läraren styr allt: steget går aldrig vidare av sig självt, och vid 0 visar
  * timern bara "Klart".
+ *
+ * Planerade minuter per steg (issue #153):
+ *   attGoraMin   — lista lika lång som attGora (raderna, även tomma), med
+ *                  ett heltal 1–90 eller null per rad. Normaliseras till
+ *                  stegens längd; ogiltiga värden och tomma rader → null.
+ *                  Minuterna följer sina steg när texten ändras
+ *                  (realignMinutes). De är en del av planeringen: kopior
+ *                  får med dem och resetOrdningRun rör dem inte. De startar
+ *                  aldrig någon timer själva.
  */
 
 import { formatMs } from "./timer.js";
@@ -38,11 +47,26 @@ const localISO = (now) => {
 };
 const isIndex = (v) => Number.isInteger(v) && v >= 0;
 
+/** Lektionsordningens rader som de står i textfältet (även tomma). */
+const ordningRows = (fields) => {
+  const a = fields?.attGora;
+  return Array.isArray(a) ? a : (a ? String(a).split("\n") : []);
+};
+
 /** Stegen som visas på tavlan (trimmade, utan tomma rader) — samma som stepsHTML. */
 export function ordningSteps(fields) {
-  const a = fields?.attGora;
-  const rows = Array.isArray(a) ? a : (a ? String(a).split("\n") : []);
-  return rows.map((s) => String(s ?? "").trim()).filter(Boolean);
+  return ordningRows(fields).map((s) => String(s ?? "").trim()).filter(Boolean);
+}
+
+/**
+ * attGoraMin normaliserad (issue #153): lika lång som raderna i attGora,
+ * heltal 1–90 eller null. Saknas, fel längd (fylls på / kapas), ogiltigt
+ * värde eller tom rad → null.
+ */
+export function normalizeMinutes(fields) {
+  const mins = Array.isArray(fields?.attGoraMin) ? fields.attGoraMin : [];
+  return ordningRows(fields).map((s, i) =>
+    (String(s ?? "").trim() && typeof mins[i] === "number" ? parseStepMinutes(mins[i]) : null));
 }
 
 /** Normaliserade fält (ur planeringens `fields`); saknat/trasigt → null. */
@@ -55,7 +79,84 @@ export function normalizeOrdningFields(f = {}) {
     ordningAktiv: isIndex(f.ordningAktiv) ? f.ordningAktiv : null,
     ordningDatum: /^\d{4}-\d{2}-\d{2}$/.test(String(f.ordningDatum ?? "")) ? f.ordningDatum : null,
     ordningTimer: timer,
+    attGoraMin: normalizeMinutes(f),
   };
+}
+
+/* ---- Planerade minuter per steg (issue #153) ---- */
+
+/** Minuterna per steg på tavlan (samma index som ordningSteps): tal eller null. */
+export function stepMinutes(fields) {
+  const mins = normalizeMinutes(fields);
+  return ordningRows(fields).flatMap((s, i) => (String(s ?? "").trim() ? [mins[i]] : []));
+}
+
+/** Har minst ett steg minuter? Annars finns ingen Min-kolumn. */
+export const hasStepMinutes = (fields) => stepMinutes(fields).some((m) => m != null);
+
+/**
+ * Minuterna följer sina steg när textfältet ändras. Listorna är raderna
+ * (även tomma) före och efter; `oldMins` lika lång som `oldSteps`.
+ *  1. Samma text (efter trim) behåller sina minuter — dubbletter i ordning.
+ *  2. Lika många rader: en rad som bara redigerats på sin plats behåller
+ *     platsens minuter (om de inte redan gått till ett steg med samma text).
+ *  3. Nya steg får null; borttagna stegs minuter försvinner.
+ * Ren funktion — rör inte listorna.
+ */
+export function realignMinutes(oldSteps, oldMins, newSteps) {
+  const oldText = oldSteps.map((s) => String(s ?? "").trim());
+  const used = new Set();
+  const out = newSteps.map((s) => {
+    const t = String(s ?? "").trim();
+    if (!t) return undefined;
+    const i = oldText.findIndex((o, k) => o === t && !used.has(k));
+    if (i < 0) return undefined;
+    used.add(i);
+    return oldMins[i] ?? null;
+  });
+  const sameCount = oldSteps.length === newSteps.length;
+  return out.map((m, j) => {
+    if (m !== undefined) return m;
+    if (sameCount && String(newSteps[j] ?? "").trim() && !used.has(j)) return oldMins[j] ?? null;
+    return null;
+  });
+}
+
+/** attGoraMin med steg `step` (index bland stegen på tavlan) satt till `min` (tal eller null). */
+export function setStepMinutes(fields, step, min) {
+  const mins = normalizeMinutes(fields);
+  let n = -1;
+  const rows = ordningRows(fields);
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i] ?? "").trim() && ++n === step) { mins[i] = min; break; }
+  }
+  return mins;
+}
+
+/** Lektionens längd i minuter ur "HH:MM"-tiderna; saknas eller slut ≤ start → null. */
+export function lessonMinutes(start, end) {
+  const m = (s) => {
+    const r = /^(\d{1,2}):(\d{2})$/.exec(String(s ?? ""));
+    return r ? +r[1] * 60 + +r[2] : null;
+  };
+  const a = m(start);
+  const b = m(end);
+  return a != null && b != null && b > a ? b - a : null;
+}
+
+/**
+ * Raden under minutfälten (bara läraren): "Planerat: 50 min av lektionens 80",
+ * "Planerat: 95 min — 15 min mer än lektionen", utan start/slut "Planerat:
+ * 50 min". Utan minuter "". Bara information — påverkar inget annat.
+ */
+export function plannedText(plan) {
+  const mins = stepMinutes(plan?.fields).filter((m) => m != null);
+  if (mins.length === 0) return "";
+  const total = mins.reduce((a, b) => a + b, 0);
+  const lesson = lessonMinutes(plan?.start, plan?.end);
+  if (lesson == null) return `Planerat: ${total} min`;
+  if (total > lesson) return `Planerat: ${total} min — ${total - lesson} min mer än lektionen`;
+  return `Planerat: ${total} min av lektionens ${lesson}`;
 }
 
 /**

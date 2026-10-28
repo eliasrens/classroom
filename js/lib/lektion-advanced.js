@@ -2,8 +2,8 @@
  * "AVANCERAT" I LEKTIONSPLANERINGENS SIDOPANEL — per lärare (issue #149).
  *
  * Sidopanelen är som standard lika enkel som från början. De större
- * delarna — Efter rasten, Bra jobbat, stegning och timer i Lektionsordning
- * och Widgets — visas bara när läraren slagit på växeln "Avancerat". Valet
+ * delarna — Efter rasten, Bra jobbat, stegning och timer i Lektionsordning,
+ * minuter per steg (issue #153) och Widgets — visas bara när läraren slagit på växeln "Avancerat". Valet
  * sparas PRIVAT per lärare via datalagret (offline-först, följer läraren
  * mellan datorer — ingen elevdata):
  *
@@ -16,7 +16,7 @@
  * planeringens data ändras aldrig av att växeln slås av eller på.
  */
 
-import { ordningState } from "./lektionsordning.js";
+import { hasStepMinutes, ordningState } from "./lektionsordning.js";
 
 export const ADVANCED_SETTINGS_DOC = "lektionsvy";
 
@@ -36,6 +36,8 @@ export function isAdvanced(doc) {
  * sidopanelens ordning — för informationsraden när växeln är av.
  * Stegningen räknas bara när den gäller nu (samma regel som tavlan:
  * ordningState, och Lektionsordning visas) — ett läge från igår räknas inte.
+ * Planerade minuter (issue #153) räknas när Lektionsordning visas och minst
+ * ett steg har minuter — då syns Min-kolumnen på tavlan.
  */
 export function advancedPartsInUse(plan, now = Date.now()) {
   const show = plan?.show ?? {};
@@ -43,6 +45,7 @@ export function advancedPartsInUse(plan, now = Date.now()) {
   if (show.efterRasten === true) parts.push("Efter rasten");
   if (show.praise === true) parts.push("Bra jobbat");
   if (Array.isArray(plan?.widgets) && plan.widgets.length > 0) parts.push("widgets");
+  if (show.attGora === true && hasStepMinutes(plan?.fields)) parts.push("planerade minuter");
   if (show.attGora === true && ordningState(plan, now).active != null) parts.push("stegning i Lektionsordning");
   return parts;
 }

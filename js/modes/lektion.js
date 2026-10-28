@@ -87,6 +87,10 @@
  *   av sig självt. Utan markering är tavlans HTML exakt som förut. Läget
  *   gäller dagen det sattes, till lektionens slut; lärarvyn nollställer
  *   det sedan (en gång), och kopior får aldrig med det.
+ * - Planerade minuter per steg (issue #153, fields.attGoraMin): skrivs under
+ *   "Minuter per steg" i sidopanelen (bara med Avancerat på) och visas i en
+ *   smal Min-kolumn till höger om stegen, inne i Lektionsordnings kolumn
+ *   (tar bara bredd därifrån). Utan minuter är tavlan exakt som förut.
  * - "Avancerat" (issue #149, js/lib/lektion-advanced.js): sidopanelen är som
  *   standard enkel. Efter rasten, Bra jobbat, stegningen i Lektionsordning
  *   och Widgets visas bara med växeln "Avancerat" längst ner i panelen på
@@ -110,8 +114,8 @@ import {
 } from "../lib/efter-rasten.js";
 import {
   STEP_MIN_MIN, STEP_MIN_MAX, STEP_QUICK_MIN, STEP_MIN_ERROR, createOrdningReset, normalizeOrdningFields, ordningSteps,
-  ordningState, ordningView, parseStepMinutes, resetOrdningRun, stepCountdown, stepNext, stepPlusOneMinute, stepPrev,
-  stepStartTimer, stepStopTimer,
+  ordningState, ordningView, parseStepMinutes, plannedText, realignMinutes, resetOrdningRun, setStepMinutes, stepCountdown,
+  stepMinutes, stepNext, stepPlusOneMinute, stepPrev, stepStartTimer, stepStopTimer,
 } from "../lib/lektionsordning.js";
 import {
   ADVANCED_FIELD_KEYS, ADVANCED_SETTINGS_DOC, advancedPartsInUse, advancedSettingsPath, isAdvanced,
@@ -323,8 +327,31 @@ function textHTML(value) {
   return v ? `<div class="lb-text">${esc(v).replace(/\n/g, "<br>")}</div>` : `<div class="lb-empty">—</div>`;
 }
 
+/* Planerade minuter (issue #153): Lektionsordning med en smal Min-kolumn.
+   Stegen och minuterna ligger i SAMMA rutnät (fältet: rubrikraden + kroppen
+   som subgrid), så att varje minut står på sitt stegs rad även när texten
+   bryts. Listan behåller sin HTML (stepsHTML) men lägger ut sig i rutnätet
+   (display: contents); minutcellerna placeras på sina rader. Skiljelinjen
+   (.lb-min__rule) står SIST och spänner över alla rader — dess underkant är
+   stegens underkant, som fitBoard mäter (contentBottom). Ramen och
+   timerbrickan på det pågående steget sitter kvar i stegets egen cell. */
+function stepsMinFieldHTML(part, plan, run, mins) {
+  const n = mins.length;
+  const done = (i) => run && run.active < n && i < run.active;
+  const cells = mins.map((m, i) =>
+    `<span class="lb-min${done(i) ? " lb-min--done" : ""}" style="grid-row:${i + 1}">${m ?? ""}</span>`).join("");
+  return `<div class="lb-field lb-field--${part.key} lb-field--min">
+    <div class="lb-field__label">${esc(part.label.toUpperCase())}</div>
+    <div class="lb-field__label lb-min__label">MIN</div>
+    <div class="lb-field__body">${stepsHTML(plan.fields[part.key], run)}${cells}<span class="lb-min__rule" aria-hidden="true" style="grid-row:1 / span ${n}"></span></div>
+  </div>`;
+}
+
 function fieldHTML(part, plan, run = null) {
   const val = plan.fields[part.key];
+  // Min-kolumnen bara när minst ett steg har minuter — annars exakt som förut.
+  const mins = part.kind === "steps" ? stepMinutes(plan.fields) : [];
+  if (mins.some((m) => m != null)) return stepsMinFieldHTML(part, plan, run, mins);
   let body;
   if (part.kind === "steps") body = stepsHTML(val, run);
   else if (part.kind === "list") body = listHTML(val);
@@ -437,6 +464,11 @@ function boardHTML(rawPlan, subjects, { praise = false, breakBox = "", run = nul
    upp bredd om sidokolumnerna inte ryms. Räcker inte ens golvet sänks
    --lb-scale bara så mycket som behövs (fitBreakColumn) — sidokolumnerna
    klipps aldrig — och går tillbaka när rutan tonats bort.
+   Min-kolumnen (issue #153) mäts bort på samma sätt under sökningen
+   (klassen lb-field--min tas av, kolumnens delar är då display:none), så
+   --lb-scale är exakt den som samma planering utan minuter får. Bryts
+   stegen sedan av den smalare bredden krymps bara Lektionsordning
+   (--lb-steps-scale), aldrig resten av tavlan.
    ============================================================ */
 
 /* Den smala kolumnens bredd, som andel av mittenraden. Taket 0.30 är
@@ -514,6 +546,7 @@ function fitBoard(fitEl, praiseBoard = null) {
   const breakEl = midEl?.querySelector(".lb-break");
   const stepsEl = midEl?.querySelector(".lb-field--attGora");
   const breakOnly = midEl?.classList.contains("lb-col--break-only");
+  const minEl = stepsEl?.classList.contains("lb-field--min") ? stepsEl : null;
   // Mittenkolumnens egna skalor (och den smala kolumnens bredd) börjar om
   // (även när rutan har tonats bort).
   midEl?.style.removeProperty("--lb-steps-scale");
@@ -531,6 +564,8 @@ function fitBoard(fitEl, praiseBoard = null) {
   // luft tas bort när rutan står i kolumnen) inte gäller under mätningen —
   // annars blev --lb-scale olika med och utan ruta (issue #144).
   else if (breakEl) breakEl.classList.add("lb-break--off");
+  // Min-kolumnen (issue #153) likaså: utan klassen är fältet som utan minuter.
+  minEl?.classList.remove("lb-field--min");
   let scale = searchScale(1, () => !overflows(boardEl), setScale);
   if (withPraise) {
     praiseBoard.fit();
@@ -540,15 +575,16 @@ function fitBoard(fitEl, praiseBoard = null) {
     }
   }
   boardEl.dataset.scale = scale.toFixed(2);
+  minEl?.classList.add("lb-field--min");
   if (breakOnly) {
     // Kolumnen utan ruta (den har tonats bort) kommer inte tillbaka.
     if (breakEl) fitBreakOnly(boardEl, midEl, breakEl, midSpot, { scale, setScale, praiseBoard: withPraise ? praiseBoard : null });
     return;
   }
-  if (!breakEl) return;
-  breakEl.classList.remove("lb-break--off");
+  if (!breakEl && !minEl) return;
+  if (breakEl) breakEl.classList.remove("lb-break--off");
 
-  // 2. Rutan + Lektionsordning i mittenkolumnen: bara de krymps.
+  // 2. Rutan och/eller Min-kolumnen + Lektionsordning i mittenkolumnen: bara de krymps.
   const setVar = (name) => (s) => {
     if (s >= 1) midEl.style.removeProperty(name);
     else midEl.style.setProperty(name, s.toFixed(3));
@@ -560,8 +596,17 @@ function fitBoard(fitEl, praiseBoard = null) {
   // nederkant — ett horisontellt överflöd i rutan (t.ex. den stora
   // timern) är rutans sak, inte stegens.
   // Markeringen (issue #146) räknas aldrig in: samma skalor med och utan.
+  // Med Min-kolumnen räknas även stegens bredd: ett långt ord i den smalare
+  // kolumnen får inte gå in under minuterna (issue #153).
+  const minRows = minEl ? [...minEl.querySelectorAll(".lb-steps > li")] : [];
   const fits = () => !overflows(midEl, null, { x: false })
+    && minRows.every((li) => li.scrollWidth <= li.clientWidth + 1)
     && (!lastStep || stepsWithin(lastStep.getBoundingClientRect().bottom, midEl.getBoundingClientRect().bottom));
+  if (!breakEl) {
+    const steps = searchScale(1, fits, setVar("--lb-steps-scale"));
+    midEl.dataset.stepsScale = steps.toFixed(2);
+    return;
+  }
   const breakFits = () => !overflows(breakEl);
   // Rutan är densamma i förhandsvisningen och på elevskärmen (lärarens
   // knappar sitter i sidopanelen sedan issue #144), så skalorna blir lika.
@@ -845,7 +890,8 @@ const ADV_TAG = `<span class="adv-tag">Avancerat</span>`;
 /**
  * `advanced` = växeln "Avancerat" (issue #149). Av: Efter rasten och Bra
  * jobbat (ADVANCED_FIELD_KEYS) och stegningens plats under Lektionsordning
- * renderas inte. På: samma HTML som före #149, plus etiketterna.
+ * renderas inte. På: samma HTML som före #149, plus etiketterna och
+ * platsen för "Minuter per steg" (issue #153, renderStepMins).
  */
 function fieldsHTML(plan, { advanced = false } = {}) {
   const keys = advanced ? FIELD_KEYS : FIELD_KEYS.filter((k) => !ADVANCED_FIELD_KEYS.includes(k));
@@ -858,8 +904,11 @@ function fieldsHTML(plan, { advanced = false } = {}) {
     const input = multi
       ? `<textarea data-field="${k}" rows="${k === "attGora" ? 4 : 2}" placeholder="En rad per punkt">${esc(val)}</textarea>`
       : `<input type="text" data-field="${k}" value="${esc(val)}" autocomplete="off">`;
-    // Lektionsordning: stegningen i stunden under textfältet (issue #146, renderStepRun).
-    const run = k === "attGora" && advanced ? `<div class="field-edit__run" data-el="step-run" hidden></div>` : "";
+    // Lektionsordning: minuter per steg (issue #153, renderStepMins) och
+    // stegningen i stunden (issue #146, renderStepRun) under textfältet.
+    const run = k === "attGora" && advanced
+      ? `<div class="field-edit__mins" data-el="step-mins" hidden></div><div class="field-edit__run" data-el="step-run" hidden></div>`
+      : "";
     return `<div class="field-edit${on ? "" : " field-edit--off"}" data-fieldwrap="${k}">
       <div class="field-edit__head">
         <label><input type="checkbox" data-show="${k}" ${on ? "checked" : ""}> ${esc(part.label.toUpperCase())}</label>
@@ -911,6 +960,23 @@ function breakFieldHTML(plan, on) {
   </div>`;
 }
 
+/** "Minuter per steg" (issue #153): en rad per steg (nummer, text kortad
+    med ellips, sifferfält 1–90). Felet visas vid fältet och sparas inte.
+    Ingenting utan steg. Bara med Avancerat på — platsen finns annars inte. */
+function stepMinsHTML(np) {
+  const steps = ordningSteps(np.fields);
+  if (steps.length === 0) return "";
+  const mins = stepMinutes(np.fields);
+  const rows = steps.map((s, i) => `<li class="field-edit__mins-row">
+        <span class="field-edit__mins-step" title="${esc(s)}">${i + 1}. ${esc(s)}</span>
+        <input type="number" class="field-edit__mins-min" data-el="plan-min" data-step="${i}" min="${STEP_MIN_MIN}" max="${STEP_MIN_MAX}" step="1" inputmode="numeric" value="${mins[i] ?? ""}" aria-label="Minuter för steg ${i + 1}" aria-describedby="plan-min-error-${i}">
+        <p class="field-edit__run-error" id="plan-min-error-${i}" data-el="plan-min-error" role="alert" hidden>${esc(STEP_MIN_ERROR)}</p>
+      </li>`).join("");
+  return `<div class="field-edit__mins-head"><span>Minuter per steg</span>${ADV_TAG}</div>
+    <ol class="field-edit__mins-list">${rows}</ol>
+    <p class="field-edit__mins-sum" data-el="plan-sum" aria-live="polite">${esc(plannedText(np))}</p>`;
+}
+
 /** Lektionsordning i stunden (issue #146): Föregående/Nästa steg, status
     och timern på det pågående steget. Bara med steg och när Lektionsordning
     syns på tavlan. Samma knappstil som Efter rastens "+1 min"/"Dölj nu".
@@ -929,9 +995,15 @@ function stepRunHTML(np, now) {
         <button type="button" class="btn" data-act="step-stop" title="Ta bort timern — steget förblir markerat">Stoppa timer</button>
       </div>`;
   } else if (active != null) {
+    // Planerade minuter (issue #153): "Starta N min" först — samma mekanism
+    // som snabbknapparna. Ingenting startar av sig självt.
+    const planned = stepMinutes(np.fields)[active];
+    const plannedBtn = planned != null
+      ? `<button type="button" class="btn" data-act="step-timer" data-min="${planned}">Starta ${planned} min</button>\n        `
+      : "";
     timerPart = `<p class="field-edit__hint field-edit__run-ask">Timer på det här steget?</p>
       <div class="field-edit__run-row">
-        ${STEP_QUICK_MIN.map((m) => `<button type="button" class="btn" data-act="step-timer" data-min="${m}">${m} min</button>`).join("")}
+        ${plannedBtn}${STEP_QUICK_MIN.map((m) => `<button type="button" class="btn" data-act="step-timer" data-min="${m}">${m} min</button>`).join("")}
         <input type="number" class="field-edit__run-min" data-el="step-min" min="${STEP_MIN_MIN}" max="${STEP_MIN_MAX}" step="1" inputmode="numeric" placeholder="min" aria-label="Egna minuter (${STEP_MIN_MIN}–${STEP_MIN_MAX})" aria-describedby="step-min-error">
         <button type="button" class="btn" data-act="step-timer">Starta</button>
       </div>
@@ -1051,8 +1123,9 @@ function teacherHTML({ advanced = false } = {}) {
 
 /** Exporterade för docs/test-widgets.mjs (widgets följer med planeringen),
     docs/test-lektionsordning.mjs (tavlans HTML, issue #146) och
-    docs/test-lektion-advanced.mjs (sidopanelen med och utan Avancerat, #149). */
-export { normalizePlan, boardHTML, breakBoxHTML, fieldsHTML, stepRunHTML, teacherHTML, advancedUsedHTML };
+    docs/test-lektion-advanced.mjs (sidopanelen med och utan Avancerat, #149;
+    minuter per steg, #153). */
+export { normalizePlan, boardHTML, breakBoxHTML, fieldsHTML, stepRunHTML, stepMinsHTML, teacherHTML, advancedUsedHTML };
 
 export default {
   id: "lektion",
@@ -1466,6 +1539,42 @@ export default {
       box.innerHTML = html;
       box.hidden = !html;
     }
+    // "Minuter per steg" (issue #153): stepMinsHTML ovan. Listan byggs om
+    // bara när stegen ändras (eller planeringen byts) — annars tappar
+    // minutfältet det läraren skriver. Summan uppdateras varje gång.
+    let stepMinsShown = { box: null, key: null };
+    function renderStepMins() {
+      const box = fieldsEl.querySelector('[data-el="step-mins"]');
+      if (!box) return;
+      const p = editingPlan();
+      const np = p ? normalizePlan(p) : null;
+      const key = np ? JSON.stringify(ordningSteps(np.fields)) : "";
+      if (stepMinsShown.box !== box || stepMinsShown.key !== key) {
+        stepMinsShown = { box, key };
+        const html = np ? stepMinsHTML(np) : "";
+        box.innerHTML = html;
+        box.hidden = !html;
+        return;
+      }
+      const sum = box.querySelector('[data-el="plan-sum"]');
+      const text = np ? plannedText(np) : "";
+      if (sum && sum.textContent !== text) sum.textContent = text;
+    }
+    /** Ett minutfält ändrades: tomt → null, 1–90 → sparas, annars felet vid fältet. */
+    async function setPlanMinute(input) {
+      const p = editingPlan();
+      if (!p) return;
+      const v = input.value.trim();
+      const min = v === "" && !input.validity?.badInput ? null : parseStepMinutes(v);
+      const bad = min == null && (v !== "" || input.validity?.badInput);
+      const err = input.parentElement.querySelector('[data-el="plan-min-error"]');
+      if (err) err.hidden = !bad;
+      input.setAttribute("aria-invalid", String(bad));
+      if (bad) return;
+      const np = normalizePlan(p);
+      await patchEditing({ fields: { ...np.fields, attGoraMin: setStepMinutes(np.fields, Number(input.dataset.step), min) } });
+      renderPreview();
+    }
     // -- Avancerat (issue #149) --
     /** Raden "Den här planeringen använder …" — bara med växeln av. */
     function renderAdvancedUsed() {
@@ -1487,6 +1596,7 @@ export default {
         fieldsEl.innerHTML = fieldsHTML(normalizePlan(p), { advanced });
         mountFieldPraise();
       }
+      renderStepMins();
       renderStepRun();
       renderAdvancedUsed();
     }
@@ -1720,6 +1830,7 @@ export default {
       else { chipHost.destroy(); stageEl.innerHTML = `<div class="lesson-empty"><h1>Ingen planering</h1><p>Skapa en ny planering för att börja.</p></div>`; }
       renderPresentState();
       renderSummaries();
+      renderStepMins();
       renderStepRun();
       renderAdvancedUsed();
     }
@@ -2087,6 +2198,8 @@ export default {
 
       // Stegtimerns minutfält (issue #146) sparas inte — felet försvinner när läraren ändrar.
       if (e.target.dataset.el === "step-min") { showStepMinError(false); return; }
+      // Minuter per steg (issue #153).
+      if (e.target.dataset.el === "plan-min") { await setPlanMinute(e.target); return; }
 
       const metaKey = e.target.dataset.meta;
       if (metaKey === "name") { await patchEditing({ name: e.target.value }); renderList(); renderSummaries(); return; }
@@ -2126,10 +2239,12 @@ export default {
         await patchEditing({ fields: next });
         renderPreview();
         return;
+      } else if (fieldKey === "attGora") {
+        // Minuterna följer sina steg (issue #153, realignMinutes).
+        fields.attGora = e.target.value.split("\n");
+        fields.attGoraMin = realignMinutes(normalizePlan(p).fields.attGora, fields.attGoraMin, fields.attGora);
       } else {
-        fields[fieldKey] = fieldKey === "attGora"
-          ? e.target.value.split("\n")
-          : e.target.value;
+        fields[fieldKey] = e.target.value;
       }
       await patchEditing({ fields });
       renderPreview();

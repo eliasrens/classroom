@@ -507,6 +507,18 @@ teachers/{uid}/classes/{classId}/lessonPlans/{planId}
                          "Klart" — steget går aldrig vidare av sig självt.
                        Inget av de tre följer med i Kopiera eller Skicka
                        kopia (null). (Logik: js/lib/lektionsordning.js.)
+    attGoraMin         — planerade minuter per steg (issue #153): lista lika
+                         lång som attGora (raderna, även tomma) med ett
+                         heltal 1–90 eller null per rad. Saknas fältet, har
+                         det fel längd (fylls på med null / kapas), ett
+                         ogiltigt värde eller en tom rad → null. Minuterna
+                         följer sina steg när textfältet ändras (samma text
+                         behåller sina minuter, en rad redigerad på sin plats
+                         behåller platsens, nya steg får null). Visas i en
+                         smal Min-kolumn på tavlan när minst ett steg har
+                         minuter. Del av planeringen: följer med i Kopiera
+                         och Skicka kopia och rensas aldrig av lärarvyns
+                         nollställning. Startar aldrig någon timer själva.
   show: { … }        — vilka fält som visas på tavlan; show.praise = visa
                        "Bra jobbat"-rutan i högerkolumnen (namnen läses ur
                        den LOKALA classes/{id}/praise/board — elevdata,
